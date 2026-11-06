@@ -160,8 +160,15 @@ namespace RestoreCastle3D
                     + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회 (리롤 불가)";
         }
 
-        /// <summary>월드 커서의 XZ를 클릭 배치와 낙하 미리보기에 동일하게 사용한다.</summary>
+        /// <summary>화면 좌표의 XZ가 배치 영역 안에 있으면 실제 배치 위치를 반환한다.</summary>
         private bool TryGetPlacementXZ(Vector2 screen, out Vector3 position)
+        {
+            if (!TryGetCursorXZ(screen, out position)) return false;
+            return CanPlaceAt(position);
+        }
+
+        /// <summary>UI 밖 화면 좌표를 배치 가능 여부와 관계없이 월드 XZ로 변환한다.</summary>
+        private bool TryGetCursorXZ(Vector2 screen, out Vector3 position)
         {
             position = default;
             if (screen.x < 0f || screen.y < 0f ||
@@ -173,8 +180,19 @@ namespace RestoreCastle3D
             Plane referencePlane = new Plane(Vector3.up, Vector3.zero);
             if (!referencePlane.Raycast(viewRay, out float distance)) return false;
             position = viewRay.GetPoint(distance);
-            return _placementBounds.Contains(
-                new Vector3(position.x, groundY, position.z));
+            return true;
+        }
+
+        /// <summary>월드 XZ가 바닥 범위와 원형 배치 영역에 모두 포함되는지 확인한다.</summary>
+        private bool CanPlaceAt(Vector3 position)
+        {
+            if (!_placementBounds.Contains(new Vector3(position.x, groundY, position.z)))
+                return false;
+
+            Vector2 center = new Vector2(_placementBounds.center.x, _placementBounds.center.z)
+                + PlacementCenterOffset;
+            Vector2 offset = new Vector2(position.x, position.z) - center;
+            return offset.sqrMagnitude <= PlacementRadius * PlacementRadius;
         }
 
         /// <summary>선택한 자재의 실제 프리팹으로 -Y 방향 Raycast 낙하 예상 위치를 표시한다.</summary>
@@ -183,14 +201,16 @@ namespace RestoreCastle3D
             Mouse mouse = Mouse.current;
             if (mouse == null || _selected < 0 || mouse.rightButton.isPressed ||
                 _offers[_selected] == null ||
-                !TryGetPlacementXZ(mouse.position.ReadValue(), out Vector3 placement))
+                !TryGetCursorXZ(mouse.position.ReadValue(), out Vector3 placement))
             {
                 HideDropPreview();
                 return;
             }
 
+            bool canPlace = CanPlaceAt(placement);
             _dropPreview.Show(_offers[_selected], placement,
-                Quaternion.Euler(0f, _objectYaw, 0f), dropHeight);
+                Quaternion.Euler(0f, _objectYaw, 0f), dropHeight,
+                canPlace, _placementBounds.max.y);
 
             if (_dropPreview.IsVisible)
             {
@@ -199,7 +219,7 @@ namespace RestoreCastle3D
                 Vector3 screenTarget = _camera.WorldToScreenPoint(_dropPreview.LandingPosition);
                 if (launchTarget.z > 0f && screenTarget.z > 0f)
                     _hud.ShowDropGuide(new Vector2(launchTarget.x, launchTarget.y),
-                        new Vector2(screenTarget.x, screenTarget.y));
+                        new Vector2(screenTarget.x, screenTarget.y), canPlace);
                 else
                     _hud.HideDropGuide();
             }
@@ -323,6 +343,8 @@ namespace RestoreCastle3D
         public int CurrentStageRound => _awaitingStage ? ROUNDS_PER_STAGE : _turn % ROUNDS_PER_STAGE + 1;
         public int PlacementsPerRound => PLACEMENTS_PER_ROUND;
         public float RotationSpeed { get; set; } = 90f;
+        public Vector2 PlacementCenterOffset { get; set; }
+        public float PlacementRadius { get; set; } = 9f;
         public int PlacementsThisRound => _placementsInRound;
         // The palette hides after each real drop; Esc/right-click reopens it.
         public bool IsRoundPlacing => _resolving || !_paletteOpen;

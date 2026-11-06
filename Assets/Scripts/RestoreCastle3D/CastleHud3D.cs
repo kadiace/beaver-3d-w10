@@ -176,10 +176,14 @@ namespace RestoreCastle3D
                 + Vector2.down * hideDistance * eased;
         }
 
-        /// <summary>실제 낙하 시작점과 현재 미리보기의 화면 좌표를 실시간 점선으로 연결한다.</summary>
-        public void ShowDropGuide(Vector2 launchScreen, Vector2 landingScreen)
+        /// <summary>낙하 시작점과 미리보기를 잇고 배치 가능 여부에 따라 점선 색을 바꾼다.</summary>
+        public void ShowDropGuide(Vector2 launchScreen, Vector2 landingScreen, bool canPlace)
         {
             if (_dropGuide == null) return;
+            Color guideColor = canPlace
+                ? new Color(0.33f, 0.96f, 0.92f, 0.86f)
+                : new Color(1f, 0.18f, 0.18f, 0.86f);
+            if (_dropGuide.color != guideColor) _dropGuide.color = guideColor;
             if (!_dropGuide.gameObject.activeSelf) _dropGuide.gameObject.SetActive(true);
             _dropGuide.SetScreenEndpoints(launchScreen, landingScreen);
         }

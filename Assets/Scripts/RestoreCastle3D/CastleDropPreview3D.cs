@@ -12,18 +12,22 @@ namespace RestoreCastle3D
     {
         private const float VisualOffset = 0.025f;
         private const float MaximumRayDistance = 500f;
+        private static readonly Color _invalidTint = new Color(1f, 0.18f, 0.18f, 0.55f);
 
         private readonly List<Material> _previewMaterials = new List<Material>();
+        private readonly List<Color> _validTints = new List<Color>();
         private GameObject _instance;
         private string _materialId;
         private float _colliderBottomY;
+        private bool? _lastCanPlace;
 
         /// <summary>활성 고스트의 실제 표시 중심 위치. 화면 점선의 도착점으로 사용한다.</summary>
         public bool IsVisible => _instance != null && _instance.activeSelf;
         public Vector3 LandingPosition => _instance != null ? _instance.transform.position : Vector3.zero;
 
         /// <summary>해당 자재의 미리보기 복제본을 준비하고 접촉면 바로 위에 표시한다.</summary>
-        public void Show(CastleMaterial3D info, Vector3 placement, Quaternion rotation, float dropHeight)
+        public void Show(CastleMaterial3D info, Vector3 placement, Quaternion rotation,
+            float dropHeight, bool canPlace, float fallbackGroundY)
         {
             if (info == null) { Hide(); return; }
             if (_instance == null || _materialId != info.id)
@@ -33,20 +37,37 @@ namespace RestoreCastle3D
             // Use the same fixed XZ as the real drop; trace vertically from above
             // the launch plane onto the first physical surface at this point.
             Vector3 origin = new Vector3(placement.x, dropHeight + 5f, placement.z);
-            if (!Physics.Raycast(origin, Vector3.down, out RaycastHit hit,
-                    MaximumRayDistance, Physics.DefaultRaycastLayers,
-                    QueryTriggerInteraction.Ignore))
+            bool hasHit = Physics.Raycast(origin, Vector3.down, out RaycastHit hit,
+                MaximumRayDistance, Physics.DefaultRaycastLayers,
+                QueryTriggerInteraction.Ignore);
+            if (!hasHit && canPlace)
             {
                 Hide();
                 return;
             }
 
+            float surfaceY = hasHit ? hit.point.y : fallbackGroundY;
             _instance.transform.SetPositionAndRotation(
                 new Vector3(placement.x,
-                    hit.point.y - _colliderBottomY + VisualOffset,
+                    surfaceY - _colliderBottomY + VisualOffset,
                     placement.z),
                 rotation);
+            SetTint(canPlace);
             if (!_instance.activeSelf) _instance.SetActive(true);
+        }
+
+        /// <summary>배치 가능 여부가 바뀌면 복제 머티리얼을 기본 색 또는 경고색으로 전환한다.</summary>
+        private void SetTint(bool canPlace)
+        {
+            if (_lastCanPlace == canPlace) return;
+            for (int i = 0; i < _previewMaterials.Count; i++)
+            {
+                Material material = _previewMaterials[i];
+                Color tint = canPlace ? _validTints[i] : _invalidTint;
+                if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", tint);
+                if (material.HasProperty("_Color")) material.SetColor("_Color", tint);
+            }
+            _lastCanPlace = canPlace;
         }
 
         /// <summary>배치를 진행할 수 없거나 UI 위에 있을 때 미리보기를 숨긴다.</summary>
@@ -64,6 +85,8 @@ namespace RestoreCastle3D
             foreach (Material material in _previewMaterials)
                 if (material != null) Object.Destroy(material);
             _previewMaterials.Clear();
+            _validTints.Clear();
+            _lastCanPlace = null;
         }
 
         /// <summary>그리기용 프리팹만 복제하고 물리·게임 로직은 비활성화한다.</summary>
@@ -130,6 +153,7 @@ namespace RestoreCastle3D
                     clone.DisableKeyword("_ALPHATEST_ON");
                     clone.renderQueue = (int)RenderQueue.Transparent;
                     _previewMaterials.Add(clone);
+                    _validTints.Add(tint);
                     transparent[i] = clone;
                 }
                 renderer.sharedMaterials = transparent;
