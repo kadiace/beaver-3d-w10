@@ -20,20 +20,31 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 - 다섯 번째 기물이 생성되면 추가 드랍을 잠그고 **해당 라운드에서 진행 중인 5개 낙하 처리가 모두 끝난 후** 내구도 정산/주기적 성장/스테이지 판정을 라운드당 1회 실행합니다. 배치 진행도는 상단 ROUND 및 상태 패널에 표시합니다.
 - 후보가 선택되지 않았거나 패널·팝업 위에 마우스가 있으면 미리보기 및 점선을 숨깁니다.
 
-## 스테이지 홍수 연출과 비동기 정리
+## 스테이지 홍수 연출과 접촉 판정
 
-- 다섯 번째 라운드가 정산되면 **파란색 반투명 홍수 큐브**가 카메라의 화면과 건축물 범위를 덮으며 **+Z → -Z** 방향으로 서서히 확장됩니다. 물의 표면 높이는 해당 스테이지의 제거 기준(`max(stageCullHeight, 최하단 Y + bottomLayerHeight)`)에 맞춥니다.
-- 홍수가 시작되는 프레임에 모든 살아 있는 기물의 위치를 메인 스레드에서 단 한 번 캡처하고, `Task.Run`으로 `float[]`의 제거 후보 탐색을 병렬 실행합니다. **백그라운드 스레드는 Transform·Collider·GameObject에 접근하지 않습니다.**
-- **물 채우기와 후보 탐색이 모두 완료될 때까지** 제거하지 않습니다. 물이 먼저 가득 차면 100% 채운 상태를 유지하며 계산 종료를 기다립니다.
-- 두 작업이 끝난 뒤 메인 스레드에서 후보 기물을 제거하고, 물을 **-Y 방향으로 빠르게 내려** 사라지게 한 후 스테이지 결과 팝업을 표시합니다.
-- 이 과정에서는 신규 드랍 및 접촉 파괴 처리를 일시 중지합니다. 연결된 덩쿨과 대상의 전체 그룹 제거 후보도 워커가 계산합니다. 처리 후 보강력 재계산은 한 번만 수행하며, `HashSet`으로 접촉 이웃 탐색 시 생존 기물 조회 비용을 줄였습니다.
-- `CastleGame3D`의 `floodFillDuration`, `floodDrainDuration`, `floodFillCurve`로 연출을 조절할 수 있습니다.
+- 다섯 번째 라운드가 정산되면 **파란색 반투명 홍수 큐브**가 강바닥 전체와 카메라 화면 및 건축물 범위를 덮으며 **+Z → -Z** 방향으로 확장됩니다. 물 표면의 높이는 `max(stageCullHeight, 최하단 비기반 자재의 루트 Y + bottomLayerHeight)`로 정합니다. 이 높이는 홍수 영역의 윗면을 정하며, 자재 제거 자체는 루트 높이로 판정하지 않습니다.
+- 홍수 큐브의 콜라이더는 비활성 상태로 두고, 매 프레임 새로 채워진 구간에 `Physics.OverlapBox`를 실행합니다. 해당 구간과 자재 콜라이더가 겹치면 그 자재를 접촉 대상으로 기록합니다. 이미 채워진 구간은 다시 검사하지 않습니다.
+- 홍수가 끝까지 찬 뒤 접촉 대상으로 기록된 자재를 제거합니다. 기반은 제거 대상에서 제외하며, 덩굴로 영구 부착된 자재는 기존 규칙대로 접촉 대상의 연결 묶음 전체를 함께 제거합니다.
+- 판정은 메인 스레드에서 수행하고 Transform·Collider·GameObject를 백그라운드 작업에 전달하지 않습니다. 홍수 큐브는 시각 효과로만 사용하며 자재를 밀거나 물리적으로 움직이지 않습니다.
+- 제거 후 홍수를 **-Y 방향으로 빠르게 내려** 사라지게 하고 스테이지 결과를 표시합니다. 이 과정에서는 신규 드랍 및 접촉 파괴 처리를 일시 중지합니다. 제거 후 점수 재계산은 한 번 수행합니다.
+- `CastleGame3D`의 `floodFillDuration`, `floodDrainDuration`, `floodFillCurve`로 연출을 조절합니다.
+
+## 홍수 파괴 미리보기
+
+- **Tab**을 누르면 홍수 미리보기를 켜고 다시 누르면 끕니다. 새 입력은 `InputSystem_Actions.inputactions`의 `Player/ToggleFloodPreview`에 `<Keyboard>/tab`으로 저장하며 `Managers.Input`으로 읽습니다.
+- 현재 수면 높이에서 강바닥 전체를 덮도록 기존 홍수 오브젝트를 완전히 채운 상태로 표시합니다. 미리보기 중에도 자재 배치, 카메라 이동과 줌을 사용할 수 있습니다.
+- 실제 홍수와 같은 영역 계산과 콜라이더 접촉 조회를 사용합니다. 기반은 제외하고, 직접 접촉한 자재와 덩굴로 영구 부착되어 함께 제거될 자재를 모두 붉게 표시합니다. 접촉 버퍼가 가득 차면 확장해서 재조회하므로 많은 자재가 겹쳐 있어도 누락하지 않습니다.
+- 켜는 순간 즉시 계산하며 활성 상태에서는 기본 0.1초 간격으로 갱신합니다. 자재 생성·제거·영구 부착 직후에는 다음 프레임에 갱신합니다. 현재 위치와 회전, 연결 상태를 기준으로 한 예상이며 실제 홍수 진행 중 움직임에 따라 결과는 달라질 수 있습니다.
+- 파괴 예상 자재의 메시를 깊이 가림 없이 마스크에 그리고, 물의 투명 렌더링 이후 붉은색을 한 번 합성합니다. 다른 자재나 물에 가려진 부분도 붉은 실루엣으로 보이며 여러 대상이 겹쳐도 색 농도는 일정합니다. 기존 재질과 호버 외곽선의 상태는 별도로 유지합니다.
+- 실제 홍수 시작, 재시작, 스테이지 전환, 게임 종료, 규칙 창 열기 시에는 미리보기를 자동으로 종료합니다. 미리보기는 자재를 제거하거나 점수와 라운드를 변경하지 않습니다.
+- 강조 색과 불투명도는 `Assets/Settings/CastleFloodPreview.mat`의 **Tint Color**와 **A**로 조절합니다(초기 A=0.7). 갱신 간격은 Game 씬의 Main Camera에 배치된 `CastleFloodPreview3D`의 **Refresh Interval**로 조절합니다.
+- PC와 Mobile Renderer에 `CastleFloodPreviewFeature`를 등록해 표시 재질을 연결합니다. UI는 붉은색 합성 이후 정상 표시됩니다.
 
 ## 덩쿨 영구 부착과 특수능력 무효화
 
 - `growing_vine`(성장 덩쿨)와 3라운드 주기로 생성되는 `vine`(덩쿨)은 **최초로 닿은 기물 한 개에 `FixedJoint`로 영구 결합**합니다. 이미 부착한 덩쿨은 다른 기물에 다시 부착하지 않습니다.
 - 붙잡힌 기물은 **게임 월드에 계속 남고 고유 기본 내구도 유지**하지만 자체 특수능력 및 그 능력으로 얻는 추가 내구도는 비활성화합니다. 덩쿨은 대상의 **기본 내구도 수치만큼 자신의 영구 보너스**를 얻습니다(상대 기본 내구도는 감소하지 않음).
-- 붙은 쌍은 물리적으로 같이 이동하며, 홍수 시 연결된 한 기물이라도 제거 높이 아래이면 부착된 전체 묶음을 함께 제거합니다. 홍수 백그라운드 계산에는 숫자 배열로 부착 묶음 ID를 전달합니다.
+- 붙은 쌍은 물리적으로 같이 이동합니다. 홍수에 닿은 자재가 있으면 기존 영구 부착 규칙에 따라 연결된 자재 묶음 전체를 함께 제거합니다.
 - `foul_smelling_lump`(고약한 냄새가 나는 덩어리)와 덩쿨이 닿으면 **덩쿨이 우선 부착**하고 덩어리의 접촉 파괴 능력을 봉인합니다. 그 결과 덩쿨은 덩어리에 파괴되지 않습니다.
 - 기반(`foundation`)은 스테이지 시스템상 홍수 제거 예외이므로 덩쿨 영구 부착 대상에서도 제외합니다.
 
@@ -45,7 +56,7 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 - 인접 기물에 따른 내구도, 기간·성장 보너스, 덩굴 파괴·흡수, 폐기물 봉지의 접촉 거리 효과를 3D 접촉 기준으로 계산합니다.
 - 오크통은 **처음 물리 충돌한 후 3초 뒤 폭발**해 반경 2.5 이내 주변 기물의 Rigidbody에 거리 기반 폭발 충격(`AddExplosionForce`)을 줍니다. **오크통 자신과 주변 기물 모두 삭제되지 않습니다.** 첫 충돌에는 바닥도 포함됩니다. Inspector의 `barrelExplosionImpulse`(기본 18), `barrelExplosionUpwardsModifier`(기본 0.6)로 힘을 조절합니다. 오크통은 한 번만 폭발하며, 폭발 완료 후에는 점화 대기 상태가 해제되어 이후 라운드 정산에서 불필요하게 기다리지 않습니다.
 - **스테이지당 5라운드, 라운드당 5개 배치**합니다(총 5스테이지, 최대 125개 직접 배치). 현재 남은 기물의 내구도 합계로 목표 내구도(45 × 스테이지²)를 판정하며, 과거 라운드의 내구도는 누적하지 않습니다. 살아있는 나무의 후보 등장 확률은 기존의 절반입니다.
-- 스테이지 종료 시 최하단 기물 중심 Y를 확인해 `max(-1.25, 최하단 Y + 0.8)`을 제거 경계로 사용합니다. 그 경계보다 낮은 기물을 제거해 **약 한 층**만 정리합니다(기반 제외). 기준 하한 `stageCullHeight=-1.25`와 한 층 두께 `bottomLayerHeight=0.8`은 Inspector에서 변경 가능합니다.
+- 스테이지 홍수의 윗면은 최하단 비기반 자재의 루트 Y와 `bottomLayerHeight`를 기준으로 정합니다. Inspector 기본값은 `stageCullHeight=-1.75`, `bottomLayerHeight=0.4`이며, 이 값은 홍수의 공간 범위에만 영향을 주고 제거 여부는 자재 콜라이더 접촉으로 판정합니다.
 - 배치 보조 Plane/바닥 메시가 화면에 보이지 않도록 했으며, 중력 낙하를 받쳐 주는 **보이지 않는 물리 바닥 콜라이더**는 유지합니다.
 - `Assets/Resources/Materials/HighFriction.physicMaterial`: 정지 마찰 1.5, 동적 마찰 1.2, Maximum 결합, 반발 0. 런타임 Rigidbody linearDamping=2, angularDamping=5.
 - `Assets/Resources/Textures/BlockPixel8.tga`: 공용 8×8 픽셀 패턴, Point 필터링 및 mipmap 비활성화.
@@ -61,7 +72,10 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 - `Assets/Scripts/RestoreCastle3D/` — 게임 상태, 3D 접촉, 능력 및 점수 계산
 - `Assets/Scripts/RestoreCastle3D/CastleDropPreview3D.cs` — 실제 자재 프리팹의 반투명 충돌 예상 위치 미리보기(-Y Raycast)
 - `Assets/Scripts/RestoreCastle3D/CastleDropGuideGraphic3D.cs` — 커서부터 미리보기까지 연결하는 점선 UGUI Graphic
-- `Assets/Scripts/RestoreCastle3D/CastleFloodEffect3D.cs` — +Z에서 -Z로 차오르고 -Y로 빠지는 반투명 홍수 연출
+- `Assets/Scripts/RestoreCastle3D/CastleFloodEffect3D.cs` — 실제 홍수와 미리보기가 공유하는 반투명 홍수 표시
+- `Assets/Scripts/RestoreCastle3D/CastleFloodQuery3D.cs` — 공통 홍수 영역·콜라이더 접촉·영구 부착 묶음 판정
+- `Assets/Scripts/RestoreCastle3D/CastleFloodPreview3D.cs` — 카메라별 홍수 미리보기 상태와 주기적 대상 갱신
+- `Assets/Scripts/RestoreCastle3D/CastleFloodPreviewFeature.cs` 및 `CastleFloodPreview.shader` — 파괴 예상 메시의 관통 마스크와 붉은 tint 합성
 - `Assets/Scripts/Scenes/GameSceneContext.cs` — 기존 Game 씬에서 신규 게임 시작
 
 ## 남은 확인

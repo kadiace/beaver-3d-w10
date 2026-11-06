@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
@@ -46,10 +45,12 @@ namespace RestoreCastle3D
             new Dictionary<(CastlePiece3D, CastlePiece3D), int>();
         private readonly HashSet<string> _consumedContacts = new HashSet<string>();
         private readonly CastleMaterial3D[] _offers = new CastleMaterial3D[3];
+        private readonly CastleFloodQuery3D _floodQuery = new CastleFloodQuery3D();
         private CastleCatalog3D _catalog;
         private CastleHud3D _hud;
         private CastleDropPreview3D _dropPreview;
         private CastleFloodEffect3D _floodEffect;
+        private CastleFloodPreview3D _floodPreview;
         private Bounds _placementBounds;
         private CastleFloatingText3D _floatingText;
         private CastlePiece3D _effectSource;
@@ -85,6 +86,8 @@ namespace RestoreCastle3D
             CreateHud();
             _dropPreview = new CastleDropPreview3D();
             _floodEffect = new CastleFloodEffect3D();
+            _floodPreview = _camera.GetComponent<CastleFloodPreview3D>();
+            _floodPreview.Initialize(this, _floodEffect);
             ResetGame();
         }
 
@@ -97,6 +100,8 @@ namespace RestoreCastle3D
                 _dropMouseReleased = true;
 
             UpdateCameraInput();
+            if (CanPreviewFlood && Managers.Input.FloodPreviewPressed)
+                _floodPreview.Toggle();
             if (!_stageTransitioning)
             {
                 ApplyContactDestruction();
@@ -236,6 +241,7 @@ namespace RestoreCastle3D
 
         private void OnDestroy()
         {
+            if (_floodPreview != null) _floodPreview.Hide();
             SetOutlineTargets(null);
             _dropPreview?.Dispose();
             _floodEffect?.Dispose();
@@ -355,6 +361,7 @@ namespace RestoreCastle3D
             && _paletteOpen && _placementsInRound < PLACEMENTS_PER_ROUND;
         public bool CanReroll => CanSelect && _placementsInRound == 0;
         public bool CanShowItemInfo => !_awaitingStage && !_finished && !_rulesOpen;
+        internal bool CanPreviewFlood => !_stageTransitioning && !_finished && !_rulesOpen;
         public event Action<CastleChange3D> ChangeCommitted;
 
         /// <summary>게임 규칙이 확정한 변화를 위치와 원인을 보존한 채 표시 시스템에 전달한다.</summary>
@@ -453,6 +460,7 @@ namespace RestoreCastle3D
         /// <summary>모든 배치와 소모품 상태를 초기화하고 기본 발판을 배치한다.</summary>
         private void ResetGame()
         {
+            _floodPreview.Hide();
             SetOutlineTargets(null);
             if (_stageFloodRoutine != null)
             {
@@ -508,6 +516,7 @@ namespace RestoreCastle3D
             piece.Body.angularDamping = 5f;
             _pieces.Add(piece);
             _pieceSet.Add(piece);
+            _floodPreview.RequestRefresh();
             if (material.id == "vine")
                 PublishChange(new CastleChange3D(piece, null, CastleChangeKind.Created, 0,
                     position, "덩쿨 생성!"));
@@ -705,6 +714,7 @@ namespace RestoreCastle3D
             // Preserve the target's own base reinforcement while also
             // transferring that same base amount to the vine's permanent bonus.
             vine.PermanentBonus += _catalog.Get(target.MaterialId).baseReinforcement;
+            _floodPreview.RequestRefresh();
         }
 
         /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
@@ -765,16 +775,7 @@ namespace RestoreCastle3D
 
             HashSet<CastlePiece3D> connected = new HashSet<CastlePiece3D>();
             Stack<CastlePiece3D> pending = new Stack<CastlePiece3D>();
-            pending.Push(piece);
-            while (pending.Count > 0)
-            {
-                CastlePiece3D current = pending.Pop();
-                if (current == null || !_pieceSet.Contains(current) || !connected.Add(current))
-                    continue;
-                foreach (CastlePiece3D attached in current.AttachedPieces)
-                    if (attached != null && !connected.Contains(attached))
-                        pending.Push(attached);
-            }
+            CastleFloodQuery3D.CollectAttachmentGroup(piece, _pieceSet, connected, pending);
 
             foreach (CastlePiece3D current in connected)
             {
@@ -786,6 +787,7 @@ namespace RestoreCastle3D
                     current.transform.position));
                 Destroy(current.gameObject);
             }
+            _floodPreview.RequestRefresh();
             return connected.Count;
         }
 
@@ -937,24 +939,16 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// Unity 오브젝트는 메인 스레드에서 스냅샷으로 읽고, 후보 조건 검색만
-        /// float[]와 Task.Run으로 백그라운드에서 수행한다.
+        /// Advances the flood, collects pieces whose colliders overlap each newly filled slab,
+        /// and removes the contacted pieces after the water finishes filling.
         /// </summary>
         private IEnumerator ResolveStageFlood()
         {
-            StageCullSnapshot snapshot = CaptureStageCullSnapshot();
+            CastleFloodVolume3D volume = CaptureFloodVolume();
+            var floodedPieces = new HashSet<CastlePiece3D>();
+            float previousFilledLength = 0f;
 
-            // Stage termination is already locked. Only numeric height arrays
-            // go to a worker: absolutely no Transform, Collider or GameObject calls.
-            float[] heights = snapshot.Heights;
-            float cutoff = snapshot.Cutoff;
-            int[] groups = snapshot.Groups;
-            int groupCount = snapshot.GroupCount;
-            Task<int[]> scan = Task.Run(() => FindCullCandidates(heights, groups, groupCount, cutoff));
-
-            // Water begins filling on the same frame that the task is queued.
-            _floodEffect.Begin(snapshot.CenterX, snapshot.Width,
-                snapshot.StartZ, snapshot.EndZ, cutoff, groundY);
+            _floodEffect.Begin(volume);
 
             float elapsed = 0f;
             while (elapsed < floodFillDuration)
@@ -964,31 +958,15 @@ namespace RestoreCastle3D
                 float eased = floodFillCurve == null ? Mathf.SmoothStep(0f, 1f, fraction)
                     : Mathf.Clamp01(floodFillCurve.Evaluate(fraction));
                 _floodEffect.SetFill(eased);
+                CollectFloodContacts(volume, floodedPieces, previousFilledLength);
+                previousFilledLength = _floodEffect.FilledLength;
                 yield return null;
             }
             _floodEffect.SetFill(1f);
+            CollectFloodContacts(volume, floodedPieces, previousFilledLength);
 
-            // If searching is still in progress, keep the water completely full.
-            if (!scan.IsCompleted)
-                _status = "물이 가득 찼습니다. 침수된 기물을 확인하는 중...";
-            while (!scan.IsCompleted)
-                yield return null;
-
-            int[] cullIndices;
-            if (scan.IsFaulted || scan.IsCanceled)
+            foreach (CastlePiece3D piece in floodedPieces)
             {
-                Debug.LogError("Background stage flood scan failed, retrying on main thread: "
-                    + scan.Exception);
-                cullIndices = FindCullCandidates(heights, groups, groupCount, cutoff);
-            }
-            else
-                cullIndices = scan.Result;
-
-            // Apply Unity object destruction on the main thread after both
-            // the full flood and the worker calculation are complete.
-            foreach (int index in cullIndices)
-            {
-                CastlePiece3D piece = snapshot.Pieces[index];
                 if (piece == null || !_pieceSet.Contains(piece)) continue;
                 RemovePiece(piece, CastleChangeKind.Flooded);
             }
@@ -1017,137 +995,35 @@ namespace RestoreCastle3D
             _status = "홍수가 지나갔습니다. 다음 스테이지를 시작하세요.";
         }
 
-        /// <summary>메인 스레드에서 살아 있는 기물 위치를 한 번만 캡처한다.</summary>
-        private StageCullSnapshot CaptureStageCullSnapshot()
+        /// <summary>
+        /// 공통 접촉 판정으로 현재 새로 채워진 구간의 비기반 자재를 결과에 추가한다.
+        /// 이전 채움 길이와 표시기의 현재 길이를 사용해 실제 홍수의 접촉을 누적한다.
+        /// </summary>
+        private void CollectFloodContacts(CastleFloodVolume3D volume,
+            HashSet<CastlePiece3D> floodedPieces, float previousFilledLength)
         {
-            var pieces = new List<CastlePiece3D>(_pieces.Count);
-            var heights = new List<float>(_pieces.Count);
-            float lowestY = float.PositiveInfinity;
-            float leftX = float.PositiveInfinity;
-            float rightX = float.NegativeInfinity;
-            float nearZ = float.PositiveInfinity;
-            float farZ = float.NegativeInfinity;
-
-            foreach (CastlePiece3D piece in _pieces)
-            {
-                if (piece == null) continue;
-                Vector3 position = piece.transform.position;
-                leftX = Mathf.Min(leftX, position.x);
-                rightX = Mathf.Max(rightX, position.x);
-                nearZ = Mathf.Min(nearZ, position.z);
-                farZ = Mathf.Max(farZ, position.z);
-
-                if (piece.MaterialId == "foundation") continue;
-                pieces.Add(piece);
-                heights.Add(position.y);
-                lowestY = Mathf.Min(lowestY, position.y);
-            }
-
-            float cutoff = float.IsPositiveInfinity(lowestY)
-                ? stageCullHeight
-                : Mathf.Max(stageCullHeight, lowestY + bottomLayerHeight);
-
-            // Snapshot attachment connected components once on the main
-            // thread. The worker receives only immutable int[]/float[] arrays.
-            CastlePiece3D[] snapshotPieces = pieces.ToArray();
-            int[] groups = new int[snapshotPieces.Length];
-            for (int i = 0; i < groups.Length; i++) groups[i] = -1;
-            var indices = new Dictionary<CastlePiece3D, int>(snapshotPieces.Length);
-            for (int i = 0; i < snapshotPieces.Length; i++)
-                indices[snapshotPieces[i]] = i;
-
-            int groupCount = 0;
-            var frontier = new Stack<int>();
-            for (int i = 0; i < snapshotPieces.Length; i++)
-            {
-                if (groups[i] >= 0) continue;
-                groups[i] = groupCount;
-                frontier.Push(i);
-                while (frontier.Count > 0)
-                {
-                    int current = frontier.Pop();
-                    foreach (CastlePiece3D attached in snapshotPieces[current].AttachedPieces)
-                    {
-                        if (attached == null || !indices.TryGetValue(attached, out int j) ||
-                            groups[j] >= 0)
-                            continue;
-                        groups[j] = groupCount;
-                        frontier.Push(j);
-                    }
-                }
-                groupCount++;
-            }
-
-            // Include the whole camera viewport even when the pile is tiny.
-            Plane waterPlane = new Plane(Vector3.up, new Vector3(0f, cutoff, 0f));
-            Vector2[] corners = { Vector2.zero, new Vector2(Screen.width, 0f),
-                new Vector2(0f, Screen.height), new Vector2(Screen.width, Screen.height) };
-            foreach (Vector2 corner in corners)
-            {
-                Ray ray = _camera.ScreenPointToRay(corner);
-                if (!waterPlane.Raycast(ray, out float distance)) continue;
-                Vector3 pos = ray.GetPoint(distance);
-                leftX = Mathf.Min(leftX, pos.x);
-                rightX = Mathf.Max(rightX, pos.x);
-                nearZ = Mathf.Min(nearZ, pos.z);
-                farZ = Mathf.Max(farZ, pos.z);
-            }
-
-            if (float.IsPositiveInfinity(leftX))
-            {
-                leftX = nearZ = -10f;
-                rightX = farZ = 10f;
-            }
-
-            const float margin = 8f;
-            return new StageCullSnapshot(snapshotPieces, heights.ToArray(), groups, groupCount,
-                cutoff, (leftX + rightX) * 0.5f,
-                Mathf.Max(1f, rightX - leftX + margin * 2f),
-                farZ + margin, nearZ - margin);
+            _floodQuery.CollectContacts(volume, previousFilledLength, _floodEffect.FilledLength,
+                _pieceSet, floodedPieces);
         }
 
-        /// <summary>한 기물이라도 침수된 덩쿨 부착 그룹은 전체를 제거 후보로 반환한다.</summary>
-        private static int[] FindCullCandidates(float[] heights, int[] groups,
-            int groupCount, float cutoff)
+        /// <summary>
+        /// 현재 생존 자재, 강바닥, 카메라와 높이 설정으로 공통 홍수 영역을 반환한다.
+        /// 실제 홍수와 미리보기가 같은 공간 범위를 사용하도록 한다.
+        /// </summary>
+        internal CastleFloodVolume3D CaptureFloodVolume()
         {
-            var flooded = new bool[groupCount];
-            for (int i = 0; i < heights.Length; i++)
-                if (heights[i] < cutoff)
-                    flooded[groups[i]] = true;
-
-            var indices = new List<int>();
-            for (int i = 0; i < heights.Length; i++)
-                if (flooded[groups[i]])
-                    indices.Add(i);
-            return indices.ToArray();
+            return CastleFloodQuery3D.Capture(_pieces, _camera, _placementBounds,
+                stageCullHeight, bottomLayerHeight, groundY);
         }
 
-        private sealed class StageCullSnapshot
+        /// <summary>
+        /// 전달된 홍수 영역에서 직접 접촉하거나 영구 부착으로 함께 제거될 자재를 수집한다.
+        /// 결과 집합을 현재 생존 자재 기준으로 갱신하며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        internal void CollectFloodPreviewTargets(CastleFloodVolume3D volume,
+            HashSet<CastlePiece3D> result)
         {
-            public readonly CastlePiece3D[] Pieces;
-            public readonly float[] Heights;
-            public readonly int[] Groups;
-            public readonly int GroupCount;
-            public readonly float Cutoff;
-            public readonly float CenterX;
-            public readonly float Width;
-            public readonly float StartZ;
-            public readonly float EndZ;
-
-            public StageCullSnapshot(CastlePiece3D[] pieces, float[] heights,
-                int[] groups, int groupCount, float cutoff,
-                float centerX, float width, float startZ, float endZ)
-            {
-                Pieces = pieces;
-                Heights = heights;
-                Groups = groups;
-                GroupCount = groupCount;
-                Cutoff = cutoff;
-                CenterX = centerX;
-                Width = width;
-                StartZ = startZ;
-                EndZ = endZ;
-            }
+            _floodQuery.CollectDestructionTargets(volume, _pieceSet, result);
         }
 
         /// <summary>실패 시 재시작하고 통과 시 팝업을 닫아 홍수와 다음 스테이지를 진행한다.</summary>
@@ -1155,6 +1031,7 @@ namespace RestoreCastle3D
         {
             if (!_awaitingStage || _stageTransitioning) return;
             if (!_stagePassed || _finished) { ResetGame(); return; }
+            _floodPreview.Hide();
             _awaitingStage = false;
             _stageTransitioning = true;
             _resolving = true;

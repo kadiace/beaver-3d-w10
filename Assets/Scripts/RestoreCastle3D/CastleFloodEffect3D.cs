@@ -9,32 +9,19 @@ namespace RestoreCastle3D
     /// </summary>
     internal sealed class CastleFloodEffect3D
     {
-        private const float MinimumDepth = 6f;
-
+        [Header("Flood state")]
         private GameObject _water;
         private Material _material;
-        private float _centerX;
-        private float _width;
-        private float _startZ;
-        private float _endZ;
-        private float _centerY;
-        private float _depth;
+        private CastleFloodVolume3D _volume;
         private float _filledLength;
 
-        /// <summary>물 표면이 제거 높이와 일치하도록 지오메트리를 준비한다.</summary>
-        public void Begin(float centerX, float width, float startZ, float endZ,
-            float cutoffY, float groundY)
+        /// <summary>
+        /// 공통 판정에서 받은 영역으로 물의 표시를 준비하고 채움 길이를 0으로 초기화한다.
+        /// </summary>
+        public void Begin(CastleFloodVolume3D volume)
         {
             EnsureWater();
-            _centerX = centerX;
-            _width = Mathf.Max(1f, width);
-            _startZ = startZ;
-            _endZ = Mathf.Min(endZ, startZ - 0.1f);
-
-            float bottomY = Mathf.Min(groundY - MinimumDepth, cutoffY - MinimumDepth);
-            _depth = Mathf.Max(0.1f, cutoffY - bottomY);
-            _centerY = (cutoffY + bottomY) * 0.5f;
-
+            _volume = volume;
             _water.SetActive(true);
             SetFill(0f);
         }
@@ -43,31 +30,39 @@ namespace RestoreCastle3D
         public void SetFill(float fraction)
         {
             if (_water == null) return;
-            _filledLength = (_startZ - _endZ) * Mathf.Clamp01(fraction);
+            _filledLength = _volume.Length * Mathf.Clamp01(fraction);
             // A zero-length cube causes artifacts on some GPUs. Move it offscreen
             // when empty, then grow with the back edge anchored to +Z.
             float length = Mathf.Max(0.001f, _filledLength);
             _water.transform.position = new Vector3(
-                _centerX, _centerY, _startZ - length * 0.5f);
-            _water.transform.localScale = new Vector3(_width, _depth, length);
+                _volume.CenterX, _volume.CenterY, _volume.StartZ - length * 0.5f);
+            _water.transform.localScale = new Vector3(_volume.Width, _volume.Depth, length);
         }
+
+        /// <summary>
+        /// Returns the current filled depth so callers can query only the newly advanced water slab.
+        /// FilledLength is updated by SetFill.
+        /// </summary>
+        public float FilledLength => _filledLength;
 
         /// <summary>가득 찬 물을 빠르게 아래(-Y)로 내려 화면에서 제거한다.</summary>
         public void SetDrain(float fraction)
         {
             if (_water == null) return;
-            float distance = _depth + 18f;
+            float distance = _volume.Depth + 18f;
             _water.transform.position = new Vector3(
-                _centerX,
-                _centerY - distance * Mathf.Clamp01(fraction),
-                _startZ - _filledLength * 0.5f);
+                _volume.CenterX,
+                _volume.CenterY - distance * Mathf.Clamp01(fraction),
+                _volume.StartZ - _filledLength * 0.5f);
         }
 
+        /// <summary>홍수 표시 오브젝트를 비활성화한다. 미리보기 또는 실제 홍수의 화면 표시만 해제한다.</summary>
         public void Hide()
         {
             if (_water != null) _water.SetActive(false);
         }
 
+        /// <summary>생성한 물 오브젝트와 재질을 해제하고 내부 참조를 비운다.</summary>
         public void Dispose()
         {
             if (_water != null) Object.Destroy(_water);
@@ -76,6 +71,7 @@ namespace RestoreCastle3D
             _material = null;
         }
 
+        /// <summary>표시용 물 오브젝트와 투명한 파란 재질을 최초 한 번 준비하고 물리 콜라이더를 비활성화한다.</summary>
         private void EnsureWater()
         {
             if (_water != null) return;

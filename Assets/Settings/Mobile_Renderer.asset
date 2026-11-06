@@ -26,8 +26,9 @@ MonoBehaviour:
     probeSamplingDebugMesh: {fileID: 0}
     probeSamplingDebugTexture: {fileID: 0}
     probeVolumeBlendStatesCS: {fileID: 0}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: 686142327654121948}
+  m_RendererFeatureMap: dc012fc9cfaa8509
   m_UseNativeRenderPass: 1
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 2
@@ -50,3 +51,17 @@ MonoBehaviour:
   m_CopyDepthMode: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &686142327654121948
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fd6c3292b624e58af985f6667776be0, type: 3}
+  m_Name: Castle Flood Preview
+  m_EditorClassIdentifier: Assembly-CSharp::RestoreCastle3D.CastleFloodPreviewFeature
+  m_Active: 1
+  _overlayMaterial: {fileID: 2100000, guid: d361e763fb514117a61dd35de7e7543f, type: 2}

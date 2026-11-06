@@ -12,6 +12,10 @@ public class InputManager
     [Header("Player Mode")]
     public Vector2 MoveInput => _inputMode == InputMode.Player ? PlayerMap.Move.ReadValue<Vector2>() : Vector2.zero;
 
+    /// <summary>플레이 모드에서 에셋에 지정된 홍수 미리보기 입력이 이번 프레임에 눌렸는지 반환한다.</summary>
+    public bool FloodPreviewPressed => _inputMode == InputMode.Player &&
+        PlayerMap.ToggleFloodPreview.WasPressedThisFrame();
+
     [Header("UI Mode")]
     public bool ConfirmPressed => _inputMode == InputMode.UI && UIMap.Click.WasPressedThisFrame();
 
