@@ -389,7 +389,7 @@ namespace RestoreCastle3D
             float scroll = mouse.scroll.ReadValue().y;
             if (Mathf.Abs(scroll) > 0.01f)
                 _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize *
-                    Mathf.Exp(-scroll * 0.0013f), 6f, 13.5f);
+                    Mathf.Exp(-scroll * 0.03f), 6f, 13.5f);
             ClampCameraTarget();
             UpdateCameraPosition();
         }
