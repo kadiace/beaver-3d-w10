@@ -52,6 +52,35 @@ namespace RestoreCastle3D
             _water.transform.localScale = new Vector3(_width, _depth, length);
         }
 
+        /// <summary>
+        /// Returns the current filled depth so callers can query only the newly advanced water slab.
+        /// FilledLength is updated by SetFill.
+        /// </summary>
+        public float FilledLength => _filledLength;
+
+        /// <summary>
+        /// Calculates an axis-aligned overlap box for the portion filled since previousFilledLength.
+        /// Returns false when the fill has not advanced and otherwise outputs its center and half extents.
+        /// </summary>
+        public bool TryGetNewFillSegment(float previousFilledLength,
+            out Vector3 center, out Vector3 halfExtents)
+        {
+            float segmentLength = _filledLength - Mathf.Clamp(previousFilledLength, 0f, _filledLength);
+            if (segmentLength <= 0.0001f)
+            {
+                center = Vector3.zero;
+                halfExtents = Vector3.zero;
+                return false;
+            }
+
+            float previousLength = _filledLength - segmentLength;
+            center = new Vector3(_centerX, _centerY,
+                _startZ - previousLength - segmentLength * 0.5f);
+            halfExtents = new Vector3(_width * 0.5f, _depth * 0.5f,
+                segmentLength * 0.5f);
+            return true;
+        }
+
         /// <summary>가득 찬 물을 빠르게 아래(-Y)로 내려 화면에서 제거한다.</summary>
         public void SetDrain(float fraction)
         {
