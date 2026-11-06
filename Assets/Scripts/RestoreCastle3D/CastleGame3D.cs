@@ -45,10 +45,12 @@ namespace RestoreCastle3D
             new Dictionary<(CastlePiece3D, CastlePiece3D), int>();
         private readonly HashSet<string> _consumedContacts = new HashSet<string>();
         private readonly CastleMaterial3D[] _offers = new CastleMaterial3D[3];
+        private readonly CastleFloodQuery3D _floodQuery = new CastleFloodQuery3D();
         private CastleCatalog3D _catalog;
         private CastleHud3D _hud;
         private CastleDropPreview3D _dropPreview;
         private CastleFloodEffect3D _floodEffect;
+        private CastleFloodPreview3D _floodPreview;
         private Bounds _placementBounds;
         private CastleFloatingText3D _floatingText;
         private CastlePiece3D _effectSource;
@@ -84,6 +86,8 @@ namespace RestoreCastle3D
             CreateHud();
             _dropPreview = new CastleDropPreview3D();
             _floodEffect = new CastleFloodEffect3D();
+            _floodPreview = _camera.GetComponent<CastleFloodPreview3D>();
+            _floodPreview.Initialize(this, _floodEffect);
             ResetGame();
         }
 
@@ -96,6 +100,8 @@ namespace RestoreCastle3D
                 _dropMouseReleased = true;
 
             UpdateCameraInput();
+            if (CanPreviewFlood && Managers.Input.FloodPreviewPressed)
+                _floodPreview.Toggle();
             if (!_stageTransitioning)
             {
                 ApplyContactDestruction();
@@ -215,6 +221,7 @@ namespace RestoreCastle3D
 
         private void OnDestroy()
         {
+            if (_floodPreview != null) _floodPreview.Hide();
             SetOutlineTargets(null);
             _dropPreview?.Dispose();
             _floodEffect?.Dispose();
@@ -332,6 +339,7 @@ namespace RestoreCastle3D
             && _paletteOpen && _placementsInRound < PLACEMENTS_PER_ROUND;
         public bool CanReroll => CanSelect && _placementsInRound == 0;
         public bool CanShowItemInfo => !_awaitingStage && !_finished && !_rulesOpen;
+        internal bool CanPreviewFlood => !_stageTransitioning && !_finished && !_rulesOpen;
         public event Action<CastleChange3D> ChangeCommitted;
 
         /// <summary>게임 규칙이 확정한 변화를 위치와 원인을 보존한 채 표시 시스템에 전달한다.</summary>
@@ -430,6 +438,7 @@ namespace RestoreCastle3D
         /// <summary>모든 배치와 소모품 상태를 초기화하고 기본 발판을 배치한다.</summary>
         private void ResetGame()
         {
+            _floodPreview.Hide();
             SetOutlineTargets(null);
             if (_stageFloodRoutine != null)
             {
@@ -485,6 +494,7 @@ namespace RestoreCastle3D
             piece.Body.angularDamping = 5f;
             _pieces.Add(piece);
             _pieceSet.Add(piece);
+            _floodPreview.RequestRefresh();
             if (material.id == "vine")
                 PublishChange(new CastleChange3D(piece, null, CastleChangeKind.Created, 0,
                     position, "덩쿨 생성!"));
@@ -682,6 +692,7 @@ namespace RestoreCastle3D
             // Preserve the target's own base reinforcement while also
             // transferring that same base amount to the vine's permanent bonus.
             vine.PermanentBonus += _catalog.Get(target.MaterialId).baseReinforcement;
+            _floodPreview.RequestRefresh();
         }
 
         /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
@@ -742,16 +753,7 @@ namespace RestoreCastle3D
 
             HashSet<CastlePiece3D> connected = new HashSet<CastlePiece3D>();
             Stack<CastlePiece3D> pending = new Stack<CastlePiece3D>();
-            pending.Push(piece);
-            while (pending.Count > 0)
-            {
-                CastlePiece3D current = pending.Pop();
-                if (current == null || !_pieceSet.Contains(current) || !connected.Add(current))
-                    continue;
-                foreach (CastlePiece3D attached in current.AttachedPieces)
-                    if (attached != null && !connected.Contains(attached))
-                        pending.Push(attached);
-            }
+            CastleFloodQuery3D.CollectAttachmentGroup(piece, _pieceSet, connected, pending);
 
             foreach (CastlePiece3D current in connected)
             {
@@ -763,6 +765,7 @@ namespace RestoreCastle3D
                     current.transform.position));
                 Destroy(current.gameObject);
             }
+            _floodPreview.RequestRefresh();
             return connected.Count;
         }
 
@@ -919,12 +922,11 @@ namespace RestoreCastle3D
         /// </summary>
         private IEnumerator ResolveStageFlood()
         {
-            StageFloodSnapshot snapshot = CaptureStageFloodSnapshot();
+            CastleFloodVolume3D volume = CaptureFloodVolume();
             var floodedPieces = new HashSet<CastlePiece3D>();
             float previousFilledLength = 0f;
 
-            _floodEffect.Begin(snapshot.CenterX, snapshot.Width,
-                snapshot.StartZ, snapshot.EndZ, snapshot.Cutoff, groundY);
+            _floodEffect.Begin(volume);
 
             float elapsed = 0f;
             while (elapsed < floodFillDuration)
@@ -934,12 +936,12 @@ namespace RestoreCastle3D
                 float eased = floodFillCurve == null ? Mathf.SmoothStep(0f, 1f, fraction)
                     : Mathf.Clamp01(floodFillCurve.Evaluate(fraction));
                 _floodEffect.SetFill(eased);
-                CollectFloodContacts(floodedPieces, previousFilledLength);
+                CollectFloodContacts(volume, floodedPieces, previousFilledLength);
                 previousFilledLength = _floodEffect.FilledLength;
                 yield return null;
             }
             _floodEffect.SetFill(1f);
-            CollectFloodContacts(floodedPieces, previousFilledLength);
+            CollectFloodContacts(volume, floodedPieces, previousFilledLength);
 
             foreach (CastlePiece3D piece in floodedPieces)
             {
@@ -972,112 +974,42 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// Queries the newly filled flood slab and adds overlapping non-foundation pieces
-        /// to floodedPieces, using previousFilledLength to avoid checking old water volume.
+        /// 공통 접촉 판정으로 현재 새로 채워진 구간의 비기반 자재를 결과에 추가한다.
+        /// 이전 채움 길이와 표시기의 현재 길이를 사용해 실제 홍수의 접촉을 누적한다.
         /// </summary>
-        private void CollectFloodContacts(HashSet<CastlePiece3D> floodedPieces,
-            float previousFilledLength)
+        private void CollectFloodContacts(CastleFloodVolume3D volume,
+            HashSet<CastlePiece3D> floodedPieces, float previousFilledLength)
         {
-            if (!_floodEffect.TryGetNewFillSegment(previousFilledLength,
-                out Vector3 center, out Vector3 halfExtents))
-                return;
-
-            Collider[] colliders = Physics.OverlapBox(center, halfExtents,
-                Quaternion.identity, Physics.AllLayers, QueryTriggerInteraction.Ignore);
-            foreach (Collider collider in colliders)
-            {
-                CastlePiece3D piece = collider.GetComponentInParent<CastlePiece3D>();
-                if (piece == null || piece.MaterialId == "foundation" ||
-                    !_pieceSet.Contains(piece))
-                    continue;
-
-                floodedPieces.Add(piece);
-            }
+            _floodQuery.CollectContacts(volume, previousFilledLength, _floodEffect.FilledLength,
+                _pieceSet, floodedPieces);
         }
 
         /// <summary>
-        /// Captures the current piece bounds and computes the flood surface and horizontal extent.
-        /// The returned snapshot stores only the geometry needed by the flood effect.
+        /// 현재 생존 자재, 강바닥, 카메라와 높이 설정으로 공통 홍수 영역을 반환한다.
+        /// 실제 홍수와 미리보기가 같은 공간 범위를 사용하도록 한다.
         /// </summary>
-        private StageFloodSnapshot CaptureStageFloodSnapshot()
+        internal CastleFloodVolume3D CaptureFloodVolume()
         {
-            float lowestY = float.PositiveInfinity;
-            float leftX = float.PositiveInfinity;
-            float rightX = float.NegativeInfinity;
-            float nearZ = float.PositiveInfinity;
-            float farZ = float.NegativeInfinity;
-
-            foreach (CastlePiece3D piece in _pieces)
-            {
-                if (piece == null) continue;
-                Vector3 position = piece.transform.position;
-                leftX = Mathf.Min(leftX, position.x);
-                rightX = Mathf.Max(rightX, position.x);
-                nearZ = Mathf.Min(nearZ, position.z);
-                farZ = Mathf.Max(farZ, position.z);
-
-                if (piece.MaterialId != "foundation")
-                    lowestY = Mathf.Min(lowestY, position.y);
-            }
-
-            float cutoff = float.IsPositiveInfinity(lowestY)
-                ? stageCullHeight
-                : Mathf.Max(stageCullHeight, lowestY + bottomLayerHeight);
-
-            // Include the whole camera viewport even when the pile is tiny.
-            Plane waterPlane = new Plane(Vector3.up, new Vector3(0f, cutoff, 0f));
-            Vector2[] corners = { Vector2.zero, new Vector2(Screen.width, 0f),
-                new Vector2(0f, Screen.height), new Vector2(Screen.width, Screen.height) };
-            foreach (Vector2 corner in corners)
-            {
-                Ray ray = _camera.ScreenPointToRay(corner);
-                if (!waterPlane.Raycast(ray, out float distance)) continue;
-                Vector3 pos = ray.GetPoint(distance);
-                leftX = Mathf.Min(leftX, pos.x);
-                rightX = Mathf.Max(rightX, pos.x);
-                nearZ = Mathf.Min(nearZ, pos.z);
-                farZ = Mathf.Max(farZ, pos.z);
-            }
-
-            if (float.IsPositiveInfinity(leftX))
-            {
-                leftX = nearZ = -10f;
-                rightX = farZ = 10f;
-            }
-
-            const float margin = 8f;
-            return new StageFloodSnapshot(cutoff, (leftX + rightX) * 0.5f,
-                Mathf.Max(1f, rightX - leftX + margin * 2f),
-                farZ + margin, nearZ - margin);
+            return CastleFloodQuery3D.Capture(_pieces, _camera, _placementBounds,
+                stageCullHeight, bottomLayerHeight, groundY);
         }
 
-        private sealed class StageFloodSnapshot
+        /// <summary>
+        /// 전달된 홍수 영역에서 직접 접촉하거나 영구 부착으로 함께 제거될 자재를 수집한다.
+        /// 결과 집합을 현재 생존 자재 기준으로 갱신하며 게임 상태는 변경하지 않는다.
+        /// </summary>
+        internal void CollectFloodPreviewTargets(CastleFloodVolume3D volume,
+            HashSet<CastlePiece3D> result)
         {
-            public readonly float Cutoff;
-            public readonly float CenterX;
-            public readonly float Width;
-            public readonly float StartZ;
-            public readonly float EndZ;
-
-            /// <summary>
-            /// Stores the flood volume geometry used during the stage transition.
-            /// Inputs define the flood surface, center, width and Z bounds.
-            /// </summary>
-            public StageFloodSnapshot(float cutoff, float centerX, float width,
-                float startZ, float endZ)
-            {
-                Cutoff = cutoff;
-                CenterX = centerX;
-                Width = width;
-                StartZ = startZ;
-                EndZ = endZ;
-            }
+            _floodQuery.CollectDestructionTargets(volume, _pieceSet, result);
         }
+
         /// <summary>실패 시 재시작하고 통과 시 팝업을 닫아 홍수와 다음 스테이지를 진행한다.</summary>
         public void ContinueStage()
         {
             if (!_awaitingStage || _stageTransitioning) return;
             if (!_stagePassed || _finished) { ResetGame(); return; }
+            _floodPreview.Hide();
             _awaitingStage = false;
             _stageTransitioning = true;
             _resolving = true;

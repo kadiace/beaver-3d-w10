@@ -22,12 +22,23 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 
 ## 스테이지 홍수 연출과 접촉 판정
 
-- 다섯 번째 라운드가 정산되면 **파란색 반투명 홍수 큐브**가 카메라 화면과 건축물 범위를 덮으며 **+Z → -Z** 방향으로 확장됩니다. 물 표면의 높이는 `max(stageCullHeight, 최하단 비기반 자재의 루트 Y + bottomLayerHeight)`로 정합니다. 이 높이는 홍수 영역의 윗면을 정하며, 자재 제거 자체는 루트 높이로 판정하지 않습니다.
+- 다섯 번째 라운드가 정산되면 **파란색 반투명 홍수 큐브**가 강바닥 전체와 카메라 화면 및 건축물 범위를 덮으며 **+Z → -Z** 방향으로 확장됩니다. 물 표면의 높이는 `max(stageCullHeight, 최하단 비기반 자재의 루트 Y + bottomLayerHeight)`로 정합니다. 이 높이는 홍수 영역의 윗면을 정하며, 자재 제거 자체는 루트 높이로 판정하지 않습니다.
 - 홍수 큐브의 콜라이더는 비활성 상태로 두고, 매 프레임 새로 채워진 구간에 `Physics.OverlapBox`를 실행합니다. 해당 구간과 자재 콜라이더가 겹치면 그 자재를 접촉 대상으로 기록합니다. 이미 채워진 구간은 다시 검사하지 않습니다.
 - 홍수가 끝까지 찬 뒤 접촉 대상으로 기록된 자재를 제거합니다. 기반은 제거 대상에서 제외하며, 덩굴로 영구 부착된 자재는 기존 규칙대로 접촉 대상의 연결 묶음 전체를 함께 제거합니다.
 - 판정은 메인 스레드에서 수행하고 Transform·Collider·GameObject를 백그라운드 작업에 전달하지 않습니다. 홍수 큐브는 시각 효과로만 사용하며 자재를 밀거나 물리적으로 움직이지 않습니다.
 - 제거 후 홍수를 **-Y 방향으로 빠르게 내려** 사라지게 하고 스테이지 결과를 표시합니다. 이 과정에서는 신규 드랍 및 접촉 파괴 처리를 일시 중지합니다. 제거 후 점수 재계산은 한 번 수행합니다.
 - `CastleGame3D`의 `floodFillDuration`, `floodDrainDuration`, `floodFillCurve`로 연출을 조절합니다.
+
+## 홍수 파괴 미리보기
+
+- **Tab**을 누르면 홍수 미리보기를 켜고 다시 누르면 끕니다. 새 입력은 `InputSystem_Actions.inputactions`의 `Player/ToggleFloodPreview`에 `<Keyboard>/tab`으로 저장하며 `Managers.Input`으로 읽습니다.
+- 현재 수면 높이에서 강바닥 전체를 덮도록 기존 홍수 오브젝트를 완전히 채운 상태로 표시합니다. 미리보기 중에도 자재 배치, 카메라 이동과 줌을 사용할 수 있습니다.
+- 실제 홍수와 같은 영역 계산과 콜라이더 접촉 조회를 사용합니다. 기반은 제외하고, 직접 접촉한 자재와 덩굴로 영구 부착되어 함께 제거될 자재를 모두 붉게 표시합니다. 접촉 버퍼가 가득 차면 확장해서 재조회하므로 많은 자재가 겹쳐 있어도 누락하지 않습니다.
+- 켜는 순간 즉시 계산하며 활성 상태에서는 기본 0.1초 간격으로 갱신합니다. 자재 생성·제거·영구 부착 직후에는 다음 프레임에 갱신합니다. 현재 위치와 회전, 연결 상태를 기준으로 한 예상이며 실제 홍수 진행 중 움직임에 따라 결과는 달라질 수 있습니다.
+- 파괴 예상 자재의 메시를 깊이 가림 없이 마스크에 그리고, 물의 투명 렌더링 이후 붉은색을 한 번 합성합니다. 다른 자재나 물에 가려진 부분도 붉은 실루엣으로 보이며 여러 대상이 겹쳐도 색 농도는 일정합니다. 기존 재질과 호버 외곽선의 상태는 별도로 유지합니다.
+- 실제 홍수 시작, 재시작, 스테이지 전환, 게임 종료, 규칙 창 열기 시에는 미리보기를 자동으로 종료합니다. 미리보기는 자재를 제거하거나 점수와 라운드를 변경하지 않습니다.
+- 강조 색과 불투명도는 `Assets/Settings/CastleFloodPreview.mat`의 **Tint Color**와 **A**로 조절합니다(초기 A=0.7). 갱신 간격은 Game 씬의 Main Camera에 배치된 `CastleFloodPreview3D`의 **Refresh Interval**로 조절합니다.
+- PC와 Mobile Renderer에 `CastleFloodPreviewFeature`를 등록해 표시 재질을 연결합니다. UI는 붉은색 합성 이후 정상 표시됩니다.
 
 ## 덩쿨 영구 부착과 특수능력 무효화
 
@@ -61,7 +72,10 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 - `Assets/Scripts/RestoreCastle3D/` — 게임 상태, 3D 접촉, 능력 및 점수 계산
 - `Assets/Scripts/RestoreCastle3D/CastleDropPreview3D.cs` — 실제 자재 프리팹의 반투명 충돌 예상 위치 미리보기(-Y Raycast)
 - `Assets/Scripts/RestoreCastle3D/CastleDropGuideGraphic3D.cs` — 커서부터 미리보기까지 연결하는 점선 UGUI Graphic
-- `Assets/Scripts/RestoreCastle3D/CastleFloodEffect3D.cs` — +Z에서 -Z로 차오르고 -Y로 빠지는 반투명 홍수 연출
+- `Assets/Scripts/RestoreCastle3D/CastleFloodEffect3D.cs` — 실제 홍수와 미리보기가 공유하는 반투명 홍수 표시
+- `Assets/Scripts/RestoreCastle3D/CastleFloodQuery3D.cs` — 공통 홍수 영역·콜라이더 접촉·영구 부착 묶음 판정
+- `Assets/Scripts/RestoreCastle3D/CastleFloodPreview3D.cs` — 카메라별 홍수 미리보기 상태와 주기적 대상 갱신
+- `Assets/Scripts/RestoreCastle3D/CastleFloodPreviewFeature.cs` 및 `CastleFloodPreview.shader` — 파괴 예상 메시의 관통 마스크와 붉은 tint 합성
 - `Assets/Scripts/Scenes/GameSceneContext.cs` — 기존 Game 씬에서 신규 게임 시작
 
 ## 남은 확인
