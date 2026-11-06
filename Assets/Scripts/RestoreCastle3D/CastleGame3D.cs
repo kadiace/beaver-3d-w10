@@ -113,8 +113,15 @@ namespace RestoreCastle3D
             {
                 if (keyboard.escapeKey.wasPressedThisFrame)
                     OpenCandidatePalette();
-                if (keyboard.qKey.wasPressedThisFrame) _objectYaw -= 90f;
-                if (keyboard.eKey.wasPressedThisFrame) _objectYaw += 90f;
+                if (keyboard.qKey.wasPressedThisFrame)
+                    _objectYaw -= 1f;
+                else if (keyboard.qKey.isPressed)
+                    _objectYaw -= RotationSpeed * Time.deltaTime;
+
+                if (keyboard.eKey.wasPressedThisFrame)
+                    _objectYaw += 1f;
+                else if (keyboard.eKey.isPressed)
+                    _objectYaw += RotationSpeed * Time.deltaTime;
             }
 
             if (mouse != null && mouse.rightButton.wasPressedThisFrame)
@@ -315,6 +322,7 @@ namespace RestoreCastle3D
         public int RoundsPerStage => ROUNDS_PER_STAGE;
         public int CurrentStageRound => _awaitingStage ? ROUNDS_PER_STAGE : _turn % ROUNDS_PER_STAGE + 1;
         public int PlacementsPerRound => PLACEMENTS_PER_ROUND;
+        public float RotationSpeed { get; set; } = 90f;
         public int PlacementsThisRound => _placementsInRound;
         // The palette hides after each real drop; Esc/right-click reopens it.
         public bool IsRoundPlacing => _resolving || !_paletteOpen;
