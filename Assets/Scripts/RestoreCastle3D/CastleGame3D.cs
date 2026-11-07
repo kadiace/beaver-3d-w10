@@ -22,6 +22,7 @@ namespace RestoreCastle3D
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float FLOOD_IMPULSE = 60f;
         private const float FLOOD_SURFACE_Y = -1.95f;
+        private const float BOUNDARY_DESTRUCTION_DELAY = 1f;
 
         [Header("Barrel explosion")]
         [SerializeField, Min(0f)] private float barrelExplosionImpulse = 18f;
@@ -822,17 +823,19 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// Z 경계를 넘은 기물과 부착된 기물을 제거하고 스테이지 전환 밖에서는 내구도를 갱신한다.
+        /// Z 경계를 넘은 기물만 제거하고 스테이지 전환 밖에서는 내구도를 갱신한다.
         /// piece는 경계를 넘은 기물이다.
         /// </summary>
         internal void RemoveOutsideBoundary(CastlePiece3D piece)
         {
-            if (RemovePiece(piece) > 0 && !_stageTransitioning)
+            if (RemovePiece(piece, CastleChangeKind.Destroyed, BOUNDARY_DESTRUCTION_DELAY,
+                false) > 0 && !_stageTransitioning)
                 RecalculateScores();
         }
 
-        /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>
-        private int RemovePiece(CastlePiece3D piece, CastleChangeKind reason = CastleChangeKind.Destroyed)
+        /// <summary>기물을 제거하고 요청된 경우에만 연결 기물까지 연쇄 제거한다.</summary>
+        private int RemovePiece(CastlePiece3D piece, CastleChangeKind reason = CastleChangeKind.Destroyed,
+            float destructionDelay = 0f, bool removeAttached = true)
         {
             if (piece == null || !_pieceSet.Contains(piece)) return 0;
 
@@ -844,9 +847,10 @@ namespace RestoreCastle3D
                 CastlePiece3D current = pending.Pop();
                 if (current == null || !_pieceSet.Contains(current) || !connected.Add(current))
                     continue;
-                foreach (CastlePiece3D attached in current.AttachedPieces)
-                    if (attached != null && !connected.Contains(attached))
-                        pending.Push(attached);
+                if (removeAttached)
+                    foreach (CastlePiece3D attached in current.AttachedPieces)
+                        if (attached != null && !connected.Contains(attached))
+                            pending.Push(attached);
             }
 
             foreach (CastlePiece3D current in connected)
@@ -857,7 +861,7 @@ namespace RestoreCastle3D
                 _score.Remove(current);
                 PublishChange(new CastleChange3D(current, piece, reason, 0,
                     current.transform.position));
-                Destroy(current.gameObject);
+                Destroy(current.gameObject, destructionDelay);
             }
             return connected.Count;
         }
