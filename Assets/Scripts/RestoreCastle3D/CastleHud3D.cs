@@ -142,15 +142,9 @@ namespace RestoreCastle3D
             _completePopup.SetActive(false);
             _rulesPopup.SetActive(false);
             _tooltip.SetActive(false);
-            _rulesBody.text = "자재를 선택한 뒤 빈 공간을 클릭해 높은 곳에서 떨어뜨리세요.\n"
-                + "접촉 중인 기물끼리 내구도 능력이 적용됩니다.\n"
-                + "우클릭 드래그: 카메라 회전\n"
-                + "Q/E: 기물 회전 / Esc: 선택 취소\n"
-                + "오크통: 첫 충돌 3초 뒤 주변 기물을 날림 (오크통 유지)\n"
-                + "첫 드랍 전에는 후보를 변경할 수 있습니다.\n"
-                + "매 드랍 후 선택 UI를 숨깁니다. Esc/우클릭으로 다시 열어 다른 자재 선택 가능.\n"
-                + "첫 드랍 이후에는 리롤 불가. 라운드 전체 5개 배치.\n"
-                + "5라운드마다 내구도를 판정하며, 통과 팝업을 닫으면 홍수가 최하단 기물 약 한 층을 정리합니다.";
+            _rulesBody.text = @"매 스테이지마다 강 상류에서 홍수가 밀려옵니다.
+기물을 높이 쌓아 홍수에서 살아남으세요!
+";
             Refresh();
         }
 
