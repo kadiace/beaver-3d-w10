@@ -264,7 +264,7 @@ namespace RestoreCastle3D
                 if (piece == null || !_pieceSet.Contains(piece) ||
                     _catalog.Get(piece.MaterialId).category == "쓰레기" ||
                     (materialId == "foul_smelling_lump" && piece.MaterialId == "foundation") ||
-                    Vector3.Distance(piece.transform.position, center) > WASTE_EFFECT_RADIUS)
+                    !IsInWasteEffectRange(piece, center))
                     continue;
                 piece.SetPenaltyOutline(true);
                 _penaltyTargets.Add(piece);
@@ -864,11 +864,24 @@ namespace RestoreCastle3D
             return piece.AbilitySuppressed;
         }
 
-        /// <summary>기물의 중심에서 지정된 범위 안에 있는 살아 있는 다른 기물을 반환한다.</summary>
+        /// <summary>기물 Collider가 지정된 위치 중심의 폐기물 효과 범위에 일부라도 겹치는지 판정한다.</summary>
+        private static bool IsInWasteEffectRange(CastlePiece3D piece, Vector3 center)
+        {
+            float radiusSquared = WASTE_EFFECT_RADIUS * WASTE_EFFECT_RADIUS;
+            foreach (Collider collider in piece.GetComponentsInChildren<Collider>())
+            {
+                if (!collider.enabled || collider.isTrigger) continue;
+                Vector3 closestPoint = collider.ClosestPoint(center);
+                if ((closestPoint - center).sqrMagnitude <= radiusSquared) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Collider가 폐기물 효과 범위와 겹치는 살아 있는 다른 기물을 반환한다.</summary>
         private IEnumerable<CastlePiece3D> PiecesInRange(CastlePiece3D source)
         {
             return _pieces.Where(piece => piece != null && piece != source &&
-                Vector3.Distance(piece.transform.position, source.transform.position) <= WASTE_EFFECT_RADIUS);
+                IsInWasteEffectRange(piece, source.transform.position));
         }
 
         /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>
