@@ -431,7 +431,7 @@ namespace RestoreCastle3D
             UpdateCameraPosition();
         }
 
-        /// <summary>현재 화면 크기에서도 냇가 바깥이 조금만 보이도록 카메라 중심을 제한한다.</summary>
+        /// <summary>기존 강바닥 이동 범위를 유지하면서 카메라 주시점을 배치 반경 안으로 제한한다.</summary>
         private void ClampCameraTarget()
         {
             float movementSize = Mathf.Min(_camera.orthographicSize, CAMERA_MOVEMENT_REFERENCE_SIZE);
@@ -449,6 +449,13 @@ namespace RestoreCastle3D
                 CAMERA_EDGE_MARGIN - halfVisibleZ) * CAMERA_MOVEMENT_RANGE_MULTIPLIER;
             _cameraTarget.x = Mathf.Clamp(_cameraTarget.x, -limitX, limitX);
             _cameraTarget.z = Mathf.Clamp(_cameraTarget.z, -limitZ, limitZ);
+
+            Vector2 center = new Vector2(_placementBounds.center.x, _placementBounds.center.z)
+                + PlacementCenterOffset;
+            Vector2 offset = new Vector2(_cameraTarget.x, _cameraTarget.z) - center;
+            Vector2 clamped = center + Vector2.ClampMagnitude(offset, PlacementRadius);
+            _cameraTarget.x = clamped.x;
+            _cameraTarget.z = clamped.y;
         }
 
         /// <summary>고정 각도를 유지한 채 평면상의 주시 위치를 변경한다.</summary>
