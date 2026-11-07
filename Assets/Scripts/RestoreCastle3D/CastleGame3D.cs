@@ -580,14 +580,14 @@ namespace RestoreCastle3D
             return piece;
         }
 
-        /// <summary>희귀도 4:2:1, 태그 2:2:2:3:1, 같은 묶음 내 균등 확률로 중복 없는 후보를 뽑는다.</summary>
+        /// <summary>희귀도 4:2:1, 태그 5:5:2:6:2(2.5:2.5:1:3:1), 같은 묶음 내 균등 확률로 중복 없는 후보를 뽑는다.</summary>
         private void DealOffers()
         {
             List<CastleMaterial3D> available = _catalog.All.Where(x => !x.startOnly && !x.spawnOnly).ToList();
             string[] rarities = { "일반", "희귀", "고급" };
             int[] rarityWeights = { 4, 2, 1 };
             string[] categories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
-            int[] categoryWeights = { 2, 2, 2, 3, 1 };
+            int[] categoryWeights = { 5, 5, 2, 6, 2 };
             for (int i = 0; i < _offers.Length; i++)
             {
                 int rarityTotal = 0;
