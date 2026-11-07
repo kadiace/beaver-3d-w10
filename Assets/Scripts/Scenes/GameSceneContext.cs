@@ -9,6 +9,9 @@ public class GameSceneContext : MonoBehaviour
     [SerializeField] private Vector2 _placementCenterOffset;
     [SerializeField, Min(0.1f)] private float _placementRadius = 9f;
 
+    [Header("Camera")]
+    [SerializeField, Min(0f)] private float _cameraYawPerScrollStep = 5f;
+
     private void Start()
     {
         Managers.Input.SetInputMode(InputMode.Player);
@@ -18,6 +21,7 @@ public class GameSceneContext : MonoBehaviour
         game.RotationSpeed = _rotationSpeed;
         game.PlacementCenterOffset = _placementCenterOffset;
         game.PlacementRadius = _placementRadius;
+        game.CameraYawPerScrollStep = _cameraYawPerScrollStep;
         Debug.Log("[GameSceneContext] Game scene initialized.");
     }
 

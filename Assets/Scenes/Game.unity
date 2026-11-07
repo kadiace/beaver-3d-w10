@@ -1571,6 +1571,7 @@ MonoBehaviour:
   _rotationSpeed: 90
   _placementCenterOffset: {x: 0, y: 0}
   _placementRadius: 9
+  _cameraYawPerScrollStep: 5
 --- !u!1001 &1762329492425469008
 PrefabInstance:
   m_ObjectHideFlags: 0
