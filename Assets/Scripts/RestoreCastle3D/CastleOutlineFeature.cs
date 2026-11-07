@@ -8,14 +8,16 @@ using UnityEngine.Rendering.Universal;
 
 namespace RestoreCastle3D
 {
-    /// <summary>호버 기물과 접촉 이웃을 각각 다른 렌더링 레이어의 외곽선으로 그린다.</summary>
+    /// <summary>호버·접촉·디메리트 대상의 렌더링 레이어를 각 색상의 외곽선으로 그린다.</summary>
     public sealed class CastleOutlineFeature : ScriptableRendererFeature
     {
         [SerializeField] private Material _yellowMaterial;
         [SerializeField] private Material _cyanMaterial;
+        [SerializeField] private Material _redMaterial;
 
         private OutlinePass _yellowPass;
         private OutlinePass _cyanPass;
+        private OutlinePass _redPass;
         private Material _maskMaterial;
 
         public override void Create()
@@ -24,12 +26,14 @@ namespace RestoreCastle3D
             _maskMaterial = null;
             _yellowPass = null;
             _cyanPass = null;
-            if (_yellowMaterial == null || _cyanMaterial == null) return;
+            _redPass = null;
+            if (_yellowMaterial == null || _cyanMaterial == null || _redMaterial == null) return;
 
             _maskMaterial = new Material(_yellowMaterial) { hideFlags = HideFlags.HideAndDontSave };
             _maskMaterial.SetFloat("_Outline_Thickness", 0f);
             _yellowPass = new OutlinePass(2u, _yellowMaterial, _maskMaterial, 1 << 3);
             _cyanPass = new OutlinePass(4u, _cyanMaterial, _maskMaterial, 1 << 4);
+            _redPass = new OutlinePass(8u, _redMaterial, _maskMaterial, 1 << 5);
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -37,6 +41,7 @@ namespace RestoreCastle3D
             if (_yellowPass == null) return;
             renderer.EnqueuePass(_cyanPass);
             renderer.EnqueuePass(_yellowPass);
+            renderer.EnqueuePass(_redPass);
         }
 
         protected override void Dispose(bool disposing)

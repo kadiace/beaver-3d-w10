@@ -93,7 +93,7 @@ namespace RestoreCastle3D
         private void Rebuild(CastleMaterial3D info)
         {
             Dispose();
-            GameObject prefab = Resources.Load<GameObject>("Prefabs/" + info.id);
+            GameObject prefab = Resources.Load<GameObject>("Prefabs/" + CastleCatalog3D.PrefabId(info.id));
             if (prefab == null)
             {
                 Debug.LogWarning("[CastleDropPreview3D] Missing prefab: " + info.id);
@@ -126,6 +126,7 @@ namespace RestoreCastle3D
 
             foreach (Renderer renderer in _instance.GetComponentsInChildren<Renderer>(true))
             {
+                if (renderer.gameObject.name == "Penalty Range") continue;
                 Material[] originals = renderer.sharedMaterials;
                 Material[] transparent = new Material[originals.Length];
                 for (int i = 0; i < originals.Length; i++)
@@ -160,6 +161,8 @@ namespace RestoreCastle3D
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
+            Transform range = _instance.transform.Find("Penalty Range");
+            if (range != null && info.id != "mud") range.gameObject.SetActive(true);
         }
     }
 }

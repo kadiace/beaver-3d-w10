@@ -15,6 +15,7 @@ namespace RestoreCastle3D
         private const int PLACEMENTS_PER_ROUND = 5;
         private const int STAGE_COUNT = 5;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
+        private const float WASTE_EFFECT_RADIUS = 2.5f;
         private const float CAMERA_EDGE_MARGIN = 3f;
         private const float CAMERA_MOVEMENT_RANGE_MULTIPLIER = 1.2f;
         private const float CAMERA_MOVEMENT_REFERENCE_SIZE = 7f;
@@ -40,6 +41,7 @@ namespace RestoreCastle3D
         private readonly List<CastlePiece3D> _pieces = new List<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _pieceSet = new HashSet<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _outlinedNeighbors = new HashSet<CastlePiece3D>();
+        private readonly HashSet<CastlePiece3D> _penaltyTargets = new HashSet<CastlePiece3D>();
         private readonly Dictionary<CastlePiece3D, int> _score = new Dictionary<CastlePiece3D, int>();
         private readonly Dictionary<(CastlePiece3D, CastlePiece3D), int> _contributions =
             new Dictionary<(CastlePiece3D, CastlePiece3D), int>();
@@ -217,6 +219,8 @@ namespace RestoreCastle3D
                 Quaternion.Euler(0f, _objectYaw, 0f), dropHeight,
                 canPlace, _placementBounds.max.y);
 
+            UpdatePenaltyTargets(_offers[_selected].id);
+
             if (_dropPreview.IsVisible)
             {
                 Vector3 launchTarget = _camera.WorldToScreenPoint(
@@ -236,7 +240,43 @@ namespace RestoreCastle3D
         private void HideDropPreview()
         {
             _dropPreview?.Hide();
+            ClearPenaltyTargets();
             _hud?.HideDropGuide();
+        }
+
+        /// <summary>현재 가이드 중심에서 실제 폐기물 능력의 적용 대상만 빨간 외곽선으로 표시한다.</summary>
+        private void UpdatePenaltyTargets(string materialId)
+        {
+            if (!_dropPreview.IsVisible ||
+                (materialId != "foul_smelling_lump" && materialId != "waste_bag_small"))
+            {
+                ClearPenaltyTargets();
+                return;
+            }
+
+            foreach (CastlePiece3D piece in _penaltyTargets)
+                if (piece != null) piece.SetPenaltyOutline(false);
+            _penaltyTargets.Clear();
+
+            Vector3 center = _dropPreview.LandingPosition;
+            foreach (CastlePiece3D piece in _pieces)
+            {
+                if (piece == null || !_pieceSet.Contains(piece) ||
+                    _catalog.Get(piece.MaterialId).category == "쓰레기" ||
+                    (materialId == "foul_smelling_lump" && piece.MaterialId == "foundation") ||
+                    Vector3.Distance(piece.transform.position, center) > WASTE_EFFECT_RADIUS)
+                    continue;
+                piece.SetPenaltyOutline(true);
+                _penaltyTargets.Add(piece);
+            }
+        }
+
+        /// <summary>가이드가 사라질 때 이전 디메리트 대상의 빨간 외곽선을 지운다.</summary>
+        private void ClearPenaltyTargets()
+        {
+            foreach (CastlePiece3D piece in _penaltyTargets)
+                if (piece != null) piece.SetPenaltyOutline(false);
+            _penaltyTargets.Clear();
         }
 
         private void OnDestroy()
@@ -285,7 +325,12 @@ namespace RestoreCastle3D
         {
             if (_outlinedPiece != hovered)
             {
-                if (_outlinedPiece != null) _outlinedPiece.SetOutlineLayer(0);
+                if (_outlinedPiece != null)
+                {
+                    _outlinedPiece.SetOutlineLayer(0);
+                    Transform previousRange = _outlinedPiece.transform.Find("Penalty Range");
+                    if (previousRange != null) previousRange.gameObject.SetActive(false);
+                }
                 _outlinedPiece = hovered;
             }
 
@@ -306,6 +351,9 @@ namespace RestoreCastle3D
                 _outlinedNeighbors.Add(neighbor);
             }
             _outlinedPiece.SetOutlineLayer(2u);
+            Transform range = _outlinedPiece.transform.Find("Penalty Range");
+            if (range != null && _outlinedPiece.MaterialId != "mud")
+                range.gameObject.SetActive(true);
         }
 
         /// <summary>ISO 카메라를 설정하고 씬에 배치된 평평한 진흙 냇가의 배치 범위를 읽는다.</summary>
@@ -511,12 +559,12 @@ namespace RestoreCastle3D
         /// <summary>Resources/Prefabs에서 3D 기물을 로드하고 Rigidbody를 통한 중력 낙하를 준비한다.</summary>
         private CastlePiece3D Spawn(CastleMaterial3D material, Vector3 position, bool anchored = false)
         {
-            GameObject prefab = Resources.Load<GameObject>("Prefabs/" + material.id);
+            GameObject prefab = Resources.Load<GameObject>("Prefabs/" + CastleCatalog3D.PrefabId(material.id));
             if (prefab == null) throw new InvalidOperationException("Missing 3D prefab: " + material.id);
             GameObject instance = Instantiate(prefab, position, Quaternion.Euler(0f, _objectYaw, 0f));
             instance.name = material.name;
             CastlePiece3D piece = instance.GetComponent<CastlePiece3D>();
-            piece.Initialize(this, _turn);
+            piece.Initialize(this, _turn, material.id);
             piece.Body.isKinematic = anchored;
             piece.Body.useGravity = !anchored;
             piece.Body.linearDamping = 2f;
@@ -530,21 +578,42 @@ namespace RestoreCastle3D
             return piece;
         }
 
-        /// <summary>서로 다른 자재 3개를 뽑되 살아있는 나무의 등장 확률을 절반으로 낮춘다.</summary>
+        /// <summary>희귀도 4:2:1, 태그 2:2:2:3:1, 같은 묶음 내 균등 확률로 중복 없는 후보를 뽑는다.</summary>
         private void DealOffers()
         {
             List<CastleMaterial3D> available = _catalog.All.Where(x => !x.startOnly && !x.spawnOnly).ToList();
+            string[] rarities = { "일반", "희귀", "고급" };
+            int[] rarityWeights = { 4, 2, 1 };
+            string[] categories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
+            int[] categoryWeights = { 2, 2, 2, 3, 1 };
             for (int i = 0; i < _offers.Length; i++)
             {
-                int index = _random.Next(available.Count);
-                _offers[i] = available[index];
-                available.RemoveAt(index);
-                if (_offers[i].id == "living_tree" && _random.Next(2) == 0)
+                int rarityTotal = 0;
+                for (int r = 0; r < rarities.Length; r++)
+                    if (available.Any(x => x.rarity == rarities[r])) rarityTotal += rarityWeights[r];
+                int rarityRoll = _random.Next(rarityTotal);
+                int rarityIndex = 0;
+                for (; rarityIndex < rarities.Length; rarityIndex++)
                 {
-                    index = _random.Next(available.Count);
-                    _offers[i] = available[index];
-                    available.RemoveAt(index);
+                    if (!available.Any(x => x.rarity == rarities[rarityIndex])) continue;
+                    rarityRoll -= rarityWeights[rarityIndex];
+                    if (rarityRoll < 0) break;
                 }
+                List<CastleMaterial3D> tier = available.Where(x => x.rarity == rarities[rarityIndex]).ToList();
+                int categoryTotal = 0;
+                for (int c = 0; c < categories.Length; c++)
+                    if (tier.Any(x => x.category == categories[c])) categoryTotal += categoryWeights[c];
+                int categoryRoll = _random.Next(categoryTotal);
+                int categoryIndex = 0;
+                for (; categoryIndex < categories.Length; categoryIndex++)
+                {
+                    if (!tier.Any(x => x.category == categories[categoryIndex])) continue;
+                    categoryRoll -= categoryWeights[categoryIndex];
+                    if (categoryRoll < 0) break;
+                }
+                List<CastleMaterial3D> group = tier.Where(x => x.category == categories[categoryIndex]).ToList();
+                _offers[i] = group[_random.Next(group.Count)];
+                available.Remove(_offers[i]);
             }
             _selected = -1;
             _placementsInRound = 0;
@@ -574,12 +643,6 @@ namespace RestoreCastle3D
             bool finalDrop = _placementsInRound == PLACEMENTS_PER_ROUND;
             if (finalDrop) _resolving = true;
 
-            if (material.id == "bucket")
-            {
-                dropped.PermanentBonus += 6;
-                PublishChange(new CastleChange3D(dropped, dropped, CastleChangeKind.Durability,
-                    6, dropped.transform.position));
-            }
             if (material.id == "empty_bottle")
             {
                 _extraRerolls++;
@@ -644,21 +707,23 @@ namespace RestoreCastle3D
                 int woods = Adjacent(piece).Count(n => _catalog.Get(n.MaterialId).category == "목재");
                 if (piece.MaterialId == "branch" && age % 3 == 0) piece.PermanentBonus += woods;
                 if (piece.MaterialId == "leafy_branch" && age % 2 == 0) piece.PermanentBonus += woods;
-                if (piece.MaterialId == "living_tree" && age % 2 == 0)
+                if (piece.MaterialId == "living_tree" && piece.GrowthCount < 8)
                 {
+                    piece.GrowthCount++;
                     piece.PermanentBonus++;
                     piece.transform.localScale *= 1.1f;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
                 }
-                if (piece.MaterialId == "bamboo")
+                if (piece.MaterialId == "bamboo" && piece.GrowthCount < 3)
                 {
                     BoxCollider collider = piece.GetComponent<BoxCollider>();
                     Vector3 previousTop = collider.transform.TransformPoint(collider.center
                         + Vector3.up * collider.size.y * 0.5f);
-                    Vector3 extensionCenter = previousTop + piece.transform.up * 0.5f;
+                    Vector3 extensionCenter = previousTop + piece.transform.up *
+                        (collider.size.y * piece.transform.lossyScale.y * 0.5f);
                     foreach (Collider hit in Physics.OverlapBox(extensionCenter,
-                        new Vector3(collider.size.x * 0.5f, 0.5f, collider.size.z * 0.5f),
+                        Vector3.Scale(collider.size * 0.5f, piece.transform.lossyScale),
                         piece.transform.rotation, Physics.DefaultRaycastLayers,
                         QueryTriggerInteraction.Ignore))
                     {
@@ -675,12 +740,16 @@ namespace RestoreCastle3D
                         scale.y += 1f;
                         child.localScale = scale;
                     }
-                    piece.PermanentBonus++;
+                    piece.GrowthCount++;
+                    if (piece.GrowthCount == 3) piece.PermanentBonus += 5;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
                 }
-                if (piece.MaterialId == "growing_vine" && age % 3 == 0)
-                    Spawn(_catalog.Get("vine"), piece.transform.position + new Vector3(1f, 2.2f, 0.3f));
+                if (piece.MaterialId == "growing_vine" && age % 2 == 0)
+                {
+                    Vector3 direction = Quaternion.Euler(0f, _random.Next(360), 0f) * Vector3.forward;
+                    Spawn(_catalog.Get("vine"), piece.transform.position + direction * 1.2f + Vector3.up);
+                }
             }
         }
 
@@ -724,6 +793,16 @@ namespace RestoreCastle3D
             _floodPreview.RequestRefresh();
         }
 
+        /// <summary>진흙과 직접 접촉한 목재를 부착하고 목재끼리의 간접 인접을 활성화한다.</summary>
+        public void TryAttachMud(CastlePiece3D a, CastlePiece3D b)
+        {
+            if (_stageTransitioning || !_pieceSet.Contains(a) || !_pieceSet.Contains(b)) return;
+            CastlePiece3D mud = a.MaterialId == "mud" ? a : b.MaterialId == "mud" ? b : null;
+            CastlePiece3D wood = mud == a ? b : a;
+            if (mud != null && wood.MaterialId != "foundation" && !IsAbilityDisabled(mud) &&
+                _catalog.Get(wood.MaterialId).category == "목재") mud.AttachWood(wood);
+        }
+
         /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
         private void ApplyContactDestruction()
         {
@@ -747,11 +826,11 @@ namespace RestoreCastle3D
                     lump.AbilitySuppressed)
                     continue;
 
-                foreach (CastlePiece3D neighbor in Adjacent(lump).ToArray())
+                foreach (CastlePiece3D neighbor in PiecesInRange(lump).ToArray())
                 {
                     if (neighbor == null || !_pieceSet.Contains(neighbor) ||
-                        neighbor.IsVine || neighbor.MaterialId == "foundation" ||
-                        neighbor.MaterialId == "foul_smelling_lump")
+                        _catalog.Get(neighbor.MaterialId).category == "쓰레기" ||
+                        neighbor.MaterialId == "foundation")
                         continue;
 
                     string key = lump.GetInstanceID() + ":" + neighbor.GetInstanceID();
@@ -764,15 +843,31 @@ namespace RestoreCastle3D
         /// <summary>접촉 그래프에서 소멸된 기물을 제외한 실제 인접 기물만 반환한다.</summary>
         private IEnumerable<CastlePiece3D> Adjacent(CastlePiece3D piece)
         {
-            return piece.Contacts.Where(n => n != null && _pieceSet.Contains(n));
+            HashSet<CastlePiece3D> neighbors = new HashSet<CastlePiece3D>(
+                piece.Contacts.Where(n => n != null && _pieceSet.Contains(n)));
+            if (piece.MaterialId == "mud" || _catalog.Get(piece.MaterialId).category == "목재")
+                foreach (CastlePiece3D attached in piece.AttachedPieces)
+                    if (attached != null && _pieceSet.Contains(attached)) neighbors.Add(attached);
+            if (_catalog.Get(piece.MaterialId).category == "목재")
+                foreach (CastlePiece3D mud in neighbors.Where(n => n.MaterialId == "mud" &&
+                    !IsAbilityDisabled(n)).ToArray())
+                    foreach (CastlePiece3D wood in mud.AttachedPieces)
+                        if (wood != piece && wood != null && _pieceSet.Contains(wood) &&
+                            _catalog.Get(wood.MaterialId).category == "목재") neighbors.Add(wood);
+            return neighbors;
         }
 
         /// <summary>덩쿨 봉인 또는 활성 라바콘 꼭대기의 접촉으로 특수능력이 막혔는지 확인한다.</summary>
         public bool IsAbilityDisabled(CastlePiece3D piece)
         {
-            return piece.AbilitySuppressed || Adjacent(piece).Any(n =>
-                n.MaterialId == "traffic_cone" && !n.AbilitySuppressed &&
-                piece.transform.position.y > n.transform.position.y + 0.15f);
+            return piece.AbilitySuppressed;
+        }
+
+        /// <summary>기물의 중심에서 지정된 범위 안에 있는 살아 있는 다른 기물을 반환한다.</summary>
+        private IEnumerable<CastlePiece3D> PiecesInRange(CastlePiece3D source)
+        {
+            return _pieces.Where(piece => piece != null && piece != source &&
+                Vector3.Distance(piece.transform.position, source.transform.position) <= WASTE_EFFECT_RADIUS);
         }
 
         /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>
@@ -782,7 +877,8 @@ namespace RestoreCastle3D
 
             HashSet<CastlePiece3D> connected = new HashSet<CastlePiece3D>();
             Stack<CastlePiece3D> pending = new Stack<CastlePiece3D>();
-            CastleFloodQuery3D.CollectAttachmentGroup(piece, _pieceSet, connected, pending);
+            CastleFloodQuery3D.CollectAttachmentGroup(piece, _pieceSet, connected, pending,
+                reason == CastleChangeKind.Flooded);
 
             foreach (CastlePiece3D current in connected)
             {
@@ -855,24 +951,30 @@ namespace RestoreCastle3D
                 int Count(string category) => neighbors.Count(n => _catalog.Get(n.MaterialId).category == category);
                 switch (piece.MaterialId)
                 {
-                    case "large_stone": if (Count("석재") >= 2) AddBonus(piece, 2); break;
+                    case "large_stone": if (Count("석재") >= 2) AddBonus(piece, 4); break;
                     case "fossil": if (neighbors.Count(n => n.MaterialId == "fossil") >= 3) AddBonus(piece, 10); break;
-                    case "tire": AddBonus(piece, -Count("쓰레기")); break;
-                    case "umbrella": if (_turn - piece.PlacedTurn <= 3) AddBonus(piece, 3); break;
-                    case "life_ring": AddBonus(piece, Mathf.Min(2, Count("쓰레기"))); break;
-                    case "rubber_duck": if (neighbors.Any(n => n.MaterialId == "life_ring")) AddBonus(piece, 4); break;
-                    case "dented_can": AddBonus(piece, Count("식물")); break;
+                    case "gem":
+                        if (neighbors.Any(n => n.MaterialId == "pebble") &&
+                            neighbors.Any(n => n.MaterialId == "large_stone") &&
+                            neighbors.Any(n => n.MaterialId == "fossil")) AddBonus(piece, 15);
+                        break;
+                    case "log": if (neighbors.Any(n => n.MaterialId == "mud")) AddBonus(piece, 2); break;
                     case "broken_game_controller":
-                        AddBonus(piece, neighbors.Where(n => _catalog.Get(n.MaterialId).category == "쓰레기")
+                        AddBonus(piece, neighbors.Where(n => _catalog.Get(n.MaterialId).category == "잡동사니")
                             .Select(n => n.MaterialId).Distinct().Count());
                         break;
-                    case "all_purpose_glue": AddBonus(piece, neighbors.Select(n => n.MaterialId).Distinct().Count()); break;
                 }
+                if (piece.MaterialId == "bucket")
+                    foreach (CastlePiece3D n in neighbors.Where(n => _catalog.Get(n.MaterialId).category == "석재"))
+                        AddBonus(n, 1);
                 if (piece.MaterialId == "watering_can")
                     foreach (CastlePiece3D n in neighbors.Where(n => _catalog.Get(n.MaterialId).category == "식물"))
                         AddBonus(n, 1);
                 if (piece.MaterialId == "loose_work_glove")
                     foreach (CastlePiece3D n in neighbors.Where(n => _catalog.Get(n.MaterialId).category == "목재"))
+                        AddBonus(n, 1);
+                if (piece.MaterialId == "life_jacket")
+                    foreach (CastlePiece3D n in neighbors.Where(n => _catalog.Get(n.MaterialId).category == "잡동사니"))
                         AddBonus(n, 1);
             }
 
@@ -880,26 +982,11 @@ namespace RestoreCastle3D
             {
                 if (IsAbilityDisabled(piece)) continue;
                 _effectSource = piece;
-                int penalty = piece.MaterialId == "waste_bag_small" ? 1 :
-                    piece.MaterialId == "waste_bag_medium" ? 2 : piece.MaterialId == "waste_bag_large" ? 3 : 0;
-                if (penalty == 0) continue;
-                foreach (CastlePiece3D neighbor in Adjacent(piece))
-                    if (_catalog.Get(neighbor.MaterialId).category != "쓰레기" &&
-                        _catalog.Get(neighbor.MaterialId).category != "폐기물")
-                        AddBonus(neighbor, -penalty);
+                if (piece.MaterialId != "waste_bag_small") continue;
+                foreach (CastlePiece3D neighbor in PiecesInRange(piece))
+                    if (_catalog.Get(neighbor.MaterialId).category != "쓰레기")
+                        AddBonus(neighbor, -2);
             }
-            Dictionary<CastlePiece3D, int> beforeLog = new Dictionary<CastlePiece3D, int>(_score);
-            foreach (CastlePiece3D piece in _score.Keys.ToArray())
-                if (!IsAbilityDisabled(piece) && piece.MaterialId == "log")
-                {
-                    _effectSource = piece;
-                    foreach (CastlePiece3D n in Adjacent(piece))
-                        if (_catalog.Get(n.MaterialId).category == "목재")
-                        {
-                            _effectSource = n;
-                            AddBonus(piece, beforeLog[n]);
-                        }
-                }
             _effectSource = null;
             foreach (var contribution in _contributions)
             {
