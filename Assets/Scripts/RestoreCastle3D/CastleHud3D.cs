@@ -144,6 +144,11 @@ namespace RestoreCastle3D
             _tooltip.SetActive(false);
             _rulesBody.text = @"매 스테이지마다 강 상류에서 홍수가 밀려옵니다.
 기물을 높이 쌓아 홍수에서 살아남으세요!
+
+우클릭 드래그: 카메라 회전
+Q/E: 기물 회전 / Esc: 선택 취소
+
+홍수에 밀려 절벽 뒤로 넘어간 기물은 파괴됩니다.
 ";
             Refresh();
         }

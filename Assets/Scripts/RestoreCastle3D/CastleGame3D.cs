@@ -47,6 +47,7 @@ namespace RestoreCastle3D
             new Dictionary<(CastlePiece3D, CastlePiece3D), int>();
         private readonly HashSet<string> _consumedContacts = new HashSet<string>();
         private readonly CastleMaterial3D[] _offers = new CastleMaterial3D[3];
+        private GameSceneContext _sceneContext;
         private CastleCatalog3D _catalog;
         private CastleHud3D _hud;
         private CastleDropPreview3D _dropPreview;
@@ -85,8 +86,11 @@ namespace RestoreCastle3D
         private bool _rightGestureMoved;
         private bool _rightGestureScrolled;
 
+        internal float DestructionBoundaryZ => _sceneContext.DestructionBoundaryZ;
+
         private void Start()
         {
+            _sceneContext = GetComponent<GameSceneContext>();
             _catalog = new CastleCatalog3D();
             ConfigureScene();
             CreateHud();
@@ -446,7 +450,7 @@ namespace RestoreCastle3D
                 else if (!rightButton.isPressed && !rightButton.wasReleasedThisFrame && !pointerOverUi)
                 {
                     _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize *
-                        Mathf.Exp(-scroll * 0.0013f), 6f, 13.5f);
+                        Mathf.Exp(-scroll * 0.03f), 6f, 12.5f);
                 }
             }
 
@@ -738,6 +742,24 @@ namespace RestoreCastle3D
             vine.PermanentBonus += _catalog.Get(target.MaterialId).baseReinforcement;
         }
 
+        /// <summary>접촉한 모든 기물을 접착제에 결합하고, 기물 제거 시에는 결합을 해제한다.</summary>
+        public void TryAttachGlue(CastlePiece3D a, CastlePiece3D b)
+        {
+            if (_stageTransitioning || a == null || b == null ||
+                !_pieceSet.Contains(a) || !_pieceSet.Contains(b))
+                return;
+
+            bool canA = a.MaterialId == "all_purpose_glue" && !IsAbilityDisabled(a);
+            bool canB = b.MaterialId == "all_purpose_glue" && !IsAbilityDisabled(b);
+            if (!canA && !canB) return;
+
+            CastlePiece3D glue = canA && canB
+                ? (a.GetInstanceID() > b.GetInstanceID() ? a : b)
+                : (canA ? a : b);
+            CastlePiece3D target = glue == a ? b : a;
+            glue.TryGlueTo(target);
+        }
+
         /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
         private void ApplyContactDestruction()
         {
@@ -753,6 +775,16 @@ namespace RestoreCastle3D
                     TryAttachVines(piece, neighbor);
                     if (piece.HasAttachmentTarget) break;
                 }
+            }
+
+            // Retry existing contacts if their initial collision callback was missed.
+            foreach (CastlePiece3D glue in _pieces.ToArray())
+            {
+                if (glue == null || glue.MaterialId != "all_purpose_glue" ||
+                    IsAbilityDisabled(glue))
+                    continue;
+                foreach (CastlePiece3D neighbor in Adjacent(glue).ToArray())
+                    TryAttachGlue(glue, neighbor);
             }
 
             foreach (CastlePiece3D lump in _pieces.ToArray())
@@ -787,6 +819,16 @@ namespace RestoreCastle3D
             return piece.AbilitySuppressed || Adjacent(piece).Any(n =>
                 n.MaterialId == "traffic_cone" && !n.AbilitySuppressed &&
                 piece.transform.position.y > n.transform.position.y + 0.15f);
+        }
+
+        /// <summary>
+        /// Z 경계를 넘은 기물과 부착된 기물을 제거하고 스테이지 전환 밖에서는 내구도를 갱신한다.
+        /// piece는 경계를 넘은 기물이다.
+        /// </summary>
+        internal void RemoveOutsideBoundary(CastlePiece3D piece)
+        {
+            if (RemovePiece(piece) > 0 && !_stageTransitioning)
+                RecalculateScores();
         }
 
         /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>
