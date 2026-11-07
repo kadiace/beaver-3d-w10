@@ -473,8 +473,6 @@ namespace RestoreCastle3D
             piece.Initialize(this, _turn);
             piece.Body.isKinematic = anchored;
             piece.Body.useGravity = !anchored;
-            piece.Body.linearDamping = 2f;
-            piece.Body.angularDamping = 5f;
             _pieces.Add(piece);
             _pieceSet.Add(piece);
             if (material.id == "vine")
