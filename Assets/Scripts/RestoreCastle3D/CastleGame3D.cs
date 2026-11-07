@@ -27,8 +27,6 @@ namespace RestoreCastle3D
         [Header("3D drop")]
         [SerializeField, Min(2f)] private float dropHeight = 7f;
         [SerializeField, Range(0.05f, 0.5f)] private float dropClickCooldown = 0.1f;
-        [SerializeField] private float stageCullHeight = -1.75f;
-        [SerializeField, Min(0.2f)] private float bottomLayerHeight = 0.4f;
         [SerializeField] private float groundY = -2.25f;
 
         [Header("Flood stage transition")]
@@ -52,6 +50,7 @@ namespace RestoreCastle3D
         private CastleHud3D _hud;
         private CastleDropPreview3D _dropPreview;
         private CastleFloodEffect3D _floodEffect;
+        private GameSceneContext _sceneContext;
         private CastleFloodPreview3D _floodPreview;
         private Bounds _placementBounds;
         private CastleFloatingText3D _floatingText;
@@ -83,6 +82,7 @@ namespace RestoreCastle3D
 
         private void Start()
         {
+            _sceneContext = GetComponent<GameSceneContext>();
             _catalog = new CastleCatalog3D();
             ConfigureScene();
             CreateHud();
@@ -1102,13 +1102,13 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// 현재 생존 자재, 강바닥, 카메라와 높이 설정으로 공통 홍수 영역을 반환한다.
+        /// 현재 생존 자재, 강바닥, 카메라와 고정 수면 높이로 공통 홍수 영역을 반환한다.
         /// 실제 홍수와 미리보기가 같은 공간 범위를 사용하도록 한다.
         /// </summary>
         internal CastleFloodVolume3D CaptureFloodVolume()
         {
             return CastleFloodQuery3D.Capture(_pieces, _camera, _placementBounds,
-                stageCullHeight, bottomLayerHeight, groundY);
+                _sceneContext.FloodSurfaceY, groundY);
         }
 
         /// <summary>

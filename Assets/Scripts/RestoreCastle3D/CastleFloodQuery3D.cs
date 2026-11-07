@@ -66,14 +66,12 @@ namespace RestoreCastle3D
         private Collider[] _colliders = new Collider[64];
 
         /// <summary>
-        /// 현재 자재와 강바닥 및 카메라 범위, 높이 설정을 받아 홍수 영역을 반환한다.
-        /// 비기반 자재의 최하단 루트 높이로 수면을 정하고 강바닥 전체를 XZ 범위에 포함한다.
+        /// 현재 자재와 강바닥 및 카메라 범위, 고정 수면 높이를 받아 홍수 영역을 반환한다.
+        /// 자재의 위치는 XZ 범위에만 반영하며 강바닥 전체를 포함한다.
         /// </summary>
         public static CastleFloodVolume3D Capture(IEnumerable<CastlePiece3D> pieces,
-            Camera camera, Bounds riverBounds, float minimumSurfaceY,
-            float bottomLayerHeight, float groundY)
+            Camera camera, Bounds riverBounds, float surfaceY, float groundY)
         {
-            float lowestY = float.PositiveInfinity;
             float leftX = riverBounds.min.x;
             float rightX = riverBounds.max.x;
             float nearZ = riverBounds.min.z;
@@ -87,13 +85,8 @@ namespace RestoreCastle3D
                 rightX = Mathf.Max(rightX, position.x);
                 nearZ = Mathf.Min(nearZ, position.z);
                 farZ = Mathf.Max(farZ, position.z);
-                if (piece.MaterialId != "foundation" && !piece.RiverAnchored)
-                    lowestY = Mathf.Min(lowestY, position.y);
             }
 
-            float surfaceY = float.IsPositiveInfinity(lowestY)
-                ? minimumSurfaceY
-                : Mathf.Max(minimumSurfaceY, lowestY + bottomLayerHeight);
             Plane surface = new Plane(Vector3.up, new Vector3(0f, surfaceY, 0f));
             for (int x = 0; x <= 1; x++)
             {

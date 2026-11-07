@@ -9,6 +9,12 @@ public class GameSceneContext : MonoBehaviour
     [SerializeField] private Vector2 _placementCenterOffset;
     [SerializeField, Min(0.1f)] private float _placementRadius = 9f;
 
+    [Header("Flood")]
+    [SerializeField] private float _floodSurfaceY = -1.75f;
+
+    /// <summary>Inspector에서 설정한 스테이지 공통 홍수 수면의 월드 Y 좌표를 반환한다.</summary>
+    public float FloodSurfaceY => _floodSurfaceY;
+
     private void Start()
     {
         Managers.Input.SetInputMode(InputMode.Player);
