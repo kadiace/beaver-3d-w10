@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace RestoreCastle3D
 {
-    [RequireComponent(typeof(Rigidbody), typeof(BoxCollider))]
+    [RequireComponent(typeof(Rigidbody))]
     public sealed class CastlePiece3D : MonoBehaviour
     {
         [SerializeField] private string materialId;

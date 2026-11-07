@@ -102,14 +102,17 @@ namespace RestoreCastle3D
 
             _instance = Object.Instantiate(prefab);
             _instance.name = "Drop Preview - " + info.name;
-            _instance.SetActive(false);
             _materialId = info.id;
 
-            BoxCollider sourceCollider = _instance.GetComponent<BoxCollider>();
-            _colliderBottomY = sourceCollider == null
-                ? 0f
-                : (sourceCollider.center.y - sourceCollider.size.y * 0.5f)
-                    * _instance.transform.localScale.y;
+            _colliderBottomY = float.PositiveInfinity;
+            foreach (Collider collider in _instance.GetComponentsInChildren<Collider>(true))
+            {
+                if (!collider.enabled || collider.isTrigger) continue;
+                _colliderBottomY = Mathf.Min(_colliderBottomY, collider.bounds.min.y
+                    - _instance.transform.position.y);
+            }
+            if (float.IsPositiveInfinity(_colliderBottomY)) _colliderBottomY = 0f;
+            _instance.SetActive(false);
 
             // A preview must never push pieces, fall, start a barrel fuse,
             // participate in contact scoring, or block the prediction Raycast.
