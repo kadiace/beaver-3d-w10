@@ -16,9 +16,8 @@ namespace RestoreCastle3D
         private const int STAGE_COUNT = 5;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
-        private const float CAMERA_DRAG_DEGREES_PER_PIXEL = 0.2f;
-        private const float CAMERA_MIN_PITCH = 30f;
-        private const float CAMERA_MAX_PITCH = 80f;
+        private const float CAMERA_MIN_TARGET_Z = -5f;
+        private const float CAMERA_MAX_TARGET_Z = 5f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float FLOOD_IMPULSE = 60f;
         private const float FLOOD_SURFACE_Y = -1.95f;
@@ -163,7 +162,7 @@ namespace RestoreCastle3D
                     + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회 (리롤 불가)";
         }
 
-        /// <summary>월드 커서의 XZ를 클릭 배치와 낙하 미리보기에 동일하게 사용한다.</summary>
+        /// <summary>강바닥 안이면서 Z가 0 이하인 월드 커서 위치를 배치와 미리보기에 사용한다.</summary>
         private bool TryGetPlacementXZ(Vector2 screen, out Vector3 position)
         {
             position = default;
@@ -176,7 +175,7 @@ namespace RestoreCastle3D
             Plane referencePlane = new Plane(Vector3.up, Vector3.zero);
             if (!referencePlane.Raycast(viewRay, out float distance)) return false;
             position = viewRay.GetPoint(distance);
-            return _placementBounds.Contains(
+            return position.z <= 0f && _placementBounds.Contains(
                 new Vector3(position.x, groundY, position.z));
         }
 
@@ -386,7 +385,7 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// 우클릭 드래그로 카메라를 회전하고 휠 입력으로 수직축 회전 또는 줌을 처리한다.
+        /// 우클릭 드래그로 카메라 주시점을 강의 Z축을 따라 이동하고 휠로 회전 또는 줌을 처리한다.
         /// UI 밖에서 시작한 짧은 우클릭은 버튼을 놓을 때 자재 후보를 연다.
         /// </summary>
         private void UpdateCameraInput()
@@ -430,11 +429,12 @@ namespace RestoreCastle3D
 
                 if (_rightGestureMoved && delta.sqrMagnitude > 0f)
                 {
-                    Vector3 angles = _camera.transform.eulerAngles;
-                    float pitch = Mathf.Clamp(angles.x - delta.y * CAMERA_DRAG_DEGREES_PER_PIXEL,
-                        CAMERA_MIN_PITCH, CAMERA_MAX_PITCH);
-                    float yaw = angles.y + delta.x * CAMERA_DRAG_DEGREES_PER_PIXEL;
-                    _camera.transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+                    float unit = 2f * _camera.orthographicSize / Mathf.Max(Screen.height, 1);
+                    Vector3 right = Vector3.ProjectOnPlane(_camera.transform.right, Vector3.up).normalized;
+                    Vector3 up = Vector3.ProjectOnPlane(_camera.transform.up, Vector3.up).normalized;
+                    float movementZ = unit * (right.z * delta.x + up.z * delta.y);
+                    _cameraTarget.z = Mathf.Clamp(_cameraTarget.z - movementZ,
+                        CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z);
                 }
             }
 

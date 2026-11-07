@@ -113,11 +113,12 @@ namespace RestoreCastle3D
             _game?.TryAttachGlue(this, other);
         }
 
-        /// <summary>접착제가 닿은 대상과 FixedJoint를 공유 등록해 중복 결합을 방지한다.</summary>
+        /// <summary>아직 같은 조인트 연결망에 속하지 않은 대상만 접착하고 결합을 양쪽에 등록한다.</summary>
         public bool TryGlueTo(CastlePiece3D target)
         {
             if (materialId != "all_purpose_glue" || target == null || target == this ||
-                _body == null || target.Body == null || _glueJoints.ContainsKey(target))
+                _body == null || target.Body == null || _glueJoints.ContainsKey(target) ||
+                IsJointConnectedTo(target))
                 return false;
 
             FixedJoint joint = gameObject.AddComponent<FixedJoint>();
@@ -129,6 +130,35 @@ namespace RestoreCastle3D
             _glueJoints.Add(target, joint);
             target._glueJoints.Add(this, joint);
             return true;
+        }
+
+        /// <summary>접착제와 덩굴의 기존 조인트를 따라 대상까지 이어지는 경로가 있는지 확인한다.</summary>
+        private bool IsJointConnectedTo(CastlePiece3D target)
+        {
+            HashSet<CastlePiece3D> visited = new HashSet<CastlePiece3D> { this };
+            Stack<CastlePiece3D> pending = new Stack<CastlePiece3D>();
+            pending.Push(this);
+
+            while (pending.Count > 0)
+            {
+                CastlePiece3D current = pending.Pop();
+                foreach (KeyValuePair<CastlePiece3D, FixedJoint> bond in current._glueJoints)
+                {
+                    CastlePiece3D neighbor = bond.Key;
+                    if (neighbor == null || bond.Value == null) continue;
+                    if (neighbor == target) return true;
+                    if (visited.Add(neighbor)) pending.Push(neighbor);
+                }
+
+                foreach (CastlePiece3D neighbor in current._attachedPieces)
+                {
+                    if (neighbor == null) continue;
+                    if (neighbor == target) return true;
+                    if (visited.Add(neighbor)) pending.Push(neighbor);
+                }
+            }
+
+            return false;
         }
 
         /// <summary>첫 접촉 기물과 한 번만 FixedJoint 결합하고 고유 능력을 봉인한다.</summary>
