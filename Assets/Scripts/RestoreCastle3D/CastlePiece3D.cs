@@ -11,6 +11,7 @@ namespace RestoreCastle3D
 
         private readonly HashSet<CastlePiece3D> _contacts = new HashSet<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _attachedPieces = new HashSet<CastlePiece3D>();
+        private readonly Dictionary<CastlePiece3D, FixedJoint> _glueJoints = new Dictionary<CastlePiece3D, FixedJoint>();
         private CastlePiece3D _attachmentTarget;
         private CastleGame3D _game;
         private Rigidbody _body;
@@ -81,6 +82,12 @@ namespace RestoreCastle3D
             foreach (CastlePiece3D other in _attachedPieces)
                 if (other != null) other._attachedPieces.Remove(this);
             _attachedPieces.Clear();
+            foreach (KeyValuePair<CastlePiece3D, FixedJoint> bond in _glueJoints)
+            {
+                if (bond.Key != null) bond.Key._glueJoints.Remove(this);
+                if (bond.Value != null) Destroy(bond.Value);
+            }
+            _glueJoints.Clear();
             foreach (CastlePiece3D other in _contacts)
                 if (other != null) other._contacts.Remove(this);
             _contacts.Clear();
@@ -96,6 +103,25 @@ namespace RestoreCastle3D
             // Called on the physics contact frame, before the lump's Update
             // destruction can run. A vine touching a foul lump always wins.
             _game?.TryAttachVines(this, other);
+            _game?.TryAttachGlue(this, other);
+        }
+
+        /// <summary>접착제가 닿은 대상과 FixedJoint를 공유 등록해 중복 결합을 방지한다.</summary>
+        public bool TryGlueTo(CastlePiece3D target)
+        {
+            if (materialId != "all_purpose_glue" || target == null || target == this ||
+                _body == null || target.Body == null || _glueJoints.ContainsKey(target))
+                return false;
+
+            FixedJoint joint = gameObject.AddComponent<FixedJoint>();
+            joint.connectedBody = target.Body;
+            // Keep collision contacts so adjacency-based durability effects still work.
+            joint.enableCollision = true;
+            joint.breakForce = Mathf.Infinity;
+            joint.breakTorque = Mathf.Infinity;
+            _glueJoints.Add(target, joint);
+            target._glueJoints.Add(this, joint);
+            return true;
         }
 
         /// <summary>첫 접촉 기물과 한 번만 FixedJoint 결합하고 고유 능력을 봉인한다.</summary>
