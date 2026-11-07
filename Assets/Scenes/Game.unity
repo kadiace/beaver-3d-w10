@@ -395,10 +395,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e4a9ada1e98455aa041ed77d9e7b81f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RestoreCastle3D.CastleFloodPreview3D
-  _refreshInterval: 0.1
-  _game: {fileID: 0}
-  _nextRefreshTime: 0
-  _isVisible: 0
 --- !u!1 &2100000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -445,7 +441,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _rotationSpeed: 90
   _cameraYawPerScrollStep: 5
-  _destructionBoundaryZ: -30
+  _destructionBoundaryZ: -15
 --- !u!1001 &1762329492425469008
 PrefabInstance:
   m_ObjectHideFlags: 0
