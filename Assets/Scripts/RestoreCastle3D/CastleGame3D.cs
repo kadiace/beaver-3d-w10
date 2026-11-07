@@ -702,19 +702,21 @@ namespace RestoreCastle3D
                 {
                     piece.GrowthCount++;
                     piece.PermanentBonus++;
-                    piece.transform.localScale *= 1.1f;
+                    piece.transform.localScale *= 1.05f;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
                 }
                 if (piece.MaterialId == "bamboo" && piece.GrowthCount < 3)
                 {
                     BoxCollider collider = piece.GetComponent<BoxCollider>();
+                    float segmentHeight = collider.size.y / (piece.GrowthCount + 1);
                     Vector3 previousTop = collider.transform.TransformPoint(collider.center
                         + Vector3.up * collider.size.y * 0.5f);
                     Vector3 extensionCenter = previousTop + piece.transform.up *
-                        (collider.size.y * piece.transform.lossyScale.y * 0.5f);
+                        (segmentHeight * piece.transform.lossyScale.y * 0.5f);
                     foreach (Collider hit in Physics.OverlapBox(extensionCenter,
-                        Vector3.Scale(collider.size * 0.5f, piece.transform.lossyScale),
+                        Vector3.Scale(new Vector3(collider.size.x, segmentHeight, collider.size.z)
+                            * 0.5f, piece.transform.lossyScale),
                         piece.transform.rotation, Physics.DefaultRaycastLayers,
                         QueryTriggerInteraction.Ignore))
                     {
@@ -722,15 +724,16 @@ namespace RestoreCastle3D
                         if (blocked != null && blocked != piece && blocked.MaterialId != "foundation")
                             RemovePiece(blocked);
                     }
-                    collider.center += Vector3.up * 0.5f;
-                    collider.size += Vector3.up;
-                    foreach (Transform child in piece.transform)
+                    int segmentParts = piece.transform.childCount / (piece.GrowthCount + 1);
+                    for (int i = 0; i < segmentParts; i++)
                     {
-                        child.localPosition += Vector3.up * 0.5f;
-                        Vector3 scale = child.localScale;
-                        scale.y += 1f;
-                        child.localScale = scale;
+                        Transform original = piece.transform.GetChild(i);
+                        GameObject section = Instantiate(original.gameObject, piece.transform);
+                        section.transform.localPosition = original.localPosition
+                            + Vector3.up * segmentHeight * (piece.GrowthCount + 1);
                     }
+                    collider.center += Vector3.up * segmentHeight * 0.5f;
+                    collider.size += Vector3.up * segmentHeight;
                     piece.GrowthCount++;
                     if (piece.GrowthCount == 3) piece.PermanentBonus += 5;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
