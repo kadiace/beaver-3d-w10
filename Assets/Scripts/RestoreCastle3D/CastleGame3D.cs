@@ -568,7 +568,7 @@ namespace RestoreCastle3D
         /// <summary>서로 다른 자재 3개를 뽑되 살아있는 나무의 등장 확률을 절반으로 낮춘다.</summary>
         private void DealOffers()
         {
-            List<CastleMaterial3D> available = _catalog.All.Where(x => !x.startOnly && !x.spawnOnly && x.id != "growing_vine").ToList();
+            List<CastleMaterial3D> available = _catalog.All.Where(CastleCatalog3D.CanAppearAsOffer).ToList();
             for (int i = 0; i < _offers.Length; i++)
             {
                 int index = _random.Next(available.Count);
