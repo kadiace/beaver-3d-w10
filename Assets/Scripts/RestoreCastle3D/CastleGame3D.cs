@@ -568,7 +568,7 @@ namespace RestoreCastle3D
         /// <summary>서로 다른 자재 3개를 뽑되 살아있는 나무의 등장 확률을 절반으로 낮춘다.</summary>
         private void DealOffers()
         {
-            List<CastleMaterial3D> available = _catalog.All.Where(x => !x.startOnly && !x.spawnOnly).ToList();
+            List<CastleMaterial3D> available = _catalog.All.Where(x => !x.startOnly && !x.spawnOnly && x.id != "growing_vine").ToList();
             for (int i = 0; i < _offers.Length; i++)
             {
                 int index = _random.Next(available.Count);
@@ -758,22 +758,20 @@ namespace RestoreCastle3D
             vine.PermanentBonus += _catalog.Get(target.MaterialId).baseReinforcement;
         }
 
-        /// <summary>접촉한 모든 기물을 접착제에 결합하고, 기물 제거 시에는 결합을 해제한다.</summary>
+        /// <summary>
+        /// 충돌한 a와 b가 살아 있으면 두 자재의 결합강도 합으로 일반 조인트를 생성한다.
+        /// 생성 주체는 인스턴스 ID로 정하며 홍수 중에도 결합할 수 있다.
+        /// </summary>
         public void TryAttachGlue(CastlePiece3D a, CastlePiece3D b)
         {
-            if (_stageTransitioning || a == null || b == null ||
-                !_pieceSet.Contains(a) || !_pieceSet.Contains(b))
+            if (a == null || b == null || !_pieceSet.Contains(a) || !_pieceSet.Contains(b))
                 return;
 
-            bool canA = a.MaterialId == "all_purpose_glue" && !IsAbilityDisabled(a);
-            bool canB = b.MaterialId == "all_purpose_glue" && !IsAbilityDisabled(b);
-            if (!canA && !canB) return;
-
-            CastlePiece3D glue = canA && canB
-                ? (a.GetInstanceID() > b.GetInstanceID() ? a : b)
-                : (canA ? a : b);
-            CastlePiece3D target = glue == a ? b : a;
-            glue.TryGlueTo(target);
+            CastlePiece3D owner = a.GetInstanceID() > b.GetInstanceID() ? a : b;
+            CastlePiece3D target = owner == a ? b : a;
+            float strength = _catalog.Get(a.MaterialId).bondStrength +
+                _catalog.Get(b.MaterialId).bondStrength;
+            owner.TryGlueTo(target, strength);
         }
 
         /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
@@ -793,15 +791,6 @@ namespace RestoreCastle3D
                 }
             }
 
-            // Retry existing contacts if their initial collision callback was missed.
-            foreach (CastlePiece3D glue in _pieces.ToArray())
-            {
-                if (glue == null || glue.MaterialId != "all_purpose_glue" ||
-                    IsAbilityDisabled(glue))
-                    continue;
-                foreach (CastlePiece3D neighbor in Adjacent(glue).ToArray())
-                    TryAttachGlue(glue, neighbor);
-            }
 
             foreach (CastlePiece3D lump in _pieces.ToArray())
             {
@@ -872,6 +861,7 @@ namespace RestoreCastle3D
             {
                 if (current == _outlinedPiece) SetOutlineTargets(null);
                 _pieceSet.Remove(current);
+                current.ReleaseGlueJoints();
                 _pieces.Remove(current);
                 _score.Remove(current);
                 PublishChange(new CastleChange3D(current, piece, reason, 0,

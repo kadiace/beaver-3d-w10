@@ -12,6 +12,8 @@ namespace RestoreCastle3D
         private readonly HashSet<CastlePiece3D> _contacts = new HashSet<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _attachedPieces = new HashSet<CastlePiece3D>();
         private readonly Dictionary<CastlePiece3D, FixedJoint> _glueJoints = new Dictionary<CastlePiece3D, FixedJoint>();
+        private readonly HashSet<CastlePiece3D> _brokenContactBlocks = new HashSet<CastlePiece3D>();
+        private readonly List<CastlePiece3D> _brokenJointBuffer = new List<CastlePiece3D>();
         private CastlePiece3D _attachmentTarget;
         private CastleGame3D _game;
         private Rigidbody _body;
@@ -54,6 +56,7 @@ namespace RestoreCastle3D
 
         private void FixedUpdate()
         {
+            CleanupBrokenJoints();
             if (_game != null && materialId != "foundation" &&
                 transform.position.z <= _game.DestructionBoundaryZ)
                 _game.RemoveOutsideBoundary(this);
@@ -61,7 +64,7 @@ namespace RestoreCastle3D
 
         private void OnCollisionEnter(Collision collision)
         {
-            Register(collision);
+            Register(collision, true);
             if (materialId == "barrel" && !_game.IsAbilityDisabled(this)
                 && !_fuseStarted && _game != null)
             {
@@ -73,7 +76,7 @@ namespace RestoreCastle3D
 
         private void OnCollisionStay(Collision collision)
         {
-            Register(collision);
+            Register(collision, false);
         }
 
         private void OnCollisionExit(Collision collision)
@@ -82,6 +85,8 @@ namespace RestoreCastle3D
             if (other == null || other == this) return;
             _contacts.Remove(other);
             other._contacts.Remove(this);
+            _brokenContactBlocks.Remove(other);
+            other._brokenContactBlocks.Remove(this);
         }
 
         private void OnDestroy()
@@ -89,47 +94,90 @@ namespace RestoreCastle3D
             foreach (CastlePiece3D other in _attachedPieces)
                 if (other != null) other._attachedPieces.Remove(this);
             _attachedPieces.Clear();
+            ReleaseGlueJoints();
+            foreach (CastlePiece3D other in _brokenContactBlocks)
+                if (other != null) other._brokenContactBlocks.Remove(this);
+            _brokenContactBlocks.Clear();
+            foreach (CastlePiece3D other in _contacts)
+                if (other != null) other._contacts.Remove(this);
+            _contacts.Clear();
+        }
+
+        /// <summary>
+        /// collision의 기물을 양방향 접촉 목록에 기록하고 최초 충돌이면 공통 결합을 시도한다.
+        /// isNewCollision은 새 충돌 여부이며 접촉 유지 중에는 재결합하지 않는다.
+        /// </summary>
+        private void Register(Collision collision, bool isNewCollision)
+        {
+            CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
+            if (other == null || other == this) return;
+            CleanupBrokenJoints();
+            other.CleanupBrokenJoints();
+            bool firstContact = _contacts.Add(other);
+            other._contacts.Add(this);
+            _game?.TryAttachVines(this, other);
+            if (isNewCollision && firstContact && !_brokenContactBlocks.Contains(other))
+                _game?.TryAttachGlue(this, other);
+        }
+
+        /// <summary>
+        /// target이 다른 연결망에 있으면 strength를 파괴 강도로 사용해 조인트를 생성한다.
+        /// 양쪽 연결 목록을 갱신하고 생성 여부를 반환한다.
+        /// </summary>
+        public bool TryGlueTo(CastlePiece3D target, float strength)
+        {
+            if (target == null || target == this || _body == null || target.Body == null ||
+                _brokenContactBlocks.Contains(target) || target._brokenContactBlocks.Contains(this) ||
+                _glueJoints.ContainsKey(target) || IsJointConnectedTo(target))
+                return false;
+
+            FixedJoint joint = gameObject.AddComponent<FixedJoint>();
+            joint.connectedBody = target.Body;
+            joint.enableCollision = true;
+            joint.breakForce = strength;
+            joint.breakTorque = strength;
+            _glueJoints.Add(target, joint);
+            target._glueJoints.Add(this, joint);
+            return true;
+        }
+
+        /// <summary>
+        /// 파괴되어 사라진 접착 조인트를 양쪽 목록에서 제거한다.
+        /// 여전히 접촉 중인 대상은 접촉이 끝날 때까지 재결합을 차단한다.
+        /// </summary>
+        private void CleanupBrokenJoints()
+        {
+            _brokenJointBuffer.Clear();
+            foreach (KeyValuePair<CastlePiece3D, FixedJoint> bond in _glueJoints)
+                if (bond.Key == null || bond.Value == null)
+                    _brokenJointBuffer.Add(bond.Key);
+
+            foreach (CastlePiece3D other in _brokenJointBuffer)
+            {
+                _glueJoints.Remove(other);
+                if (other == null) continue;
+                other._glueJoints.Remove(this);
+                if (_contacts.Contains(other) || other._contacts.Contains(this))
+                {
+                    _brokenContactBlocks.Add(other);
+                    other._brokenContactBlocks.Add(this);
+                }
+            }
+            _brokenJointBuffer.Clear();
+        }
+
+        /// <summary>
+        /// 이 기물의 모든 일반 접착 조인트를 제거하고 상대 기물의 연결 목록을 갱신한다.
+        /// 기물이 게임에서 제거되거나 파괴될 때 사용한다.
+        /// </summary>
+        internal void ReleaseGlueJoints()
+        {
             foreach (KeyValuePair<CastlePiece3D, FixedJoint> bond in _glueJoints)
             {
                 if (bond.Key != null) bond.Key._glueJoints.Remove(this);
                 if (bond.Value != null) Destroy(bond.Value);
             }
             _glueJoints.Clear();
-            foreach (CastlePiece3D other in _contacts)
-                if (other != null) other._contacts.Remove(this);
-            _contacts.Clear();
-        }
-
-        /// <summary>충돌한 두 기물을 양방향 접촉 그래프에 기록한다. 바닥 충돌은 제외한다.</summary>
-        private void Register(Collision collision)
-        {
-            CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
-            if (other == null || other == this) return;
-            _contacts.Add(other);
-            other._contacts.Add(this);
-            // Called on the physics contact frame, before the lump's Update
-            // destruction can run. A vine touching a foul lump always wins.
-            _game?.TryAttachVines(this, other);
-            _game?.TryAttachGlue(this, other);
-        }
-
-        /// <summary>아직 같은 조인트 연결망에 속하지 않은 대상만 접착하고 결합을 양쪽에 등록한다.</summary>
-        public bool TryGlueTo(CastlePiece3D target)
-        {
-            if (materialId != "all_purpose_glue" || target == null || target == this ||
-                _body == null || target.Body == null || _glueJoints.ContainsKey(target) ||
-                IsJointConnectedTo(target))
-                return false;
-
-            FixedJoint joint = gameObject.AddComponent<FixedJoint>();
-            joint.connectedBody = target.Body;
-            // Keep collision contacts so adjacency-based durability effects still work.
-            joint.enableCollision = true;
-            joint.breakForce = Mathf.Infinity;
-            joint.breakTorque = Mathf.Infinity;
-            _glueJoints.Add(target, joint);
-            target._glueJoints.Add(this, joint);
-            return true;
         }
 
         /// <summary>접착제와 덩굴의 기존 조인트를 따라 대상까지 이어지는 경로가 있는지 확인한다.</summary>

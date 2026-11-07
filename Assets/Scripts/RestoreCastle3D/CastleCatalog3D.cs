@@ -13,6 +13,7 @@ namespace RestoreCastle3D
         public bool startOnly;
         public bool spawnOnly;
         public int baseReinforcement;
+        public float bondStrength;
         public string[] abilities;
     }
 
