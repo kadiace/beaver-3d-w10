@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -73,6 +74,8 @@ namespace RestoreCastle3D
             _rulesBody = FindText("RulesPopup/Contents/BodyText");
             _tooltip = transform.Find("CandidateMaterialTooltip").gameObject;
             _tooltipText = FindText("CandidateMaterialTooltip/CandidateMaterialTooltipText");
+            _tooltipText.supportRichText = true;
+            _effects.supportRichText = true;
 
             // The original 2D HUD is instantiated into a different game scene.
             // Use an explicit top-left anchor and pivot for predictable placement.
@@ -146,7 +149,7 @@ namespace RestoreCastle3D
                 + "접촉 중인 기물끼리 내구도 능력이 적용됩니다.\n"
                 + "우클릭 드래그: 카메라 XZ 이동 / 휠: 확대·축소\n"
                 + "Q/E: 기물 회전 / Esc: 선택 취소\n"
-                + "오크통: 첫 충돌 3초 뒤 주변 기물을 날림 (오크통 유지)\n"
+                + "오크통: 첫 충돌 1초 뒤 주변 기물을 날림 (오크통 유지)\n"
                 + "첫 드랍 전에는 후보를 변경할 수 있습니다.\n"
                 + "매 드랍 후 선택 UI를 숨깁니다. Esc/우클릭으로 다시 열어 다른 자재 선택 가능.\n"
                 + "첫 드랍 이후에는 리롤 불가. 라운드 전체 5개 배치.\n"
@@ -394,8 +397,9 @@ namespace RestoreCastle3D
                 ? Array.Empty<string>()
                 : material.abilities.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
             string description = abilities.Length == 0 ? "고유 능력 없음" : string.Join("\n", abilities);
-            return material.name + "\n기본 내구도: " + material.baseReinforcement + "\n\n"
-                + description + "\n\n[" + material.category + "]";
+            return ColorTags("[" + material.category + "] [" + DisplayRarity(material.rarity) + "]")
+                + "\n" + material.name + "\n기본 내구도: " + material.baseReinforcement
+                + "\n\n" + ColorTags(description);
         }
 
         /// <summary>원본의 배치 기물 정보 패널처럼 개별 내구도와 접촉 자재를 표시한다.</summary>
@@ -406,7 +410,7 @@ namespace RestoreCastle3D
             CastlePiece3D[] neighbors = _game.GetTouchingPieces(piece);
             List<string> lines = new List<string>
             {
-                "[" + material.category + "]",
+                "[" + material.category + "] [" + DisplayRarity(material.rarity) + "]",
                 material.name,
                 "기본 내구도 " + material.baseReinforcement
             };
@@ -428,7 +432,33 @@ namespace RestoreCastle3D
                 lines.Add("고유 능력 없음");
             else
                 lines.AddRange(material.abilities.Where(x => !string.IsNullOrWhiteSpace(x)));
-            return string.Join("\n", lines);
+            return ColorTags(string.Join("\n", lines));
+        }
+
+        /// <summary>툴팁에서 희귀와 고급의 표시 문구만 교체하고 실제 희귀도 값은 유지한다.</summary>
+        private static string DisplayRarity(string rarity)
+        {
+            return rarity == "희귀" ? "고급" : rarity == "고급" ? "희귀" : rarity;
+        }
+
+        /// <summary>자재 분류와 희귀도 대괄호 태그에 각 색상을 적용하고 나머지 설명은 유지한다.</summary>
+        private static string ColorTags(string text)
+        {
+            return Regex.Replace(text, @"\[(석재|목재|식물|잡동사니|쓰레기|일반|희귀|고급)\]", match =>
+            {
+                string color = match.Groups[1].Value switch
+                {
+                    "석재" => "#B8C9DC",
+                    "목재" => "#C88C58",
+                    "식물" => "#82C96A",
+                    "잡동사니" => "#E1BE72",
+                    "쓰레기" => "#D98987",
+                    "일반" => "#FFFFFF",
+                    "희귀" => "#BD86ED",
+                    _ => "#65ADFF"
+                };
+                return "<color=" + color + ">" + match.Value + "</color>";
+            });
         }
 
         /// <summary>텍스트에 맞게 크기를 제한한 뒤 전체 패널을 화면 안으로 배치한다.</summary>

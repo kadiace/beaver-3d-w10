@@ -17,6 +17,7 @@ namespace RestoreCastle3D
         private Renderer[] _renderers;
         private bool _fuseStarted;
         private bool _fusePending;
+        private int _growthCount;
 
         public string MaterialId => materialId;
         public Rigidbody Body => _body;
@@ -29,11 +30,14 @@ namespace RestoreCastle3D
         public bool FusePending => _fusePending;
         public int PlacedTurn { get; private set; }
         public int PermanentBonus { get; set; }
+        public int GrowthCount { get => _growthCount; set => _growthCount = value; }
+        public bool RiverAnchored { get; private set; }
 
         private void Awake()
         {
             _body = GetComponent<Rigidbody>();
-            _renderers = GetComponentsInChildren<Renderer>(true);
+            _renderers = System.Array.FindAll(GetComponentsInChildren<Renderer>(true),
+                renderer => renderer.gameObject.name != "Penalty Range");
             SetOutlineLayer(0);
         }
 
@@ -44,16 +48,27 @@ namespace RestoreCastle3D
                 renderer.renderingLayerMask = (renderer.renderingLayerMask & ~6u) | layer;
         }
 
+        /// <summary>드랍 가이드의 폐기물 디메리트 대상 여부에 따라 빨간 외곽선 레이어를 켜거나 끈다.</summary>
+        public void SetPenaltyOutline(bool enabled)
+        {
+            foreach (Renderer renderer in _renderers)
+                renderer.renderingLayerMask = enabled
+                    ? renderer.renderingLayerMask | 8u
+                    : renderer.renderingLayerMask & ~8u;
+        }
+
         /// <summary>생성된 기물에 게임 소유자 및 설치된 턴을 연결한다.</summary>
-        public void Initialize(CastleGame3D game, int turn)
+        public void Initialize(CastleGame3D game, int turn, string id = null)
         {
             _game = game;
             PlacedTurn = turn;
+            if (id != null) materialId = id;
         }
 
         private void OnCollisionEnter(Collision collision)
         {
             Register(collision);
+            TryAnchorToRiver(collision);
             if (materialId == "barrel" && !_game.IsAbilityDisabled(this)
                 && !_fuseStarted && _game != null)
             {
@@ -66,6 +81,22 @@ namespace RestoreCastle3D
         private void OnCollisionStay(Collision collision)
         {
             Register(collision);
+            TryAnchorToRiver(collision);
+        }
+
+        /// <summary>식물의 밑면이 강바닥에 직접 닿았을 때 위치를 고정하고 홍수 보호 상태를 기록한다.</summary>
+        private void TryAnchorToRiver(Collision collision)
+        {
+            if (RiverAnchored || (materialId != "sunflower" && materialId != "bamboo" &&
+                materialId != "living_tree") || collision.gameObject.name != "Flat Muddy Creek Bed") return;
+            foreach (ContactPoint contact in collision.contacts)
+            {
+                if (Vector3.Dot(contact.normal, Vector3.up) < 0.7f) continue;
+                RiverAnchored = true;
+                _body.isKinematic = true;
+                _body.useGravity = false;
+                return;
+            }
         }
 
         private void OnCollisionExit(Collision collision)
@@ -96,6 +127,19 @@ namespace RestoreCastle3D
             // Called on the physics contact frame, before the lump's Update
             // destruction can run. A vine touching a foul lump always wins.
             _game?.TryAttachVines(this, other);
+            _game?.TryAttachMud(this, other);
+        }
+
+        /// <summary>진흙에 접촉한 목재를 물리적으로 고정하고 부착 관계를 기록한다.</summary>
+        public void AttachWood(CastlePiece3D wood)
+        {
+            if (!_attachedPieces.Add(wood)) return;
+            wood._attachedPieces.Add(this);
+            FixedJoint joint = wood.gameObject.AddComponent<FixedJoint>();
+            joint.connectedBody = _body;
+            joint.enableCollision = false;
+            joint.breakForce = Mathf.Infinity;
+            joint.breakTorque = Mathf.Infinity;
         }
 
         /// <summary>첫 접촉 기물과 한 번만 FixedJoint 결합하고 고유 능력을 봉인한다.</summary>

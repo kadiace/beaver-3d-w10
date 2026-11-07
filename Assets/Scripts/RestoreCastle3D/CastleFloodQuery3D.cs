@@ -87,7 +87,7 @@ namespace RestoreCastle3D
                 rightX = Mathf.Max(rightX, position.x);
                 nearZ = Mathf.Min(nearZ, position.z);
                 farZ = Mathf.Max(farZ, position.z);
-                if (piece.MaterialId != "foundation")
+                if (piece.MaterialId != "foundation" && !piece.RiverAnchored)
                     lowestY = Mathf.Min(lowestY, position.y);
             }
 
@@ -138,7 +138,8 @@ namespace RestoreCastle3D
             for (int i = 0; i < count; i++)
             {
                 CastlePiece3D piece = _colliders[i].GetComponentInParent<CastlePiece3D>();
-                if (piece != null && piece.MaterialId != "foundation" && livePieces.Contains(piece))
+                if (piece != null && piece.MaterialId != "foundation" &&
+                    !piece.RiverAnchored && livePieces.Contains(piece))
                     result.Add(piece);
             }
             Array.Clear(_colliders, 0, count);
@@ -155,7 +156,7 @@ namespace RestoreCastle3D
             _contactedPieces.Clear();
             CollectContacts(volume, 0f, volume.Length, livePieces, _contactedPieces);
             foreach (CastlePiece3D piece in _contactedPieces)
-                CollectAttachmentGroup(piece, livePieces, result, _frontier);
+                CollectAttachmentGroup(piece, livePieces, result, _frontier, true);
             _contactedPieces.Clear();
         }
 
@@ -165,14 +166,15 @@ namespace RestoreCastle3D
         /// </summary>
         public static void CollectAttachmentGroup(CastlePiece3D piece,
             HashSet<CastlePiece3D> livePieces, HashSet<CastlePiece3D> result,
-            Stack<CastlePiece3D> frontier)
+            Stack<CastlePiece3D> frontier, bool preserveRiverAnchors = false)
         {
             frontier.Clear();
             frontier.Push(piece);
             while (frontier.Count > 0)
             {
                 CastlePiece3D current = frontier.Pop();
-                if (current == null || !livePieces.Contains(current) || !result.Add(current))
+                if (current == null || !livePieces.Contains(current) ||
+                    (preserveRiverAnchors && current.RiverAnchored) || !result.Add(current))
                     continue;
                 foreach (CastlePiece3D attached in current.AttachedPieces)
                     if (attached != null && !result.Contains(attached))
