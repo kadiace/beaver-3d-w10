@@ -15,9 +15,11 @@ namespace RestoreCastle3D
         private const int PLACEMENTS_PER_ROUND = 5;
         private const int STAGE_COUNT = 5;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
-        private const float CAMERA_EDGE_MARGIN = 3f;
-        private const float CAMERA_MOVEMENT_RANGE_MULTIPLIER = 1.2f;
-        private const float CAMERA_MOVEMENT_REFERENCE_SIZE = 7f;
+        private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
+        private const float CAMERA_DRAG_DEGREES_PER_PIXEL = 0.2f;
+        private const float CAMERA_MIN_PITCH = 30f;
+        private const float CAMERA_MAX_PITCH = 80f;
+        private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float FLOOD_IMPULSE = 60f;
         private const float FLOOD_SURFACE_Y = -1.95f;
 
@@ -77,6 +79,12 @@ namespace RestoreCastle3D
         private bool _stagePassed;
         private string _status;
 
+        [Header("Camera input")]
+        private Vector2 _rightDragDisplacement;
+        private bool _rightGestureActive;
+        private bool _rightGestureMoved;
+        private bool _rightGestureScrolled;
+
         private void Start()
         {
             _catalog = new CastleCatalog3D();
@@ -112,16 +120,14 @@ namespace RestoreCastle3D
             {
                 if (keyboard.escapeKey.wasPressedThisFrame)
                     OpenCandidatePalette();
-                if (keyboard.qKey.wasPressedThisFrame) _objectYaw -= 90f;
-                if (keyboard.eKey.wasPressedThisFrame) _objectYaw += 90f;
+                if (keyboard.qKey.isPressed) _objectYaw -= RotationSpeed * Time.deltaTime;
+                if (keyboard.eKey.isPressed) _objectYaw += RotationSpeed * Time.deltaTime;
             }
-
-            if (mouse != null && mouse.rightButton.wasPressedThisFrame)
-                OpenCandidatePalette();
 
             UpdateDropPreview();
 
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame ||
+                mouse.rightButton.isPressed || mouse.rightButton.wasReleasedThisFrame ||
                 !_dropMouseReleased || _selected < 0 ||
                 _placementsInRound >= PLACEMENTS_PER_ROUND ||
                 Time.unscaledTime - _lastDropTime < dropClickCooldown)
@@ -314,6 +320,8 @@ namespace RestoreCastle3D
         public int RoundsPerStage => ROUNDS_PER_STAGE;
         public int CurrentStageRound => _awaitingStage ? ROUNDS_PER_STAGE : _turn % ROUNDS_PER_STAGE + 1;
         public int PlacementsPerRound => PLACEMENTS_PER_ROUND;
+        public float RotationSpeed { get; set; } = 90f;
+        public float CameraYawPerScrollStep { get; set; } = 5f;
         public int PlacementsThisRound => _placementsInRound;
         // The palette hides after each real drop; Esc/right-click reopens it.
         public bool IsRoundPlacing => _resolving || !_paletteOpen;
@@ -372,48 +380,103 @@ namespace RestoreCastle3D
             ResetGame();
         }
 
-        /// <summary>카메라 회전은 변경하지 않고 XZ 평행이동과 정사영 크기만 변경한다.</summary>
+        /// <summary>
+        /// 우클릭 드래그로 카메라를 회전하고 휠 입력으로 수직축 회전 또는 줌을 처리한다.
+        /// UI 밖에서 시작한 짧은 우클릭은 버튼을 놓을 때 자재 후보를 연다.
+        /// </summary>
         private void UpdateCameraInput()
         {
             Mouse mouse = Mouse.current;
-            if (mouse == null) return;
-            if (mouse.rightButton.isPressed)
+            if (mouse == null)
             {
-                Vector2 delta = mouse.delta.ReadValue();
-                float unit = 2f * _camera.orthographicSize / Mathf.Max(Screen.height, 1);
-                Vector3 right = Vector3.ProjectOnPlane(_camera.transform.right, Vector3.up).normalized;
-                Vector3 up = Vector3.ProjectOnPlane(_camera.transform.up, Vector3.up).normalized;
-                _cameraTarget -= unit * (right * delta.x + up * delta.y);
+                _rightGestureActive = false;
+                return;
             }
+
+            var rightButton = mouse.rightButton;
+            bool pointerOverUi = EventSystem.current != null &&
+                EventSystem.current.IsPointerOverGameObject();
+            if (rightButton.wasPressedThisFrame)
+            {
+                _rightGestureActive = !pointerOverUi;
+                _rightGestureMoved = false;
+                _rightGestureScrolled = false;
+                _rightDragDisplacement = Vector2.zero;
+            }
+
+            bool gestureInProgress = _rightGestureActive &&
+                (rightButton.isPressed || rightButton.wasReleasedThisFrame);
+            if (gestureInProgress)
+            {
+                Vector2 delta = rightButton.wasPressedThisFrame
+                    ? Vector2.zero : mouse.delta.ReadValue();
+                if (!_rightGestureMoved)
+                {
+                    _rightDragDisplacement += delta;
+                    if (_rightDragDisplacement.sqrMagnitude >=
+                        CAMERA_DRAG_THRESHOLD_PIXELS * CAMERA_DRAG_THRESHOLD_PIXELS)
+                    {
+                        _rightGestureMoved = true;
+                        delta = _rightDragDisplacement;
+                    }
+                    else
+                        delta = Vector2.zero;
+                }
+
+                if (_rightGestureMoved && delta.sqrMagnitude > 0f)
+                {
+                    Vector3 angles = _camera.transform.eulerAngles;
+                    float pitch = Mathf.Clamp(angles.x - delta.y * CAMERA_DRAG_DEGREES_PER_PIXEL,
+                        CAMERA_MIN_PITCH, CAMERA_MAX_PITCH);
+                    float yaw = angles.y + delta.x * CAMERA_DRAG_DEGREES_PER_PIXEL;
+                    _camera.transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+                }
+            }
+
             float scroll = mouse.scroll.ReadValue().y;
             if (Mathf.Abs(scroll) > 0.01f)
-                _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize *
-                    Mathf.Exp(-scroll * 0.0013f), 6f, 13.5f);
-            ClampCameraTarget();
+            {
+                if (gestureInProgress)
+                {
+                    _rightGestureScrolled = true;
+                    if (!pointerOverUi)
+                        _camera.transform.Rotate(Vector3.up,
+                            NormalizeScrollSteps(scroll) * CameraYawPerScrollStep, Space.World);
+                }
+                else if (!rightButton.isPressed && !rightButton.wasReleasedThisFrame && !pointerOverUi)
+                {
+                    _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize *
+                        Mathf.Exp(-scroll * 0.0013f), 6f, 13.5f);
+                }
+            }
+
+            if (rightButton.wasReleasedThisFrame)
+            {
+                if (_rightGestureActive && !_rightGestureMoved &&
+                    !_rightGestureScrolled && !pointerOverUi)
+                    OpenCandidatePalette();
+                _rightGestureActive = false;
+            }
+
             UpdateCameraPosition();
         }
 
-        /// <summary>현재 화면 크기에서도 냇가 바깥이 조금만 보이도록 카메라 중심을 제한한다.</summary>
-        private void ClampCameraTarget()
+        /// <summary>
+        /// Input System의 휠 델타를 입력 설정과 실행 플랫폼에 맞춰 휠 칸 수로 환산한다.
+        /// 정규화된 설정은 그대로 사용하고 Windows의 플랫폼 고유 값은 120으로 나눈다.
+        /// </summary>
+        private static float NormalizeScrollSteps(float scroll)
         {
-            float movementSize = Mathf.Min(_camera.orthographicSize, CAMERA_MOVEMENT_REFERENCE_SIZE);
-            float horizontalReach = movementSize * _camera.aspect;
-            float verticalReach = movementSize / Mathf.Sin(60f * Mathf.Deg2Rad);
-            Vector3 right = _camera.transform.right;
-            Vector3 forward = Vector3.ProjectOnPlane(_camera.transform.up, Vector3.up).normalized;
-            float halfVisibleX = Mathf.Abs(right.x) * horizontalReach +
-                Mathf.Abs(forward.x) * verticalReach;
-            float halfVisibleZ = Mathf.Abs(right.z) * horizontalReach +
-                Mathf.Abs(forward.z) * verticalReach;
-            float limitX = Mathf.Max(0f, _placementBounds.extents.x +
-                CAMERA_EDGE_MARGIN - halfVisibleX) * CAMERA_MOVEMENT_RANGE_MULTIPLIER;
-            float limitZ = Mathf.Max(0f, _placementBounds.extents.z -
-                CAMERA_EDGE_MARGIN - halfVisibleZ) * CAMERA_MOVEMENT_RANGE_MULTIPLIER;
-            _cameraTarget.x = Mathf.Clamp(_cameraTarget.x, -limitX, limitX);
-            _cameraTarget.z = Mathf.Clamp(_cameraTarget.z, -limitZ, limitZ);
+            if (InputSystem.settings.scrollDeltaBehavior ==
+                InputSettings.ScrollDeltaBehavior.KeepPlatformSpecificInputRange &&
+                (Application.platform == RuntimePlatform.WindowsEditor ||
+                 Application.platform == RuntimePlatform.WindowsPlayer))
+                return scroll / WINDOWS_SCROLL_UNITS_PER_TICK;
+
+            return scroll;
         }
 
-        /// <summary>고정 각도를 유지한 채 평면상의 주시 위치를 변경한다.</summary>
+        /// <summary>현재 회전 방향과 주시 위치를 사용해 카메라 위치를 갱신한다.</summary>
         private void UpdateCameraPosition()
         {
             _camera.transform.position = _cameraTarget - _camera.transform.forward * 20f;
@@ -457,6 +520,7 @@ namespace RestoreCastle3D
             _awaitingStage = false;
             _finished = false;
             _cameraTarget = Vector3.zero;
+            _rightGestureActive = false;
             UpdateCameraPosition();
             DealOffers();
             _status = "재료를 떨어뜨려 집을 쌓으세요. Q/E: 재료 회전";

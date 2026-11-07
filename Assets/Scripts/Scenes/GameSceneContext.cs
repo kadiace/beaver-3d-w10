@@ -2,12 +2,20 @@ using UnityEngine;
 
 public class GameSceneContext : MonoBehaviour
 {
+    [Header("Object rotation")]
+    [SerializeField, Min(0f)] private float _rotationSpeed = 90f;
+
+    [Header("Camera")]
+    [SerializeField, Min(0f)] private float _cameraYawPerScrollStep = 5f;
+
     private void Start()
     {
         Managers.Input.SetInputMode(InputMode.Player);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        gameObject.AddComponent<RestoreCastle3D.CastleGame3D>();
+        RestoreCastle3D.CastleGame3D game = gameObject.AddComponent<RestoreCastle3D.CastleGame3D>();
+        game.RotationSpeed = _rotationSpeed;
+        game.CameraYawPerScrollStep = _cameraYawPerScrollStep;
         Debug.Log("[GameSceneContext] Game scene initialized.");
     }
 }
