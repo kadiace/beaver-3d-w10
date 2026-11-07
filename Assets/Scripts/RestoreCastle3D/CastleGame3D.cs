@@ -17,7 +17,7 @@ namespace RestoreCastle3D
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
         private const float CAMERA_MIN_TARGET_Z = -5f;
-        private const float CAMERA_MAX_TARGET_Z = 5f;
+        private const float CAMERA_MAX_TARGET_Z = 15f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float FLOOD_IMPULSE = 60f;
         private const float FLOOD_SURFACE_Y = -1.95f;
@@ -162,8 +162,15 @@ namespace RestoreCastle3D
                     + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회 (리롤 불가)";
         }
 
-        /// <summary>강바닥 안이면서 Z가 0 이하인 월드 커서 위치를 배치와 미리보기에 사용한다.</summary>
+        /// <summary>화면 커서가 배치 가능한 월드 XZ에 있으면 그 위치를 반환한다.</summary>
         private bool TryGetPlacementXZ(Vector2 screen, out Vector3 position)
+        {
+            if (!TryGetCursorXZ(screen, out position)) return false;
+            return CanPlaceAt(position);
+        }
+
+        /// <summary>화면 안이고 UI 밖인 커서를 기준 평면 위 월드 XZ 위치로 변환한다.</summary>
+        private bool TryGetCursorXZ(Vector2 screen, out Vector3 position)
         {
             position = default;
             if (screen.x < 0f || screen.y < 0f ||
@@ -175,24 +182,32 @@ namespace RestoreCastle3D
             Plane referencePlane = new Plane(Vector3.up, Vector3.zero);
             if (!referencePlane.Raycast(viewRay, out float distance)) return false;
             position = viewRay.GetPoint(distance);
-            return position.z <= 0f && _placementBounds.Contains(
+            return true;
+        }
+
+        /// <summary>월드 XZ가 강바닥 안이고 Z가 15 미만이면 배치를 허용한다.</summary>
+        private bool CanPlaceAt(Vector3 position)
+        {
+            return position.z < 15f && _placementBounds.Contains(
                 new Vector3(position.x, groundY, position.z));
         }
 
-        /// <summary>선택한 자재의 실제 프리팹으로 -Y 방향 Raycast 낙하 예상 위치를 표시한다.</summary>
+        /// <summary>커서 위치의 배치 가능 여부에 따라 실제 자재의 낙하 미리보기 색을 바꾼다.</summary>
         private void UpdateDropPreview()
         {
             Mouse mouse = Mouse.current;
             if (mouse == null || _selected < 0 || mouse.rightButton.isPressed ||
                 _offers[_selected] == null ||
-                !TryGetPlacementXZ(mouse.position.ReadValue(), out Vector3 placement))
+                !TryGetCursorXZ(mouse.position.ReadValue(), out Vector3 placement))
             {
                 HideDropPreview();
                 return;
             }
 
+            bool canPlace = CanPlaceAt(placement);
             _dropPreview.Show(_offers[_selected], placement,
-                Quaternion.Euler(0f, _objectYaw, 0f), dropHeight);
+                Quaternion.Euler(0f, _objectYaw, 0f), dropHeight, canPlace,
+                _placementBounds.max.y);
 
             if (_dropPreview.IsVisible)
             {
