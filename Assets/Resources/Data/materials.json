@@ -251,7 +251,8 @@
       "category": "쓰레기",
       "baseReinforcement": -1,
       "abilities": [
-        "인접한 자재 종류마다 내구도 +1"
+        "인접한 자재 종류마다 내구도 +1",
+        "자신과 닿은 모든 기물을 부착한다"
       ],
       "abilityAlternatives": []
     },
