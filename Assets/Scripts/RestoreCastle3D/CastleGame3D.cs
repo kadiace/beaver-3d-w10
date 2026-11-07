@@ -14,11 +14,15 @@ namespace RestoreCastle3D
         private const int ROUNDS_PER_STAGE = 5;
         private const int PLACEMENTS_PER_ROUND = 5;
         private const int STAGE_COUNT = 5;
+        private const int LIVING_TREE_MAX_GROWTH = 8;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float WASTE_EFFECT_RADIUS = 2.5f;
         private const float CAMERA_EDGE_MARGIN = 3f;
         private const float CAMERA_MOVEMENT_RANGE_MULTIPLIER = 1.2f;
         private const float CAMERA_MOVEMENT_REFERENCE_SIZE = 7f;
+
+        private static readonly float _livingTreeScalePerGrowth =
+            1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
 
         [Header("Barrel explosion")]
         [SerializeField, Min(0f)] private float barrelExplosionImpulse = 18f;
@@ -264,7 +268,7 @@ namespace RestoreCastle3D
                 if (piece == null || !_pieceSet.Contains(piece) ||
                     _catalog.Get(piece.MaterialId).category == "쓰레기" ||
                     (materialId == "foul_smelling_lump" && piece.MaterialId == "foundation") ||
-                    Vector3.Distance(piece.transform.position, center) > WASTE_EFFECT_RADIUS)
+                    !IsInWasteEffectRange(piece, center))
                     continue;
                 piece.SetPenaltyOutline(true);
                 _penaltyTargets.Add(piece);
@@ -705,11 +709,11 @@ namespace RestoreCastle3D
                 int woods = Adjacent(piece).Count(n => _catalog.Get(n.MaterialId).category == "목재");
                 if (piece.MaterialId == "branch" && age % 3 == 0) piece.PermanentBonus += woods;
                 if (piece.MaterialId == "leafy_branch" && age % 2 == 0) piece.PermanentBonus += woods;
-                if (piece.MaterialId == "living_tree" && piece.GrowthCount < 8)
+                if (piece.MaterialId == "living_tree" && piece.GrowthCount < LIVING_TREE_MAX_GROWTH)
                 {
                     piece.GrowthCount++;
-                    piece.PermanentBonus++;
-                    piece.transform.localScale *= 1.05f;
+                    if (piece.GrowthCount % 2 == 0) piece.PermanentBonus++;
+                    piece.transform.localScale *= _livingTreeScalePerGrowth;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
                 }
@@ -742,7 +746,7 @@ namespace RestoreCastle3D
                     collider.center += Vector3.up * segmentHeight * 0.5f;
                     collider.size += Vector3.up * segmentHeight;
                     piece.GrowthCount++;
-                    if (piece.GrowthCount == 3) piece.PermanentBonus += 5;
+                    if (piece.GrowthCount == 3) piece.PermanentBonus += 2;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
                 }
@@ -864,11 +868,24 @@ namespace RestoreCastle3D
             return piece.AbilitySuppressed;
         }
 
-        /// <summary>기물의 중심에서 지정된 범위 안에 있는 살아 있는 다른 기물을 반환한다.</summary>
+        /// <summary>기물 Collider가 지정된 위치 중심의 폐기물 효과 범위에 일부라도 겹치는지 판정한다.</summary>
+        private static bool IsInWasteEffectRange(CastlePiece3D piece, Vector3 center)
+        {
+            float radiusSquared = WASTE_EFFECT_RADIUS * WASTE_EFFECT_RADIUS;
+            foreach (Collider collider in piece.GetComponentsInChildren<Collider>())
+            {
+                if (!collider.enabled || collider.isTrigger) continue;
+                Vector3 closestPoint = collider.ClosestPoint(center);
+                if ((closestPoint - center).sqrMagnitude <= radiusSquared) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Collider가 폐기물 효과 범위와 겹치는 살아 있는 다른 기물을 반환한다.</summary>
         private IEnumerable<CastlePiece3D> PiecesInRange(CastlePiece3D source)
         {
             return _pieces.Where(piece => piece != null && piece != source &&
-                Vector3.Distance(piece.transform.position, source.transform.position) <= WASTE_EFFECT_RADIUS);
+                IsInWasteEffectRange(piece, source.transform.position));
         }
 
         /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>
@@ -1134,7 +1151,7 @@ namespace RestoreCastle3D
             _stageFloodRoutine = StartCoroutine(ResolveStageFlood());
         }
 
-        /// <summary>스테이지별 목표 내구도를 50씩 증가시켜 반환한다.</summary>
-        private static int StageTarget(int stage) => 50 * (stage + 1);
+        /// <summary>첫 스테이지 목표 30부터 스테이지마다 30씩 증가한 내구도를 반환한다.</summary>
+        private static int StageTarget(int stage) => 30 * (stage + 1);
     }
 }
