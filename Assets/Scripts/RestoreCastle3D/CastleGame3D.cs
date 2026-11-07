@@ -47,6 +47,7 @@ namespace RestoreCastle3D
             new Dictionary<(CastlePiece3D, CastlePiece3D), int>();
         private readonly HashSet<string> _consumedContacts = new HashSet<string>();
         private readonly CastleMaterial3D[] _offers = new CastleMaterial3D[3];
+        private GameSceneContext _sceneContext;
         private CastleCatalog3D _catalog;
         private CastleHud3D _hud;
         private CastleDropPreview3D _dropPreview;
@@ -85,8 +86,11 @@ namespace RestoreCastle3D
         private bool _rightGestureMoved;
         private bool _rightGestureScrolled;
 
+        internal float DestructionBoundaryZ => _sceneContext.DestructionBoundaryZ;
+
         private void Start()
         {
+            _sceneContext = GetComponent<GameSceneContext>();
             _catalog = new CastleCatalog3D();
             ConfigureScene();
             CreateHud();
@@ -787,6 +791,16 @@ namespace RestoreCastle3D
             return piece.AbilitySuppressed || Adjacent(piece).Any(n =>
                 n.MaterialId == "traffic_cone" && !n.AbilitySuppressed &&
                 piece.transform.position.y > n.transform.position.y + 0.15f);
+        }
+
+        /// <summary>
+        /// Z 경계를 넘은 기물과 부착된 기물을 제거하고 스테이지 전환 밖에서는 내구도를 갱신한다.
+        /// piece는 경계를 넘은 기물이다.
+        /// </summary>
+        internal void RemoveOutsideBoundary(CastlePiece3D piece)
+        {
+            if (RemovePiece(piece) > 0 && !_stageTransitioning)
+                RecalculateScores();
         }
 
         /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>

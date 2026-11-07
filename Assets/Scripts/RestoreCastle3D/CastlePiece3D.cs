@@ -51,6 +51,13 @@ namespace RestoreCastle3D
             PlacedTurn = turn;
         }
 
+        private void FixedUpdate()
+        {
+            if (_game != null && materialId != "foundation" &&
+                transform.position.z <= _game.DestructionBoundaryZ)
+                _game.RemoveOutsideBoundary(this);
+        }
+
         private void OnCollisionEnter(Collision collision)
         {
             Register(collision);
