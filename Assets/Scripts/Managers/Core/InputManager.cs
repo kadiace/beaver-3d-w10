@@ -17,8 +17,12 @@ public class InputManager
 
     public bool GamePadConnected { get; private set; }
 
+    /// <summary>입력 액션을 한 번 생성하고 기본 Player 모드를 활성화한다.</summary>
     public void Init()
     {
+        if (_inputActions != null)
+            return;
+
         _inputActions = new InputSystem_Actions();
 
         PlayerMap = _inputActions.Player;
@@ -29,6 +33,23 @@ public class InputManager
         SetInputMode(InputMode.Player);
     }
 
+    /// <summary>입력 액션과 전역 이벤트 구독을 해제하고 생성한 에셋을 정리한다.</summary>
+    public void Shutdown()
+    {
+        if (_inputActions == null)
+            return;
+
+        PlayerMap.Disable();
+        UIMap.Disable();
+        InputSystem.onActionChange -= CheckDeviceType;
+        _inputActions.Dispose();
+        _inputActions = null;
+        PlayerMap = default;
+        UIMap = default;
+        GamePadConnected = false;
+    }
+
+    /// <summary>지정한 입력 모드의 액션 맵만 활성화하고 커서와 시간 배율을 설정한다.</summary>
     public void SetInputMode(InputMode mode)
     {
         _inputMode = mode;

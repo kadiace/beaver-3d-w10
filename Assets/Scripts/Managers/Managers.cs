@@ -34,6 +34,16 @@ public class Managers : MonoBehaviour
         Init();
     }
 
+    private void OnDestroy()
+    {
+        if (_instance != this)
+            return;
+
+        _inputManager.Shutdown();
+        _instance = null;
+    }
+
+    /// <summary>영속 매니저를 한 번 생성하고 각 시스템을 초기화한다.</summary>
     public static void Init()
     {
         if (_instance != null)
@@ -47,8 +57,6 @@ public class Managers : MonoBehaviour
         }
         DontDestroyOnLoad(go);
         _instance = go.GetComponent<Managers>();
-
-        _instance._inputManager.Init();
 
         _instance._poolManager.Init(_instance.transform);
         _instance._dataManager.Init();
