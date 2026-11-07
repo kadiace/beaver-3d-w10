@@ -143,7 +143,7 @@ namespace RestoreCastle3D
             _rulesPopup.SetActive(false);
             _tooltip.SetActive(false);
             _rulesBody.text = @"매 스테이지마다 강 상류에서 홍수가 밀려옵니다.
-기물을 높이 쌓아 홍수에서 살아남으세요!
+기물을 쌓아 홍수에 대비하세요!
 
 우클릭 드래그: 카메라 이동
 스크롤: 확대
