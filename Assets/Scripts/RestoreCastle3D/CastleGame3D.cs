@@ -738,6 +738,24 @@ namespace RestoreCastle3D
             vine.PermanentBonus += _catalog.Get(target.MaterialId).baseReinforcement;
         }
 
+        /// <summary>접촉한 모든 기물을 접착제에 결합하고, 기물 제거 시에는 결합을 해제한다.</summary>
+        public void TryAttachGlue(CastlePiece3D a, CastlePiece3D b)
+        {
+            if (_stageTransitioning || a == null || b == null ||
+                !_pieceSet.Contains(a) || !_pieceSet.Contains(b))
+                return;
+
+            bool canA = a.MaterialId == "all_purpose_glue" && !IsAbilityDisabled(a);
+            bool canB = b.MaterialId == "all_purpose_glue" && !IsAbilityDisabled(b);
+            if (!canA && !canB) return;
+
+            CastlePiece3D glue = canA && canB
+                ? (a.GetInstanceID() > b.GetInstanceID() ? a : b)
+                : (canA ? a : b);
+            CastlePiece3D target = glue == a ? b : a;
+            glue.TryGlueTo(target);
+        }
+
         /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
         private void ApplyContactDestruction()
         {
@@ -753,6 +771,16 @@ namespace RestoreCastle3D
                     TryAttachVines(piece, neighbor);
                     if (piece.HasAttachmentTarget) break;
                 }
+            }
+
+            // Retry existing contacts if their initial collision callback was missed.
+            foreach (CastlePiece3D glue in _pieces.ToArray())
+            {
+                if (glue == null || glue.MaterialId != "all_purpose_glue" ||
+                    IsAbilityDisabled(glue))
+                    continue;
+                foreach (CastlePiece3D neighbor in Adjacent(glue).ToArray())
+                    TryAttachGlue(glue, neighbor);
             }
 
             foreach (CastlePiece3D lump in _pieces.ToArray())
