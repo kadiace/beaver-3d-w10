@@ -441,6 +441,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _rotationSpeed: 90
   _cameraYawPerScrollStep: 5
+  _floodImpulse: 55
   _destructionBoundaryZ: -15
 --- !u!1001 &1762329492425469008
 PrefabInstance:

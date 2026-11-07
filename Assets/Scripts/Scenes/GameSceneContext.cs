@@ -8,9 +8,13 @@ public class GameSceneContext : MonoBehaviour
     [Header("Camera")]
     [SerializeField, Min(0f)] private float _cameraYawPerScrollStep = 5f;
 
+    [Header("Flood")]
+    [SerializeField, Min(0f)] private float _floodImpulse = 60f;
+
     [Header("Destruction boundary")]
     [SerializeField] private float _destructionBoundaryZ = -28.2f;
 
+    public float FloodImpulse => _floodImpulse;
     public float DestructionBoundaryZ => _destructionBoundaryZ;
 
     private void Start()

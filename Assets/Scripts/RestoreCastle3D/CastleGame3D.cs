@@ -19,7 +19,6 @@ namespace RestoreCastle3D
         private const float CAMERA_MIN_TARGET_Z = -5f;
         private const float CAMERA_MAX_TARGET_Z = 15f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
-        private const float FLOOD_IMPULSE = 60f;
         private const float FLOOD_SURFACE_Y = -1.95f;
         private const float BOUNDARY_DESTRUCTION_DELAY = 1f;
 
@@ -1122,7 +1121,7 @@ namespace RestoreCastle3D
                 farZ + margin, nearZ - margin);
         }
 
-        /// <summary>파도 전면이 메쉬 범위에 닿은 기물에 (0, 1, 1) 방향 충격량을 한 번 적용한다.</summary>
+        /// <summary>snapshot과 frontZ로 파도 접촉을 확인하고 씬의 충격량을 -Z 방향으로 한 번 적용한다.</summary>
         private void PushFloodedPieces(StageCullSnapshot snapshot, float frontZ,
             HashSet<CastlePiece3D> pushed)
         {
@@ -1137,7 +1136,7 @@ namespace RestoreCastle3D
                     continue;
                 pushed.Add(piece);
                 if (!piece.Body.isKinematic)
-                    piece.Body.AddForce(Vector3.back * FLOOD_IMPULSE,
+                    piece.Body.AddForce(Vector3.back * _sceneContext.FloodImpulse,
                         ForceMode.Impulse);
             }
         }
