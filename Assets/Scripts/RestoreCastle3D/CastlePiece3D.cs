@@ -21,6 +21,7 @@ namespace RestoreCastle3D
         private bool _fuseStarted;
         private bool _fusePending;
         private bool _detonationStarted;
+        private bool _hasExploded;
 
         public string MaterialId => materialId;
         public Rigidbody Body => _body;
@@ -31,6 +32,7 @@ namespace RestoreCastle3D
         public bool AbilitySuppressed { get; private set; }
         public bool FuseStarted => _fuseStarted;
         public bool FusePending => _fusePending;
+        public bool HasExploded => _hasExploded;
         public int PlacedTurn { get; private set; }
         public int PermanentBonus { get; set; }
 
@@ -262,7 +264,11 @@ namespace RestoreCastle3D
         private IEnumerator Detonate()
         {
             yield return new WaitForSeconds(1f);
-            if (_game.IsPlacedPiece(this) && !_game.IsAbilityDisabled(this)) _game.Explode(this);
+            if (_game.IsPlacedPiece(this) && !_game.IsAbilityDisabled(this))
+            {
+                _game.Explode(this);
+                _hasExploded = true;
+            }
             _fusePending = false;
         }
     }

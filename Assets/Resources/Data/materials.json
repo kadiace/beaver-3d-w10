@@ -222,7 +222,7 @@
       "bondStrength": 100,
       "baseReinforcement": 2,
       "abilities": [
-        "다른 자재와 첫 충돌 시 폭발 예약. 라운드 낙하 정산 마지막에 1초 점화 후 반경 4에 폭발 충격"
+        "다른 자재와 충돌하면 라운드 끝에 한 번 폭발해 주변을 밀어낸다."
       ],
       "abilityAlternatives": []
     },

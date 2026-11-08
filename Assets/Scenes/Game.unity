@@ -442,6 +442,8 @@ MonoBehaviour:
   _rotationSpeed: 90
   _cameraYawPerScrollStep: 5
   _floodImpulse: 55
+  _maxDropWait: 3
+  _maxExplosionSettleWait: 3
   _destructionBoundaryZ: -15
 --- !u!1001 &1762329492425469008
 PrefabInstance:

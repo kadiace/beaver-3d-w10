@@ -43,11 +43,12 @@ namespace RestoreCastle3D
 
         /// <summary>
         /// material이 현재 게임의 자재 선택지에 등장할 수 있는지 반환한다.
-        /// 시작 전용, 자동 생성 전용 및 성장 덩쿨은 제외한다.
+        /// 시작 전용, 자동 생성 전용, 성장 덩쿨 및 만능 접착제는 제외한다.
         /// </summary>
         public static bool CanAppearAsOffer(CastleMaterial3D material)
         {
-            return !material.startOnly && !material.spawnOnly && material.id != "growing_vine";
+            return !material.startOnly && !material.spawnOnly &&
+                material.id != "growing_vine" && material.id != "all_purpose_glue";
         }
 
         /// <summary>자재 ID에 일치하는 항목을 반환한다.</summary>

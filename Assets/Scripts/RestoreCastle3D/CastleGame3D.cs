@@ -23,7 +23,7 @@ namespace RestoreCastle3D
         private const float BOUNDARY_DESTRUCTION_DELAY = 1f;
 
         [Header("Barrel explosion")]
-        [SerializeField, Min(0f)] private float barrelExplosionImpulse = 60f;
+        [SerializeField, Min(0f)] private float barrelExplosionImpulse = 40f;
         [SerializeField, Min(0f)] private float barrelExplosionUpwardsModifier = 0.6f;
 
         [Header("3D drop")]
@@ -625,7 +625,7 @@ namespace RestoreCastle3D
                 + (finalDrop ? " — 낙하 정산 대기 중" : " (계속 드랍 가능)");
 
             float elapsed = 0f;
-            while (elapsed < 7f)
+            while (elapsed < _sceneContext.MaxDropWait)
             {
                 yield return new WaitForFixedUpdate();
                 elapsed += Time.fixedDeltaTime;
@@ -662,7 +662,7 @@ namespace RestoreCastle3D
 
         /// <summary>
         /// 모든 낙하가 정산된 뒤 예약된 오크통을 점화하고 폭발로 생긴 물리 변화를 기다린다.
-        /// 추가 충돌로 예약된 오크통도 처리하며 마지막 점화 후 안정화는 최대 7초까지 기다린다.
+        /// 추가 충돌로 예약된 오크통도 처리하며 마지막 점화 후에는 씬에 설정된 최대 시간까지 안정화를 기다린다.
         /// </summary>
         private IEnumerator ResolveBarrelExplosions()
         {
@@ -675,9 +675,9 @@ namespace RestoreCastle3D
                 if (!started) yield break;
 
                 bool pending = _pieces.Any(piece => piece != null && piece.FusePending);
-                if (!pending && settleElapsed >= 0.3f &&
-                    (settleElapsed >= 7f || _pieces.All(piece => piece == null ||
-                        piece.Body.isKinematic || piece.Body.IsSleeping())))
+                if (!pending && (settleElapsed >= _sceneContext.MaxExplosionSettleWait ||
+                    (settleElapsed >= 0.3f && _pieces.All(piece => piece == null ||
+                        piece.Body.isKinematic || piece.Body.IsSleeping()))))
                     yield break;
 
                 yield return new WaitForFixedUpdate();
