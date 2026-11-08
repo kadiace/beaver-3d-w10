@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1003}
   - component: {fileID: 1004}
   - component: {fileID: 1005}
+  - component: {fileID: 1006}
   m_Layer: 0
   m_Name: barrel
   m_TagString: Untagged
@@ -79,6 +80,22 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::RestoreCastle3D.CastlePiece3D
   materialId: barrel
+--- !u!114 &1006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0382a2d44d5481baa3792fbcced10f5, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::RestoreCastle3D.CastleBarrelVisual3D
+  _blinkInterval: 0.2
+  _warningRed: {r: 1, g: 0.05, b: 0.02, a: 0.9}
+  _warningYellow: {r: 1, g: 0.9, b: 0.02, a: 0.9}
+  _spentTint: {r: 0.12, g: 0.12, b: 0.12, a: 0.92}
 --- !u!1 &10000
 GameObject:
   m_ObjectHideFlags: 0
