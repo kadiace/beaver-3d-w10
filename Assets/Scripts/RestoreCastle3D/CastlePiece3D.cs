@@ -20,6 +20,7 @@ namespace RestoreCastle3D
         private Renderer[] _renderers;
         private bool _fuseStarted;
         private bool _fusePending;
+        private bool _detonationStarted;
 
         public string MaterialId => materialId;
         public Rigidbody Body => _body;
@@ -65,12 +66,13 @@ namespace RestoreCastle3D
         private void OnCollisionEnter(Collision collision)
         {
             Register(collision, true);
-            if (materialId == "barrel" && !_game.IsAbilityDisabled(this)
-                && !_fuseStarted && _game != null)
+            if (materialId != "barrel" || _game == null || _fuseStarted) return;
+            CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
+            if (other != this && _game.IsPlacedPiece(this) && _game.IsPlacedPiece(other) &&
+                !_game.IsAbilityDisabled(this))
             {
                 _fuseStarted = true;
                 _fusePending = true;
-                StartCoroutine(Detonate());
             }
         }
 
@@ -244,13 +246,23 @@ namespace RestoreCastle3D
             }
         }
 
-        /// <summary>첫 충돌부터 1초 경과 시 소유자에게 폭발을 요청한다.</summary>
+        /// <summary>
+        /// 충돌로 예약된 오크통의 1초 점화를 라운드 낙하 정산 마지막에 시작한다.
+        /// 중복 실행을 막고 이번 호출에서 점화를 시작했는지 반환한다.
+        /// </summary>
+        internal bool BeginScheduledDetonation()
+        {
+            if (!_fusePending || _detonationStarted) return false;
+            _detonationStarted = true;
+            StartCoroutine(Detonate());
+            return true;
+        }
+
+        /// <summary>정산에서 점화를 시작한 뒤 1초가 지나면 살아 있는 오크통의 폭발을 요청하고 대기를 해제한다.</summary>
         private IEnumerator Detonate()
         {
             yield return new WaitForSeconds(1f);
-            if (_game != null && !_game.IsAbilityDisabled(this)) _game.Explode(this);
-            // The barrel persists after exploding. Do not leave it flagged as
-            // an unfinished fuse during every future round's settlement.
+            if (_game.IsPlacedPiece(this) && !_game.IsAbilityDisabled(this)) _game.Explode(this);
             _fusePending = false;
         }
     }

@@ -14,7 +14,7 @@ namespace RestoreCastle3D
         private const int ROUNDS_PER_STAGE = 5;
         private const int PLACEMENTS_PER_ROUND = 5;
         private const int STAGE_COUNT = 5;
-        private const float BARREL_EXPLOSION_RADIUS = 2.5f;
+        private const float BARREL_EXPLOSION_RADIUS = 4f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
         private const float CAMERA_MIN_TARGET_Z = -5f;
         private const float CAMERA_MAX_TARGET_Z = 15f;
@@ -23,7 +23,7 @@ namespace RestoreCastle3D
         private const float BOUNDARY_DESTRUCTION_DELAY = 1f;
 
         [Header("Barrel explosion")]
-        [SerializeField, Min(0f)] private float barrelExplosionImpulse = 18f;
+        [SerializeField, Min(0f)] private float barrelExplosionImpulse = 60f;
         [SerializeField, Min(0f)] private float barrelExplosionUpwardsModifier = 0.6f;
 
         [Header("3D drop")]
@@ -644,14 +644,7 @@ namespace RestoreCastle3D
             while (_pendingDrops > 0)
                 yield return null;
 
-            // Barrel fuses and effects must finish before the round is scored.
-            float fuseElapsed = 0f;
-            while (_pieces.Any(x => x != null && x.MaterialId == "barrel" && x.FusePending)
-                && fuseElapsed < 3.5f)
-            {
-                yield return null;
-                fuseElapsed += Time.deltaTime;
-            }
+            yield return ResolveBarrelExplosions();
 
             yield return new WaitForSeconds(0.3f);
             _turn++;
@@ -665,6 +658,31 @@ namespace RestoreCastle3D
                 DealOffers();
             }
             if (!_awaitingStage) _status = "라운드 정산 완료: 현재 내구도 " + Durability;
+        }
+
+        /// <summary>
+        /// 모든 낙하가 정산된 뒤 예약된 오크통을 점화하고 폭발로 생긴 물리 변화를 기다린다.
+        /// 추가 충돌로 예약된 오크통도 처리하며 마지막 점화 후 안정화는 최대 7초까지 기다린다.
+        /// </summary>
+        private IEnumerator ResolveBarrelExplosions()
+        {
+            bool started = false;
+            float settleElapsed = 0f;
+            while (true)
+            {
+                foreach (CastlePiece3D piece in _pieces.ToArray())
+                    if (piece != null && piece.BeginScheduledDetonation()) started = true;
+                if (!started) yield break;
+
+                bool pending = _pieces.Any(piece => piece != null && piece.FusePending);
+                if (!pending && settleElapsed >= 0.3f &&
+                    (settleElapsed >= 7f || _pieces.All(piece => piece == null ||
+                        piece.Body.isKinematic || piece.Body.IsSleeping())))
+                    yield break;
+
+                yield return new WaitForFixedUpdate();
+                settleElapsed = pending ? 0f : settleElapsed + Time.fixedDeltaTime;
+            }
         }
 
         /// <summary>원본 턴 기반 식물 성장 및 덩굴 번식을 물리 기물에 적용한다.</summary>
