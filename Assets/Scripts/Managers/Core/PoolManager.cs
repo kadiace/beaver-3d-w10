@@ -47,11 +47,6 @@ public class PoolManager
                 interpolation = body.interpolation;
                 // Clear the cached interpolation pose when teleporting a reused Rigidbody.
                 body.interpolation = RigidbodyInterpolation.None;
-                if (!body.isKinematic)
-                {
-                    body.linearVelocity = Vector3.zero;
-                    body.angularVelocity = Vector3.zero;
-                }
                 body.position = spawnPosition;
                 body.rotation = spawnRotation;
             }
@@ -65,6 +60,11 @@ public class PoolManager
                 body.position = spawnPosition;
                 body.rotation = spawnRotation;
                 itemTransform.SetPositionAndRotation(spawnPosition, spawnRotation);
+                if (!body.isKinematic)
+                {
+                    body.linearVelocity = Vector3.zero;
+                    body.angularVelocity = Vector3.zero;
+                }
                 body.interpolation = interpolation;
             }
 
