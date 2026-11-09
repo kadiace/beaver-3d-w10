@@ -313,31 +313,13 @@ namespace RestoreCastle3D
             _hoverPanel.gameObject.SetActive(false);
         }
 
+        /// <summary>오크통 주변 2m의 기물을 비활성 물리 잔해로 날리고 오크통을 제거한다.</summary>
         public void Detonate(CastlePiece3D barrel)
         {
-            if (barrel == null || barrel.IsSettling) return;
-            var group = CastleSynergy3D.Collect(barrel);
-            if (group.Count < 2) return;
-            Vector3 center = Vector3.zero;
-            foreach (var p in group) center += p.transform.position;
-            center /= group.Count;
-            // Batch joint removals to avoid duplicate intermediate score popups.
-            _batching = true;
-            foreach (var p in group) p.BreakAllAttachments();
-            _batching = false;
-            foreach (var p in group)
-            {
-                if (p == null) continue;
-                p.BlockReattachment(0.5f);
-                if (p == barrel) continue;
-                Vector3 direction = p.transform.position - center;
-                if (direction.sqrMagnitude < 0.01f)
-                    direction = Random.onUnitSphere;
-                direction.y = Mathf.Abs(direction.y) + 0.25f;
-                p.Body.AddForce(direction.normalized * 18f, ForceMode.Impulse);
-            }
-            // All members are now isolated; clear cached scores and show each loss once.
-            foreach (var p in group) Refresh(p);
+            if (barrel == null || barrel.IsSettling || barrel.MaterialId != "barrel") return;
+            List<CastlePiece3D> targets = barrel.ExplodeNearby();
+            foreach (CastlePiece3D target in targets)
+                Unregister(target);
             barrel.MarkSettling();
             Unregister(barrel);
             Managers.Resource.Destroy(barrel.gameObject);
