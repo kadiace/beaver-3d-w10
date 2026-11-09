@@ -64,6 +64,11 @@ namespace RestoreCastle3D
         private Coroutine _stageFloodRoutine;
         private Camera _camera;
         private CastlePiece3D _outlinedPiece;
+        private CastlePiece3D _heldPiece;
+        private Canvas _heldGuideCanvas;
+        private CastleDropGuideGraphic3D _heldGuide;
+        private Vector3 _holdOffset;
+        private float _heldHeight;
         private System.Random _random;
         private Vector3 _cameraTarget;
         private int _selected = -1;
@@ -103,6 +108,7 @@ namespace RestoreCastle3D
         private void Update()
         {
             UpdateCameraInput();
+            UpdateHeldPiece();
             if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
             {
                 CastleMaterial3D material = _spawnMaterials[_random.Next(_spawnMaterials.Length)];
@@ -114,7 +120,11 @@ namespace RestoreCastle3D
                 instance.GetComponent<CastlePiece3D>().EnableContinuousDrop();
                 _nextSpawnTime += SPAWN_INTERVAL;
             }
-            if (_spawnMaterials != null) return;
+            if (_spawnMaterials != null)
+            {
+                UpdateHoveredPiece();
+                return;
+            }
 
             if (_catalog == null) return;
             Mouse mouse = Mouse.current;
@@ -129,6 +139,9 @@ namespace RestoreCastle3D
                 ApplyContactDestruction();
                 UpdateHoveredPiece();
             }
+            if (_heldPiece != null || (_outlinedPiece != null && _outlinedPiece.CanPickUp &&
+                mouse != null && mouse.leftButton.wasPressedThisFrame && CanShowItemInfo))
+                return;
             if (_resolving || _awaitingStage || _finished || _rulesOpen)
             {
                 HideDropPreview();
@@ -299,6 +312,8 @@ namespace RestoreCastle3D
 
         private void OnDestroy()
         {
+            if (_heldPiece != null) _heldPiece.Throw();
+            if (_heldGuideCanvas != null) Destroy(_heldGuideCanvas.gameObject);
             if (_floodPreview != null) _floodPreview.Hide();
             SetOutlineTargets(null);
             _dropPreview?.Dispose();
@@ -308,16 +323,16 @@ namespace RestoreCastle3D
         /// <summary>3D 물리 충돌체를 마우스 레이로 탐색해 원본 자재 상세 UI에 전달한다.</summary>
         private void UpdateHoveredPiece()
         {
-            if (_hud == null) return;
+            if (_heldPiece != null) return;
             Mouse mouse = Mouse.current;
-            if (mouse == null) { SetOutlineTargets(null); _hud.SetHoveredPiece(null, Vector2.zero); return; }
+            if (mouse == null) { SetOutlineTargets(null); _hud?.SetHoveredPiece(null, Vector2.zero); return; }
 
             Vector2 position = mouse.position.ReadValue();
-            if (!CanShowItemInfo || mouse.rightButton.isPressed ||
+            if ((_spawnMaterials == null && !CanShowItemInfo) || mouse.rightButton.isPressed ||
                 (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
             {
                 SetOutlineTargets(null);
-                _hud.SetHoveredPiece(null, position);
+                _hud?.SetHoveredPiece(null, position);
                 return;
             }
 
@@ -327,15 +342,74 @@ namespace RestoreCastle3D
                     QueryTriggerInteraction.Ignore))
             {
                 CastlePiece3D candidate = hit.collider.GetComponentInParent<CastlePiece3D>();
-                if (candidate != null && _pieceSet.Contains(candidate)) piece = candidate;
+                if (candidate != null && (_pieceSet.Contains(candidate) ||
+                    _spawnMaterials != null)) piece = candidate;
             }
-            if (piece != null && Time.unscaledTime >= _nextHoverScoreRefresh)
+            if (_hud != null && piece != null && Time.unscaledTime >= _nextHoverScoreRefresh)
             {
                 RecalculateScores();
                 _nextHoverScoreRefresh = Time.unscaledTime + 0.2f;
             }
             SetOutlineTargets(piece);
-            _hud.SetHoveredPiece(piece, position);
+            _hud?.SetHoveredPiece(piece, position);
+            if (piece != null && piece.CanPickUp && mouse.leftButton.wasPressedThisFrame)
+            {
+                _heldPiece = piece;
+                _heldHeight = Mathf.Max(piece.transform.position.y + 1.5f, groundY + 2f);
+                if (TryGetCursorXZ(position, out Vector3 cursor))
+                    _holdOffset = piece.transform.position - new Vector3(cursor.x, piece.transform.position.y, cursor.z);
+                else
+                    _holdOffset = Vector3.zero;
+                piece.PickUp();
+                if (_dropPreview == null) _dropPreview = new CastleDropPreview3D();
+                SetOutlineTargets(piece);
+            }
+        }
+
+        /// <summary>잡은 기물을 커서의 XZ로 옮기고 수직 착지 가이드를 표시하다 놓으면 중력으로 떨어뜨린다.</summary>
+        private void UpdateHeldPiece()
+        {
+            if (_heldPiece == null) return;
+            Mouse mouse = Mouse.current;
+            if (mouse == null || !mouse.leftButton.isPressed)
+            {
+                _heldPiece.Throw();
+                _heldPiece = null;
+                _dropPreview.Hide();
+                if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
+                return;
+            }
+            Vector2 screen = mouse.position.ReadValue();
+            if (TryGetCursorXZ(screen, out Vector3 cursor))
+                _heldPiece.MoveHeld(new Vector3(cursor.x + _holdOffset.x, _heldHeight,
+                    cursor.z + _holdOffset.z));
+            _dropPreview.ShowHeld(_catalog.Get(_heldPiece.MaterialId), _heldPiece);
+            if (!_dropPreview.IsVisible) return;
+            if (_heldGuide == null) CreateHeldGuide();
+            Vector3 start = _camera.WorldToScreenPoint(_heldPiece.transform.position);
+            Vector3 end = _camera.WorldToScreenPoint(_dropPreview.LandingPosition);
+            _heldGuide.gameObject.SetActive(start.z > 0f && end.z > 0f);
+            if (_heldGuide.gameObject.activeSelf)
+                _heldGuide.SetScreenEndpoints(new Vector2(start.x, start.y), new Vector2(end.x, end.y));
+        }
+
+        /// <summary>HUD가 없는 연속 낙하 모드에서도 수직 낙하 점선을 그릴 화면 Canvas를 만든다.</summary>
+        private void CreateHeldGuide()
+        {
+            GameObject canvasObject = new GameObject("Held Drop Guide Canvas", typeof(RectTransform), typeof(Canvas));
+            _heldGuideCanvas = canvasObject.GetComponent<Canvas>();
+            _heldGuideCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            GameObject guide = new GameObject("Held Drop Guide", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(CastleDropGuideGraphic3D));
+            guide.transform.SetParent(canvasObject.transform, false);
+            RectTransform rect = (RectTransform)guide.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            _heldGuide = guide.GetComponent<CastleDropGuideGraphic3D>();
+            _heldGuide.color = new Color(0.33f, 0.96f, 0.92f, 0.86f);
+            _heldGuide.raycastTarget = false;
         }
 
         /// <summary>호버 대상은 노란색, 해당 대상과 현재 접촉 중인 기물은 cyan 레이어로 갱신한다.</summary>
@@ -356,19 +430,21 @@ namespace RestoreCastle3D
                 if (neighbor != null) neighbor.SetOutlineLayer(0);
             _outlinedNeighbors.Clear();
 
-            if (_outlinedPiece == null || !_pieceSet.Contains(_outlinedPiece))
+            if (_outlinedPiece == null || (!_pieceSet.Contains(_outlinedPiece) &&
+                _spawnMaterials == null))
             {
                 _outlinedPiece = null;
                 return;
             }
 
-            foreach (CastlePiece3D neighbor in Adjacent(_outlinedPiece))
+            if (_pieceSet.Contains(_outlinedPiece)) foreach (CastlePiece3D neighbor in Adjacent(_outlinedPiece))
             {
                 if (neighbor == _outlinedPiece) continue;
                 neighbor.SetOutlineLayer(4u);
                 _outlinedNeighbors.Add(neighbor);
             }
-            _outlinedPiece.SetOutlineLayer(2u);
+            _outlinedPiece.SetOutlineLayer(_outlinedPiece.WasThrown ? 4u :
+                _outlinedPiece.CanPickUp ? 2u : 0u);
             Transform range = _outlinedPiece.transform.Find("Penalty Range");
             if (range != null && _outlinedPiece.MaterialId != "mud")
                 range.gameObject.SetActive(true);
@@ -596,7 +672,7 @@ namespace RestoreCastle3D
         }
 
         /// <summary>Resources/Prefabs에서 3D 기물을 로드하고 Rigidbody를 통한 중력 낙하를 준비한다.</summary>
-        private CastlePiece3D Spawn(CastleMaterial3D material, Vector3 position, bool anchored = false)
+        private CastlePiece3D Spawn(CastleMaterial3D material, Vector3 position)
         {
             GameObject instance = Managers.Resource.Instantiate(
                 "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
@@ -605,8 +681,8 @@ namespace RestoreCastle3D
             instance.name = material.name;
             CastlePiece3D piece = instance.GetComponent<CastlePiece3D>();
             piece.Initialize(this, _turn, material.id);
-            piece.Body.isKinematic = anchored;
-            piece.Body.useGravity = !anchored;
+            piece.Body.isKinematic = false;
+            piece.Body.useGravity = true;
             _pieces.Add(piece);
             _pieceSet.Add(piece);
             _floodPreview.RequestRefresh();
@@ -931,8 +1007,7 @@ namespace RestoreCastle3D
 
             HashSet<CastlePiece3D> connected = new HashSet<CastlePiece3D>();
             Stack<CastlePiece3D> pending = new Stack<CastlePiece3D>();
-            CastleFloodQuery3D.CollectAttachmentGroup(piece, _pieceSet, connected, pending,
-                reason == CastleChangeKind.Flooded);
+            CastleFloodQuery3D.CollectAttachmentGroup(piece, _pieceSet, connected, pending);
 
             foreach (CastlePiece3D current in connected)
             {

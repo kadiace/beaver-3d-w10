@@ -56,6 +56,38 @@ namespace RestoreCastle3D
             if (!_instance.activeSelf) _instance.SetActive(true);
         }
 
+        /// <summary>잡은 기물의 바로 아래에서 -Y로 탐색해 자기 충돌체를 제외한 착지 고스트를 표시한다.</summary>
+        public void ShowHeld(CastleMaterial3D info, CastlePiece3D held)
+        {
+            if (_instance == null || _materialId != info.id) Rebuild(info);
+            if (_instance == null) return;
+
+            Vector3 position = held.transform.position;
+            float bottomY = float.PositiveInfinity;
+            foreach (Collider collider in held.GetComponentsInChildren<Collider>())
+                if (collider.enabled && !collider.isTrigger)
+                    bottomY = Mathf.Min(bottomY, collider.bounds.min.y);
+            if (float.IsPositiveInfinity(bottomY)) bottomY = position.y;
+
+            float surfaceY = bottomY;
+            RaycastHit[] hits = Physics.RaycastAll(new Vector3(position.x, bottomY - 0.01f, position.z),
+                Vector3.down, MaximumRayDistance, Physics.DefaultRaycastLayers,
+                QueryTriggerInteraction.Ignore);
+            float nearest = float.PositiveInfinity;
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider.transform.IsChildOf(held.transform) || hit.distance >= nearest) continue;
+                nearest = hit.distance;
+                surfaceY = hit.point.y;
+            }
+
+            _instance.transform.SetPositionAndRotation(
+                new Vector3(position.x, surfaceY - _colliderBottomY + VisualOffset, position.z),
+                held.transform.rotation);
+            SetTint(true);
+            if (!_instance.activeSelf) _instance.SetActive(true);
+        }
+
         /// <summary>배치 가능 여부가 바뀌면 복제 머티리얼을 기본 색 또는 경고색으로 전환한다.</summary>
         private void SetTint(bool canPlace)
         {
