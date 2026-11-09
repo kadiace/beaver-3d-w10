@@ -14,7 +14,6 @@ namespace RestoreCastle3D
         public static CastleCreekScore3D Active { get; private set; }
         private const float AwardedGroupLifetime = 2f;
         private const float PreviewRefreshInterval = 0.15f;
-        private const float PreviewDistance = 18f;
 
         private readonly HashSet<CastlePiece3D> _registered = new HashSet<CastlePiece3D>();
         private readonly Dictionary<CastlePiece3D, int> _lastPoints = new Dictionary<CastlePiece3D, int>();
@@ -80,7 +79,7 @@ namespace RestoreCastle3D
             _hoverPanel.anchorMin = _hoverPanel.anchorMax = new Vector2(0f, 1f);
             _hoverPanel.pivot = new Vector2(0f, 1f);
             _hoverPanel.anchoredPosition = new Vector2(22f, -22f);
-            _hoverPanel.sizeDelta = new Vector2(490f, 330f);
+            _hoverPanel.sizeDelta = new Vector2(490f, 390f);
             Image background = panelObject.GetComponent<Image>();
             background.color = new Color(0.05f, 0.08f, 0.12f, 0.88f);
             background.raycastTarget = false;
@@ -127,7 +126,6 @@ namespace RestoreCastle3D
         {
             _registered.Remove(piece);
             _lastPoints.Remove(piece);
-            _outlined.Remove(piece);
             if (_hovered == piece || _trackedPiece == piece)
             {
                 _hovered = null;
@@ -281,9 +279,7 @@ namespace RestoreCastle3D
                 foreach (CastlePiece3D candidate in _registered)
                 {
                     if (candidate == null || candidate == _heldPiece || candidate.IsSettling ||
-                        !candidate.isActiveAndEnabled ||
-                        Vector3.Distance(candidate.transform.position,
-                            _heldPiece.transform.position) > PreviewDistance)
+                        !candidate.isActiveAndEnabled)
                         continue;
                     Vector3 vp = _camera.WorldToViewportPoint(candidate.transform.position);
                     if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f)
