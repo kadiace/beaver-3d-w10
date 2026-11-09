@@ -420,7 +420,7 @@ namespace RestoreCastle3D
             _game?.TryAttachMud(this, other);
         }
 
-        /// <summary>직접 던진 기물에만 아직 부착되지 않은 다른 기물을 스프링으로 결합한다.</summary>
+        /// <summary>새로 던진 기물을 단독 기물 또는 기존 SpringJoint 덩어리에 연결한다.</summary>
         private void AttachThrownPiece(Collision collision)
         {
             if (!_throwOrigin || _held || _settling ||
