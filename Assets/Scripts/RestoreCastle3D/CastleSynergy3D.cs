@@ -64,8 +64,8 @@ namespace RestoreCastle3D
                         if (Direct("석재") >= 2) Award(5, p => direct.Contains(p) && Cat(p) == "석재");
                         break;
                     case "fossil":
-                        Award(Other("석재") == -1 ? 0 : (others.Count(p => Id(p) == "fossil") >= 2 ? 5 :
-                            OtherHas("fossil") ? 3 : 0), p => Id(p) == "fossil");
+                        Award(others.Count(p => Id(p) == "fossil") >= 2 ? 5 :
+                            OtherHas("fossil") ? 3 : 0, p => Id(p) == "fossil");
                         break;
                     case "gem":
                         int types = (Has("pebble") ? 1 : 0) + (Has("large_stone") ? 1 : 0) +
