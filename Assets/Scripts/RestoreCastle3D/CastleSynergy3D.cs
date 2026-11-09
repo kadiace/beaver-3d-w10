@@ -33,9 +33,53 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// Score a candidate group. Optional virtual endpoints let UI preview a hypothetical
-        /// new direct Joint without mutating live physics or attachment records.
+        /// A pair can satisfy part of a multi-piece condition even if this first link
+        /// would award zero points. Use this for selection outlines, not real scoring.
         /// </summary>
+        public static bool HasPotentialTagSynergy(CastlePiece3D a, CastlePiece3D b,
+            CastleCatalog3D catalog)
+        {
+            if (a == null || b == null || catalog == null) return false;
+            string aTag = catalog.Get(a.MaterialId)?.category;
+            string bTag = catalog.Get(b.MaterialId)?.category;
+            if (aTag == null || bTag == null) return false;
+
+            bool Helps(CastlePiece3D source, CastlePiece3D other, string tag)
+            {
+                string id = source.MaterialId;
+                string otherId = other.MaterialId;
+                switch (id)
+                {
+                    case "pebble":
+                    case "large_stone": return tag == "석재";
+                    case "fossil": return otherId == "fossil";
+                    case "gem": return otherId == "pebble" || otherId == "large_stone" ||
+                            otherId == "fossil";
+                    case "plank":
+                    case "branch": return tag == "목재";
+                    case "leafy_branch": return tag == "목재" && otherId != id;
+                    case "log": return tag == "목재" || otherId == "mud";
+                    case "sunflower": return tag == "식물";
+                    case "bamboo": return tag == "목재" || tag == "식물";
+                    case "growing_vine": return tag == "석재";
+                    case "living_tree": return tag == "목재" || tag == "식물";
+                    case "mud": return tag == "목재";
+                    case "shoe":
+                    case "life_jacket": return tag == "잡동사니";
+                    case "bucket": return tag == "석재";
+                    case "watering_can": return tag == "식물";
+                    case "loose_work_glove": return tag == "목재";
+                    case "broken_game_controller": return tag == "잡동사니" &&
+                            otherId != "broken_game_controller";
+                    case "empty_bottle": return tag != "잡동사니";
+                    case "waste_bag_small":
+                    case "foul_smelling_lump": return true;
+                    default: return false;
+                }
+            }
+            return Helps(a, b, bTag) || Helps(b, a, aTag);
+        }
+
         /// <summary>Delta of attaching a held single piece to a target and its existing component.</summary>
         public static int PreviewAttachmentDelta(CastlePiece3D held,
             CastlePiece3D target, CastleCatalog3D catalog)
@@ -56,6 +100,7 @@ namespace RestoreCastle3D
             return Evaluate(combined, catalog, held, target).Total - before;
         }
 
+        /// <summary>Score live connections with optional virtual direct edge for previews.</summary>
         public static Result Evaluate(List<CastlePiece3D> group, CastleCatalog3D catalog,
             CastlePiece3D virtualA = null, CastlePiece3D virtualB = null)
         {
