@@ -27,7 +27,11 @@ namespace RestoreCastle3D
         private int _score;
         private float _flashUntil;
         private float _edgeUntil;
+        private float _edgeLastTime;
+        private int _edgeCombined;
+        private int _edgeEvents;
         private Vector3 _edgePosition;
+        private bool _batching;
         private CastlePiece3D _hovered;
 
         public int TotalScore => _score;
@@ -99,7 +103,7 @@ namespace RestoreCastle3D
         /// <summary>Recalculate only components touched by an added or removed edge.</summary>
         public void Refresh(CastlePiece3D a, CastlePiece3D b = null)
         {
-            if (_catalog == null) return;
+            if (_catalog == null || _batching) return;
             var visited = new HashSet<CastlePiece3D>();
             foreach (var start in new[] { a, b })
             {
@@ -160,8 +164,10 @@ namespace RestoreCastle3D
             Vector3 center = Vector3.zero;
             foreach (var p in group) center += p.transform.position;
             center /= group.Count;
-            // Disable links first so physics and the scoring graph agree in this same frame.
+            // Batch joint removals to avoid duplicate intermediate score popups.
+            _batching = true;
             foreach (var p in group) p.BreakAllAttachments();
+            _batching = false;
             foreach (var p in group)
             {
                 if (p == null) continue;
@@ -182,11 +188,22 @@ namespace RestoreCastle3D
 
         private void ShowEdgeIndicator(Vector3 position, string text)
         {
+            // Combine bursty settlements rather than overwrite an unread indicator.
+            if (Time.unscaledTime - _edgeLastTime > 0.35f)
+            {
+                _edgeCombined = 0;
+                _edgeEvents = 0;
+            }
+            int.TryParse(text.Replace("점", ""), out int delta);
+            _edgeCombined += delta;
+            _edgeEvents++;
+            _edgeLastTime = Time.unscaledTime;
             _edgePosition = position;
             _edgeUntil = Time.unscaledTime + 1.5f;
             _edgeText.gameObject.SetActive(true);
-            _edgeText.text = text + " ◀";
-            _edgeText.color = text.StartsWith("-") ? new Color(0.55f, 0.8f, 1f) :
+            _edgeText.text = (_edgeCombined >= 0 ? "+" : "") + _edgeCombined + "점" +
+                (_edgeEvents > 1 ? " (" + _edgeEvents + "회)" : "");
+            _edgeText.color = _edgeCombined < 0 ? new Color(0.55f, 0.8f, 1f) :
                 new Color(1f, 0.87f, 0.35f);
         }
 
@@ -216,6 +233,10 @@ namespace RestoreCastle3D
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect,
                     target, null, out Vector2 local);
                 _edgeText.rectTransform.anchoredPosition = local;
+                string arrow = Mathf.Abs(delta.x) > Mathf.Abs(delta.y)
+                    ? (delta.x > 0 ? "→" : "←") : (delta.y > 0 ? "↑" : "↓");
+                _edgeText.text = (_edgeCombined >= 0 ? "+" : "") + _edgeCombined +
+                    "점 " + arrow + (_edgeEvents > 1 ? " (" + _edgeEvents + "회)" : "");
                 Color color = _edgeText.color;
                 color.a = Mathf.Clamp01((_edgeUntil - Time.unscaledTime) * 2f);
                 _edgeText.color = color;
