@@ -2,10 +2,11 @@ Shader "Castle Creek/Flowing Creek Bed"
 {
     Properties
     {
-        _MudColor ("Mud Color", Color) = (0.29, 0.23, 0.15, 1)
-        _FlowColor ("Flow Color", Color) = (0.43, 0.36, 0.24, 1)
+        _WaterColor ("Water Color", Color) = (0.12, 0.45, 0.62, 1)
+        _FlowColor ("Flow Highlight Color", Color) = (0.4, 0.81, 0.9, 1)
         _FlowSpeed ("Flow Speed", Float) = 1.2
         _FlowScale ("Flow Scale", Float) = 0.42
+        _VerticalFlow ("Vertical Flow (0: Creek, 1: Cliff)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -20,10 +21,11 @@ Shader "Castle Creek/Flowing Creek Bed"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
-                half4 _MudColor;
+                half4 _WaterColor;
                 half4 _FlowColor;
                 float _FlowSpeed;
                 float _FlowScale;
+                float _VerticalFlow;
             CBUFFER_END
 
             struct Attributes
@@ -50,13 +52,14 @@ Shader "Castle Creek/Flowing Creek Bed"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                float2 flow = input.positionWS.xz * _FlowScale;
+                float flowLength = lerp(input.positionWS.z, input.positionWS.y, _VerticalFlow);
+                float2 flow = float2(input.positionWS.x, flowLength) * _FlowScale;
                 flow.y += _Time.y * _FlowSpeed;
                 float waviness = sin(flow.x * 2.8 + sin(flow.y * 0.65)) * 0.38;
                 float ripple = sin(flow.y * 8.0 + waviness + sin(flow.x * 5.0) * 0.7);
                 float detail = sin(flow.y * 13.0 + flow.x * 3.2) * 0.18;
                 half streak = smoothstep(0.55, 0.9, ripple * 0.5 + 0.5 + detail);
-                half3 color = lerp(_MudColor.rgb, _FlowColor.rgb, streak);
+                half3 color = lerp(_WaterColor.rgb, _FlowColor.rgb, streak);
                 Light light = GetMainLight();
                 half lighting = saturate(dot(normalize(input.normalWS), light.direction)) * 0.55 + 0.45;
                 return half4(color * lighting * light.color, 1);
