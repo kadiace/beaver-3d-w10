@@ -438,7 +438,7 @@ namespace RestoreCastle3D
         /// <summary>툴팁에서 희귀와 고급의 표시 문구만 교체하고 실제 희귀도 값은 유지한다.</summary>
         private static string DisplayRarity(string rarity)
         {
-            return rarity == "희귀" ? "고급" : rarity == "고급" ? "희귀" : rarity;
+            return rarity;
         }
 
         /// <summary>자재 분류와 희귀도 대괄호 태그에 각 색상을 적용하고 나머지 설명은 유지한다.</summary>
