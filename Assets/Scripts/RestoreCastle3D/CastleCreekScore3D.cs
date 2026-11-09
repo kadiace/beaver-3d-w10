@@ -392,48 +392,53 @@ namespace RestoreCastle3D
 
         private void UpdateHover()
         {
-            CastlePiece3D next = null;
-            Mouse mouse = Mouse.current;
-            Vector2 cursor = mouse != null ? mouse.position.ReadValue() : Vector2.zero;
-            if (mouse != null && !mouse.rightButton.isPressed &&
-                Physics.Raycast(_camera.ScreenPointToRay(cursor), out RaycastHit hit,
-                    300f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            if (_heldPiece != null)
             {
-                var candidate = hit.collider.GetComponentInParent<CastlePiece3D>();
-                if (candidate != null && _registered.Contains(candidate)) next = candidate;
-            }
-            if (next == _hovered && next == null) return;
-            _hovered = next;
-            foreach (CastlePiece3D p in _outlined)
-                if (p != null && p.isActiveAndEnabled) p.SetOutlineLayer(0);
-            _outlined.Clear();
-            if (next == null)
-            {
-                _hoverText.gameObject.SetActive(false);
+                UpdateHeldPreview();
                 return;
             }
-            var group = CastleSynergy3D.Collect(next);
-            _hoverText.gameObject.SetActive(group.Count > 1);
-            var result = CastleSynergy3D.Evaluate(group, _catalog);
-            foreach (var p in result.Contributors)
+
+            // Tracking takes priority over the mouse pointer, including while the
+            // object moves and the camera follows it. A pooled/settled piece cannot
+            // remain tracked because Unregister() clears the reference.
+            CastlePiece3D next = TrackedPiece;
+            Mouse mouse = Mouse.current;
+            if (next == null && mouse != null && !mouse.rightButton.isPressed)
+                next = PickAt(mouse.position.ReadValue());
+
+            _hovered = next;
+            ClearOutlines();
+            if (next == null)
             {
-                if (p == null || p == next) continue;
+                _hoverPanel.gameObject.SetActive(false);
+                return;
+            }
+
+            List<CastlePiece3D> group = CastleSynergy3D.Collect(next);
+            CastleSynergy3D.Result result = CastleSynergy3D.Evaluate(group, _catalog);
+            foreach (CastlePiece3D p in result.Contributors)
+            {
+                if (p == null || p == next || p.IsSettling || !_registered.Contains(p))
+                    continue;
                 p.SetOutlineLayer(_catalog.Get(p.MaterialId).category == "쓰레기" ? 8u : 4u);
                 _outlined.Add(p);
             }
             next.SetOutlineLayer(2u);
             _outlined.Add(next);
-            _hoverText.text = _catalog.Get(next.MaterialId).name + " · 예상 " + result.Total + "점" +
-                "\n" + string.Join("\n", group.Take(6).Select(p =>
-                    _catalog.Get(p.MaterialId).name + " " +
-                    (result.Points.TryGetValue(p, out int n) && n >= 0 ? "+" : "") +
-                    (result.Points.TryGetValue(p, out int value) ? value : 0))) +
-                "\n" + string.Join("\n", _catalog.Get(next.MaterialId).abilities ??
-                    new string[0]);
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect,
-                new Vector2(Mathf.Clamp(cursor.x + 20, 0, Screen.width - 400),
-                    Mathf.Clamp(cursor.y - 16, 260, Screen.height)), null, out Vector2 local);
-            _hoverText.rectTransform.anchoredPosition = local;
+
+            CastleMaterial3D material = _catalog.Get(next.MaterialId);
+            string description = material.abilities == null || material.abilities.Length == 0
+                ? "없음" : string.Join("\n", material.abilities);
+            _hoverText.text = material.name + (TrackedPiece == next ? "  [우클릭 추적 중]" : "") +
+                "\n예상 점수: " + result.Total + "점\n" +
+                (group.Count > 1
+                    ? string.Join("\n", group.Take(6).Select(p =>
+                        _catalog.Get(p.MaterialId).name + " " +
+                        (result.Points.TryGetValue(p, out int n) && n > 0 ? "+" : "") +
+                        (result.Points.TryGetValue(p, out int value) ? value : 0)))
+                    : "아직 부착된 기물 없음") +
+                "\n\n능력: " + description;
+            _hoverPanel.gameObject.SetActive(true);
         }
 
         private void OnDestroy()
