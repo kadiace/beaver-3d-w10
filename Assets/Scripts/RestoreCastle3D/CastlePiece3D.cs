@@ -68,8 +68,9 @@ namespace RestoreCastle3D
             if (other == null || other == this || _settling || other._settling ||
                 Time.time < _attachBlockedUntil || Time.time < other._attachBlockedUntil ||
                 _attachedPieces.Count != 0) return false;
+            // Any newly dropped piece can join an already attached chunk.
             return (!other._thrown && other._attachedPieces.Count == 0) ||
-                (materialId == "barrel" && other._thrown && other._attachedPieces.Count != 0);
+                (other._thrown && other._attachedPieces.Count != 0 && _springTarget == null);
         }
         public bool IsSettling => _settling;
         /// <summary>Finalize scoring, but keep physics and joints intact for the cliff fall.</summary>
@@ -428,11 +429,11 @@ namespace RestoreCastle3D
             if (other == null || other == this || other._settling ||
                 Time.time < other._attachBlockedUntil || _attachedPieces.Contains(other)) return;
 
-            // A thrown barrel can also join an already attached group, then split the whole group.
-            bool barrelJoinsGroup = materialId == "barrel" && other._thrown &&
-                other._attachedPieces.Count != 0 && _springTarget == null &&
-                _attachedPieces.Count == 0;
-            if (barrelJoinsGroup)
+            // A freshly thrown piece (not just a barrel) can join a previously
+            // attached chunk. This new spring edge merges the score graph.
+            bool joinsExistingChunk = other._thrown && other._attachedPieces.Count != 0 &&
+                _springTarget == null && _attachedPieces.Count == 0;
+            if (joinsExistingChunk)
             {
                 SpringJoint link = gameObject.AddComponent<SpringJoint>();
                 link.connectedBody = other.Body;
@@ -447,6 +448,7 @@ namespace RestoreCastle3D
                 other._attachedPieces.Add(this);
                 CastleCreekScore3D.Active?.Refresh(this, other);
                 TryArmBarrel();
+                other.TryArmBarrel();
                 return;
             }
             if (other._thrown || other._attachedPieces.Count != 0) return;
