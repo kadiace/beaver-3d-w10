@@ -83,7 +83,7 @@ namespace RestoreCastle3D
         public void SetOutlineLayer(uint layer)
         {
             foreach (Renderer renderer in _renderers)
-                renderer.renderingLayerMask = (renderer.renderingLayerMask & ~22u) |
+                renderer.renderingLayerMask = (renderer.renderingLayerMask & ~30u) |
                     (layer != 0 ? layer : _springTarget != null ? 16u : _throwOrigin ? 4u : 0u);
         }
 
