@@ -42,6 +42,7 @@ namespace RestoreCastle3D
         private bool _throwOrigin;
         private bool _held;
         private bool _removalScheduled;
+        private float _blastDespawnAt = -1f;
         private float _attachBlockedUntil;
         private bool _settling;
         private bool _originalDetectCollisions;
@@ -183,6 +184,16 @@ namespace RestoreCastle3D
 
         private void Update()
         {
+            // Cleanup must run even while gameplay is disabled and coroutines are stopped.
+            if (_blastDespawnAt >= 0f)
+            {
+                if (Time.unscaledTime >= _blastDespawnAt)
+                {
+                    _blastDespawnAt = -1f;
+                    Managers.Resource.Destroy(gameObject);
+                }
+                return;
+            }
             if (_settling) return;
             // The scoring boundary wins over the Y fallback if both are crossed this frame.
             if (transform.position.z <= DESPAWN_Z && !_removalScheduled && !_held)
@@ -294,6 +305,7 @@ namespace RestoreCastle3D
             _throwOrigin = false;
             _held = false;
             _removalScheduled = false;
+            _blastDespawnAt = -1f;
             AbilitySuppressed = false;
             PermanentBonus = 0;
             PlacedTurn = 0;
@@ -573,14 +585,7 @@ namespace RestoreCastle3D
             MarkSettling();
             _body.isKinematic = false;
             _body.useGravity = true;
-            StartCoroutine(ReturnBlastDebris());
-        }
-
-        /// <summary>폭발로 날아간 기물을 2초 동안 물리 상태로 유지한 뒤 풀에 반환한다.</summary>
-        private IEnumerator ReturnBlastDebris()
-        {
-            yield return new WaitForSeconds(BLAST_DEBRIS_LIFETIME);
-            Managers.Resource.Destroy(gameObject);
+            _blastDespawnAt = Time.unscaledTime + BLAST_DEBRIS_LIFETIME;
         }
 
         /// <summary>진흙에 접촉한 목재를 물리적으로 고정하고 부착 관계를 기록한다.</summary>
