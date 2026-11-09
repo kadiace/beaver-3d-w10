@@ -22,6 +22,10 @@ namespace RestoreCastle3D
         private const float CAMERA_MAX_TARGET_Z = 30f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float SPAWN_INTERVAL = 0.02f;
+        private static readonly string[] CreekCategories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
+        private static readonly int[] CreekCategoryWeights = { 2, 2, 2, 3, 1 };
+        private static readonly string[] CreekRarities = { "일반", "고급", "희귀" };
+        private static readonly int[] CreekRarityWeights = { 4, 2, 1 };
 
         private static readonly float _livingTreeScalePerGrowth =
             1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
@@ -91,6 +95,9 @@ namespace RestoreCastle3D
         private bool _stagePassed;
         private string _status;
         private CastleMaterial3D[] _spawnMaterials;
+        private CastleMaterial3D[][] _creekSpawnCells;
+        private double[] _creekSpawnWeights;
+        private bool _loggedMudSpawn;
         private float _nextSpawnTime;
         private Vector2 _rightDragDisplacement;
         private bool _rightGestureActive;
@@ -101,45 +108,95 @@ namespace RestoreCastle3D
             _catalog = new CastleCatalog3D();
             _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly).ToArray();
             _random = new System.Random(Environment.TickCount);
+            BuildCreekSpawnTable();
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
             ConfigureScene();
             gameObject.AddComponent<CastleCreekScore3D>().Initialize(_camera, _catalog);
         }
 
-        /// <summary>Weighted endless spawns: categories 5:5:2:6:2; general/advanced/rare 4:2:1.</summary>
+        /// <summary>
+        /// Balance the available (tag, rarity) cells so both requested marginal
+        /// spawn ratios hold, even when a tag has no materials of a given rarity.
+        /// The table is calculated once, not on every 0.02-second spawn.
+        /// </summary>
+        private void BuildCreekSpawnTable()
+        {
+            int categories = CreekCategories.Length;
+            int rarities = CreekRarities.Length;
+            _creekSpawnCells = new CastleMaterial3D[categories * rarities][];
+            _creekSpawnWeights = new double[categories * rarities];
+            for (int c = 0; c < categories; c++)
+            {
+                for (int r = 0; r < rarities; r++)
+                {
+                    int index = c * rarities + r;
+                    _creekSpawnCells[index] = _spawnMaterials.Where(
+                        m => m.category == CreekCategories[c] && m.rarity == CreekRarities[r]).ToArray();
+                    _creekSpawnWeights[index] = _creekSpawnCells[index].Length > 0 ? 1d : 0d;
+                }
+            }
+
+            double categoryTotal = CreekCategoryWeights.Sum();
+            double rarityTotal = CreekRarityWeights.Sum();
+            // Iterative proportional fitting respects unavailable cells while maintaining
+            // both category 2:2:2:3:1 and rarity 4:2:1 global distributions.
+            for (int iteration = 0; iteration < 80; iteration++)
+            {
+                for (int c = 0; c < categories; c++)
+                {
+                    double sum = 0d;
+                    for (int r = 0; r < rarities; r++)
+                        sum += _creekSpawnWeights[c * rarities + r];
+                    if (sum <= 0d)
+                        throw new InvalidOperationException("No creek spawn materials for " + CreekCategories[c]);
+                    double scale = (CreekCategoryWeights[c] / categoryTotal) / sum;
+                    for (int r = 0; r < rarities; r++)
+                        _creekSpawnWeights[c * rarities + r] *= scale;
+                }
+                for (int r = 0; r < rarities; r++)
+                {
+                    double sum = 0d;
+                    for (int c = 0; c < categories; c++)
+                        sum += _creekSpawnWeights[c * rarities + r];
+                    if (sum <= 0d)
+                        throw new InvalidOperationException("No creek spawn materials for " + CreekRarities[r]);
+                    double scale = (CreekRarityWeights[r] / rarityTotal) / sum;
+                    for (int c = 0; c < categories; c++)
+                        _creekSpawnWeights[c * rarities + r] *= scale;
+                }
+            }
+
+            // Visibility investigation: mud is common odds-and-ends, not spawnOnly/startOnly.
+            int mudCell = Array.FindIndex(_creekSpawnCells,
+                cell => cell.Any(material => material.id == "mud"));
+            GameObject mudPrefab = Resources.Load<GameObject>("Prefabs/mud");
+            if (mudCell < 0 || mudPrefab == null || mudPrefab.GetComponent<CastlePiece3D>() == null ||
+                mudPrefab.GetComponentInChildren<Renderer>(true) == null)
+                Debug.LogError("[Creek Spawn] 진흙(mud)이 스폰 데이터/프리팹에서 누락되었습니다.");
+            else
+            {
+                double chance = _creekSpawnWeights[mudCell] / _creekSpawnCells[mudCell].Length;
+                Debug.Log($"[Creek Spawn] 진흙 스폰 가능, 예상 확률 {chance:P2}.");
+            }
+        }
+
         private CastleMaterial3D ChooseCreekMaterial()
         {
-            string[] categories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
-            int[] categoryWeights = { 5, 5, 2, 6, 2 };
-            string[] rarities = { "일반", "고급", "희귀" };
-            int[] rarityWeights = { 4, 2, 1 };
-            int categoryTotal = 0;
-            for (int i = 0; i < categories.Length; i++)
-                if (_spawnMaterials.Any(m => m.category == categories[i]))
-                    categoryTotal += categoryWeights[i];
-            int categoryRoll = _random.Next(categoryTotal);
-            string category = categories[0];
-            for (int i = 0; i < categories.Length; i++)
+            double roll = _random.NextDouble() * _creekSpawnWeights.Sum();
+            for (int i = 0; i < _creekSpawnWeights.Length; i++)
             {
-                if (!_spawnMaterials.Any(m => m.category == categories[i])) continue;
-                categoryRoll -= categoryWeights[i];
-                if (categoryRoll < 0) { category = categories[i]; break; }
+                roll -= _creekSpawnWeights[i];
+                if (roll < 0d && _creekSpawnCells[i].Length > 0)
+                {
+                    CastleMaterial3D[] cell = _creekSpawnCells[i];
+                    return cell[_random.Next(cell.Length)];
+                }
             }
-            var candidates = _spawnMaterials.Where(m => m.category == category).ToArray();
-            int rarityTotal = 0;
-            for (int i = 0; i < rarities.Length; i++)
-                if (candidates.Any(m => m.rarity == rarities[i]))
-                    rarityTotal += rarityWeights[i];
-            int rarityRoll = _random.Next(rarityTotal);
-            string rarity = rarities[0];
-            for (int i = 0; i < rarities.Length; i++)
-            {
-                if (!candidates.Any(m => m.rarity == rarities[i])) continue;
-                rarityRoll -= rarityWeights[i];
-                if (rarityRoll < 0) { rarity = rarities[i]; break; }
-            }
-            var tier = candidates.Where(m => m.rarity == rarity).ToArray();
-            return tier[_random.Next(tier.Length)];
+            // Floating-point tail fallback: choose the last populated cell.
+            for (int i = _creekSpawnCells.Length - 1; i >= 0; i--)
+                if (_creekSpawnCells[i].Length > 0)
+                    return _creekSpawnCells[i][_random.Next(_creekSpawnCells[i].Length)];
+            throw new InvalidOperationException("Creek spawn table is empty");
         }
 
         private void Update()
@@ -159,6 +216,11 @@ namespace RestoreCastle3D
                 CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
                 spawned.EnableContinuousDrop();
                 CastleCreekScore3D.Active.Register(spawned);
+                if (material.id == "mud" && !_loggedMudSpawn)
+                {
+                    _loggedMudSpawn = true;
+                    Debug.Log($"[Creek Spawn] 첫 진흙 스폰 위치: {spawned.transform.position}");
+                }
                 _nextSpawnTime += SPAWN_INTERVAL;
             }
             if (_spawnMaterials != null)
