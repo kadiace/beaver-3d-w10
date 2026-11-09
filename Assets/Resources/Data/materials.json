@@ -138,7 +138,7 @@
       "id": "bucket",
       "name": "양동이",
       "category": "잡동사니",
-      "rarity": "희귀",
+      "rarity": "고급",
       "abilities": [
         "같은 덩어리의 [석재] 1개당 +2점, 최대 +5점"
       ]
@@ -147,7 +147,7 @@
       "id": "watering_can",
       "name": "물뿌리개",
       "category": "잡동사니",
-      "rarity": "희귀",
+      "rarity": "고급",
       "abilities": [
         "같은 덩어리의 [식물] 1개당 +2점, 최대 +5점"
       ]
@@ -156,7 +156,7 @@
       "id": "loose_work_glove",
       "name": "헐거운 노가다 목장갑",
       "category": "잡동사니",
-      "rarity": "희귀",
+      "rarity": "고급",
       "abilities": [
         "같은 덩어리의 [목재] 1개당 +2점, 최대 +5점"
       ]
@@ -165,7 +165,7 @@
       "id": "life_jacket",
       "name": "구명조끼",
       "category": "잡동사니",
-      "rarity": "희귀",
+      "rarity": "고급",
       "abilities": [
         "같은 덩어리에 자신 포함 [잡동사니]가 2개 이상이면 +3점, 3개 이상이면 +5점"
       ]
@@ -174,7 +174,7 @@
       "id": "broken_game_controller",
       "name": "고장난 게임 컨트롤러",
       "category": "잡동사니",
-      "rarity": "희귀",
+      "rarity": "고급",
       "abilities": [
         "같은 덩어리의 다른 [잡동사니] 종류 1개당 +2점, 최대 +5점"
       ]
