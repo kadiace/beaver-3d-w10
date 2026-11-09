@@ -92,8 +92,11 @@ namespace RestoreCastle3D
             _hoverText.enableWordWrapping = true;
             _hoverText.overflowMode = TextOverflowModes.Ellipsis;
             _hoverPanel.gameObject.SetActive(false);
-            _edgeText = CreateLabel("Offscreen Score Indicator", 34, TextAlignmentOptions.Center);
-            _edgeText.rectTransform.sizeDelta = new Vector2(240, 80);
+            _edgeText = CreateLabel("Offscreen Score Indicator", 54, TextAlignmentOptions.Center);
+            _edgeText.fontStyle = FontStyles.Bold;
+            _edgeText.outlineWidth = 0.38f;
+            _edgeText.outlineColor = new Color32(0, 0, 0, 255);
+            _edgeText.rectTransform.sizeDelta = new Vector2(430f, 120f);
             _edgeText.gameObject.SetActive(false);
             _floating = canvasObject.AddComponent<CastleFloatingText3D>();
             _floating.Initialize(_camera, _rect);
@@ -379,14 +382,20 @@ namespace RestoreCastle3D
                 if (screen.z < 0) delta = -delta;
                 if (delta.sqrMagnitude < 1f) delta = Vector2.up;
                 delta.Normalize();
+                float horizontalInset = Mathf.Min(220f, Screen.width * 0.35f);
+                float verticalInset = Mathf.Min(85f, Screen.height * 0.3f);
                 Vector2 target = new Vector2(Screen.width / 2f, Screen.height / 2f) +
-                    new Vector2(delta.x * (Screen.width / 2f - 130f),
-                        delta.y * (Screen.height / 2f - 75f));
-                target.x = Mathf.Clamp(target.x, 130f, Screen.width - 130f);
-                target.y = Mathf.Clamp(target.y, 75f, Screen.height - 75f);
+                    new Vector2(delta.x * (Screen.width / 2f - horizontalInset),
+                        delta.y * (Screen.height / 2f - verticalInset));
+                target.x = Mathf.Clamp(target.x, horizontalInset, Screen.width - horizontalInset);
+                target.y = Mathf.Clamp(target.y, verticalInset, Screen.height - verticalInset);
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect,
                     target, null, out Vector2 local);
                 _edgeText.rectTransform.anchoredPosition = local;
+                // Entry pop makes offscreen awards noticeable without obscuring gameplay.
+                float age = Time.unscaledTime - _edgeLastTime;
+                _edgeText.rectTransform.localScale = Vector3.one *
+                    Mathf.Lerp(1.15f, 1f, Mathf.Clamp01(age / 0.35f));
                 string arrow = Mathf.Abs(delta.x) > Mathf.Abs(delta.y)
                     ? (delta.x > 0 ? "→" : "←") : (delta.y > 0 ? "↑" : "↓");
                 _edgeText.text = (_edgeCombined >= 0 ? "+" : "") + _edgeCombined +
