@@ -116,6 +116,7 @@ namespace RestoreCastle3D
         /// <summary>드랍 가이드의 폐기물 디메리트 대상 여부에 따라 빨간 외곽선 레이어를 켜거나 끈다.</summary>
         public void SetPenaltyOutline(bool enabled)
         {
+            enabled &= !_settling;
             foreach (Renderer renderer in _renderers)
                 renderer.renderingLayerMask = enabled
                     ? renderer.renderingLayerMask | 8u
@@ -135,6 +136,7 @@ namespace RestoreCastle3D
         /// <summary>자동 낙하 모드로 전환하여 기존 충돌 능력을 비활성화하고 중력을 켠다.</summary>
         public void EnableContinuousDrop()
         {
+            if (_settling) return;
             _continuousDrop = true;
             _body.isKinematic = false;
             _body.useGravity = true;
@@ -143,6 +145,7 @@ namespace RestoreCastle3D
         /// <summary>기물을 들어 올려 중력과 물리 이동을 잠시 멈춘다.</summary>
         public void PickUp()
         {
+            if (_settling) return;
             _held = true;
             _continuousDrop = false;
             _removalScheduled = false;
@@ -156,6 +159,7 @@ namespace RestoreCastle3D
         /// <summary>커서의 XZ 좌표를 따라 기물을 옮기고 물리 충돌 좌표를 동기화한다.</summary>
         public void MoveHeld(Vector3 position)
         {
+            if (_settling) return;
             _body.position = position;
             Physics.SyncTransforms();
         }
@@ -163,6 +167,7 @@ namespace RestoreCastle3D
         /// <summary>집고 있던 기물을 수평 속도 없이 중력으로 놓고 이후 다시 집지 못하도록 한다.</summary>
         public void Throw()
         {
+            if (_settling) return;
             _held = false;
             _throwOrigin = true;
             MarkAttachmentGroupThrown();
@@ -212,7 +217,8 @@ namespace RestoreCastle3D
         /// <summary>배치 기물은 게임의 추적 목록에서 제거하고 자동 낙하 기물은 리소스 풀로 반환한다.</summary>
         public void Despawn()
         {
-            if (CastleCreekScore3D.Active != null && !_settling)
+            if (_settling) return;
+            if (CastleCreekScore3D.Active != null)
             {
                 CastleCreekScore3D.Active.Discard(this);
                 return;
@@ -501,6 +507,7 @@ namespace RestoreCastle3D
         /// <summary>Detach all spring edges; used by a barrel before applying impulse.</summary>
         public void BreakAllAttachments()
         {
+            if (_settling) return;
             foreach (CastlePiece3D other in new List<CastlePiece3D>(_attachedPieces))
             {
                 if (other == null) continue;
