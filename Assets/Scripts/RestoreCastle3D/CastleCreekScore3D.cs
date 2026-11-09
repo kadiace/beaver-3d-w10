@@ -278,8 +278,8 @@ namespace RestoreCastle3D
                 _nextPreviewRefresh = Time.unscaledTime + PreviewRefreshInterval;
                 foreach (CastlePiece3D candidate in _registered)
                 {
-                    if (candidate == null || candidate == _heldPiece || candidate.IsSettling ||
-                        !candidate.isActiveAndEnabled)
+                    if (candidate == null || !candidate.isActiveAndEnabled ||
+                        !_heldPiece.CanAttachWhenThrownTo(candidate))
                         continue;
                     Vector3 vp = _camera.WorldToViewportPoint(candidate.transform.position);
                     if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f)
