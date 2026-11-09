@@ -15,7 +15,6 @@ namespace RestoreCastle3D
         private const int PLACEMENTS_PER_ROUND = 5;
         private const int STAGE_COUNT = 5;
         private const int LIVING_TREE_MAX_GROWTH = 8;
-        private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float WASTE_EFFECT_RADIUS = 2.5f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
         private const float CAMERA_MIN_POSITION_X = -20f;
@@ -31,10 +30,6 @@ namespace RestoreCastle3D
 
         private static readonly float _livingTreeScalePerGrowth =
             1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
-
-        [Header("Barrel explosion")]
-        [SerializeField, Min(0f)] private float barrelExplosionImpulse = 18f;
-        [SerializeField, Min(0f)] private float barrelExplosionUpwardsModifier = 0.6f;
 
         [Header("3D drop")]
         [SerializeField, Min(2f)] private float dropHeight = 7f;
@@ -1162,38 +1157,29 @@ namespace RestoreCastle3D
             return connected.Count;
         }
 
-        /// <summary>폭발 시 오크통은 유지하고 주변 기물에 거리 감쇠가 있는 물리 충격을 준다.</summary>
+        /// <summary>폭발 잔해의 점수 및 스테이지 추적을 해제하고 오크통을 제거한다.</summary>
         public void Explode(CastlePiece3D barrel)
         {
-            if (barrel == null || !_pieceSet.Contains(barrel)) return;
-
-            Vector3 origin = barrel.Body.worldCenterOfMass;
-            HashSet<CastlePiece3D> targets = new HashSet<CastlePiece3D>();
-            foreach (Collider collider in Physics.OverlapSphere(origin,
-                BARREL_EXPLOSION_RADIUS, Physics.DefaultRaycastLayers,
-                QueryTriggerInteraction.Ignore))
+            if (barrel == null || barrel.IsSettling || !_pieceSet.Contains(barrel)) return;
+            List<CastlePiece3D> targets = barrel.ExplodeNearby();
+            targets.Add(barrel);
+            foreach (CastlePiece3D current in targets)
             {
-                CastlePiece3D target = collider.GetComponentInParent<CastlePiece3D>();
-                if (target == null || target == barrel || target.MaterialId == "foundation"
-                    || !_pieceSet.Contains(target))
-                    continue;
-
-                Rigidbody body = target.Body;
-                if (body == null || body.isKinematic) continue;
-                targets.Add(target);
+                if (current == _outlinedPiece) SetOutlineTargets(null);
+                if (current == _heldPiece)
+                {
+                    _heldPiece = null;
+                    _dropPreview?.Hide();
+                    if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
+                }
+                _pieceSet.Remove(current);
+                _pieces.Remove(current);
+                _score.Remove(current);
             }
-
-            foreach (CastlePiece3D target in targets)
-            {
-                // Move the actual Rigidbody instead of destroying its GameObject.
-                // One impulse per piece, even when a prefab has multiple colliders.
-                target.Body.AddExplosionForce(barrelExplosionImpulse, origin,
-                    BARREL_EXPLOSION_RADIUS, barrelExplosionUpwardsModifier,
-                    ForceMode.Impulse);
-            }
-
-            // The barrel itself also remains in the game world.
-            _status = "오크통 폭발: " + targets.Count + "개 주변 기물을 날렸습니다.";
+            barrel.MarkSettling();
+            Managers.Resource.Destroy(barrel.gameObject);
+            _floodPreview.RequestRefresh();
+            _status = "오크통 폭발: " + (targets.Count - 1) + "개 주변 기물을 날렸습니다.";
         }
 
         /// <summary>원본 자재의 내구도 효과를 접촉 기반 인접 그래프에서 재계산한다.</summary>
