@@ -106,7 +106,7 @@ namespace RestoreCastle3D
             if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
             {
                 CastleMaterial3D material = _spawnMaterials[_random.Next(_spawnMaterials.Length)];
-                Vector3 position = new Vector3(UnityEngine.Random.Range(-12f, 12f), 30f, 45f);
+                Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
                 GameObject prefab = Resources.Load<GameObject>("Prefabs/" + CastleCatalog3D.PrefabId(material.id));
                 GameObject instance = Instantiate(prefab, position, Quaternion.identity);
                 instance.name = material.name;
