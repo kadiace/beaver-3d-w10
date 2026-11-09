@@ -29,7 +29,6 @@ namespace RestoreCastle3D
         public bool FuseStarted => _fuseStarted;
         public bool FusePending => _fusePending;
         public int PlacedTurn { get; private set; }
-        public int PermanentBonus { get; set; }
 
         private void Awake()
         {
@@ -62,13 +61,6 @@ namespace RestoreCastle3D
         private void OnCollisionEnter(Collision collision)
         {
             Register(collision);
-            if (materialId == "barrel" && !_game.IsAbilityDisabled(this)
-                && !_fuseStarted && _game != null)
-            {
-                _fuseStarted = true;
-                _fusePending = true;
-                StartCoroutine(Detonate());
-            }
         }
 
         private void OnCollisionStay(Collision collision)
@@ -107,9 +99,6 @@ namespace RestoreCastle3D
             if (other == null || other == this) return;
             _contacts.Add(other);
             other._contacts.Add(this);
-            // Called on the physics contact frame, before the lump's Update
-            // destruction can run. A vine touching a foul lump always wins.
-            _game?.TryAttachVines(this, other);
             _game?.TryAttachGlue(this, other);
         }
 
@@ -187,7 +176,6 @@ namespace RestoreCastle3D
         private void SuppressAbilities()
         {
             AbilitySuppressed = true;
-            PermanentBonus = 0;
             // An attached barrel cannot finish a fuse or detonate later.
             if (materialId == "barrel" && _fusePending)
             {

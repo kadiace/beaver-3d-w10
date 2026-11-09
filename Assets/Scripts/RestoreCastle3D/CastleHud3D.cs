@@ -143,7 +143,8 @@ namespace RestoreCastle3D
             _rulesPopup.SetActive(false);
             _tooltip.SetActive(false);
             _rulesBody.text = @"매 스테이지마다 강 상류에서 홍수가 밀려옵니다.
-기물을 쌓아 홍수에 대비하세요!
+기물을 쌓아 원점의 깃발을 지키세요!
+깃발이 물살에 밀려 절벽 뒤 파괴 경계를 넘으면 처음부터 다시 시작합니다.
 
 우클릭 드래그: 카메라 이동
 스크롤: 확대
@@ -212,8 +213,8 @@ Q/E: 기물 회전 / Esc: 선택 취소
             _round.text = "ROUND " + _game.CurrentStageRound + " / " + _game.RoundsPerStage
                 + (_game.PlacementsThisRound > 0 ? "   배치 " + _game.PlacementsThisRound
                     + " / " + _game.PlacementsPerRound : "");
-            _durability.text = "내구도 " + _game.Durability;
-            _target.text = "목표 " + _game.TargetDurability;
+            _durability.transform.parent.gameObject.SetActive(false);
+            _target.transform.parent.gameObject.SetActive(false);
             _rerollStat.text = "리롤 " + _game.RerollCount;
             _rerollAction.text = "리롤\n" + _game.RerollCount;
             if (_game.IsRoundPlacing && _hoveredCard >= 0)
@@ -230,13 +231,11 @@ Q/E: 기물 회전 / Esc: 선택 취소
                 if (_hoveredCard < 0) _tooltip.SetActive(false);
             }
             _effects.text = _hoveredPiece == null
-                ? "현재 내구도 " + _game.Durability
-                    + "\n자재에 마우스를 올리면 내구도와 접촉 이웃을 확인할 수 있습니다."
-                : "현재 내구도 " + _game.Durability
-                    + "\n\n" + BuildPlacedDetails(_hoveredPiece);
+                ? "자재에 마우스를 올리면 접촉 이웃을 확인할 수 있습니다."
+                : BuildPlacedDetails(_hoveredPiece);
             if (_hoveredPiece != null && _hoveredCard < 0 && _tooltip.activeSelf)
             {
-                string description = BuildPlacedDetails(_hoveredPiece);
+                string description = AbilityTooltip(_hoveredPiece.MaterialId);
                 if (_tooltipText.text != description)
                 {
                     Mouse mouse = Mouse.current;
@@ -272,14 +271,11 @@ Q/E: 기물 회전 / Esc: 선택 취소
             _completePopup.SetActive(_game.IsFinished);
             if (_game.AwaitingStage)
             {
-                _stageTitle.text = _game.StagePassed ? "스테이지 통과" : "스테이지 실패";
-                _stageBody.text = "내구도 " + _game.Durability + " / 목표 " + _game.TargetDurability
-                    + "\n" + (_game.StagePassed ? "홍수를 충분히 대비하는데 성공했습니다." : "처음부터 다시 시작합니다.")
-                    + "\n" + (_game.StatusMessage ?? "");
+                _stageTitle.text = _game.StagePassed ? "스테이지 완료" : "방어 실패";
+                _stageBody.text = _game.StatusMessage ?? "";
             }
             if (_game.IsFinished)
-                _completeBody.text = "최종 내구도 " + _game.Durability
-                    + "\n자재 " + _game.PieceCount + "개가 남았습니다.\n"
+                _completeBody.text = "자재 " + _game.PieceCount + "개가 남았습니다.\n"
                     + "닫기 버튼을 누르면 다시 시작합니다.";
         }
 
@@ -356,15 +352,18 @@ Q/E: 기물 회전 / Esc: 선택 취소
             if (!_game.CanShowItemInfo) return;
             CastleMaterial3D material = _game.CurrentOffers[index];
             if (material == null) return;
+            string description = AbilityTooltip(material.id);
+            if (description == null) return;
             _hoveredCard = index;
             _hoveredPiece = null;
-            ShowDescription(BuildCandidateDetails(material), screen);
+            ShowDescription(description, screen);
         }
 
-        /// <summary>기물에 물리 레이캐스트가 적중하면 개별 내구도와 접촉 정보를 표시한다.</summary>
+        /// <summary>기물에 물리 레이캐스트가 적중하면 접촉 정보를 표시한다.</summary>
         public void SetHoveredPiece(CastlePiece3D piece, Vector2 screen)
         {
-            if (!_game.CanShowItemInfo || !_game.IsPlacedPiece(piece))
+            if (!_game.CanShowItemInfo || !_game.IsPlacedPiece(piece) ||
+                AbilityTooltip(piece.MaterialId) == null)
                 piece = null;
 
             if (piece != _hoveredPiece)
@@ -373,29 +372,37 @@ Q/E: 기물 회전 / Esc: 선택 취소
                 if (_hoveredCard < 0)
                 {
                     if (piece == null) _tooltip.SetActive(false);
-                    else ShowDescription(BuildPlacedDetails(piece), screen);
+                    else ShowDescription(AbilityTooltip(piece.MaterialId), screen);
                 }
             }
             if (piece != null && _hoveredCard < 0)
             {
                 // The UI card exit can hide the shared tooltip after this piece is selected.
-                if (!_tooltip.activeSelf) ShowDescription(BuildPlacedDetails(piece), screen);
+                if (!_tooltip.activeSelf) ShowDescription(AbilityTooltip(piece.MaterialId), screen);
                 else MoveTooltip(screen);
             }
         }
 
-        /// <summary>원본 후보 툴팁과 동일하게 기본 내구도, 고유 능력, 분류를 조합한다.</summary>
+        /// <summary>접착제와 성장 기물에만 표시할 짧은 툴팁 문구를 반환한다.</summary>
+        private static string AbilityTooltip(string materialId)
+        {
+            if (materialId == "all_purpose_glue") return "접착제";
+            if (materialId == "living_tree" || materialId == "bamboo") return "성장한다";
+            return null;
+        }
+
+        /// <summary>후보 자재의 기존 상세 설명을 구성한다.</summary>
         private static string BuildCandidateDetails(CastleMaterial3D material)
         {
             string[] abilities = material.abilities == null
                 ? Array.Empty<string>()
                 : material.abilities.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
             string description = abilities.Length == 0 ? "고유 능력 없음" : string.Join("\n", abilities);
-            return material.name + "\n기본 내구도: " + material.baseReinforcement + "\n\n"
+            return material.name + "\n\n"
                 + description + "\n\n[" + material.category + "]";
         }
 
-        /// <summary>원본의 배치 기물 정보 패널처럼 개별 내구도와 접촉 자재를 표시한다.</summary>
+        /// <summary>배치 기물 정보 패널에 접촉 자재와 고유 능력을 표시한다.</summary>
         private string BuildPlacedDetails(CastlePiece3D piece)
         {
             CastleMaterial3D material = _game.GetPieceMaterial(piece);
@@ -404,20 +411,15 @@ Q/E: 기물 회전 / Esc: 선택 취소
             List<string> lines = new List<string>
             {
                 "[" + material.category + "]",
-                material.name,
-                "기본 내구도 " + material.baseReinforcement
+                material.name
             };
-            if (piece.PermanentBonus != 0)
-                lines.Add("추가 내구도 " + (piece.PermanentBonus > 0 ? "+" : "") + piece.PermanentBonus);
-            lines.Add("기물 내구도 " + _game.GetPieceReinforcement(piece));
             if (piece.AbilitySuppressed) lines.Add("특수능력: 덩쿨 부착으로 제거됨");
             else if (piece.HasAttachmentTarget) lines.Add("덩쿨: 최초 접촉 기물에 영구 부착");
             lines.Add("접촉 자재:");
             if (neighbors.Length == 0) lines.Add("· 없음");
             else
                 foreach (CastlePiece3D neighbor in neighbors.OrderBy(n => n.PlacedTurn))
-                    lines.Add("· " + _game.GetPieceMaterial(neighbor).name
-                        + " (" + _game.GetPieceReinforcement(neighbor) + ")");
+                    lines.Add("· " + _game.GetPieceMaterial(neighbor).name);
             lines.Add("");
             if (piece.AbilitySuppressed)
                 lines.Add("고유 능력 무효화됨");

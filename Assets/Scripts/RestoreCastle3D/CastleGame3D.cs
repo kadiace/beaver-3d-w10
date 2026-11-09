@@ -14,13 +14,13 @@ namespace RestoreCastle3D
         private const int ROUNDS_PER_STAGE = 5;
         private const int PLACEMENTS_PER_ROUND = 5;
         private const int STAGE_COUNT = 5;
+        private const float FLOOD_DURATION_INCREASE_PER_STAGE = 0.2f;
+        private const float FLOOD_DEPTH_INCREASE_PER_STAGE = 0.5f;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
         private const float CAMERA_MIN_TARGET_Z = -5f;
         private const float CAMERA_MAX_TARGET_Z = 15f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
-        private const float FLOOD_IMPULSE = 60f;
-        private const float FLOOD_SURFACE_Y = -1.95f;
         private const float BOUNDARY_DESTRUCTION_DELAY = 1f;
 
         [Header("Barrel explosion")]
@@ -33,8 +33,10 @@ namespace RestoreCastle3D
         [SerializeField] private float groundY = -2.25f;
 
         [Header("Flood stage transition")]
-        [SerializeField, Min(0.1f)] private float floodFillDuration = 2.25f;
-        [SerializeField, Min(0.05f)] private float floodDrainDuration = 0.28f;
+        [SerializeField, Min(0.1f)] private float floodFillDuration = 1.2f;
+        [SerializeField, Min(0.1f)] private float floodTravelDuration = 2.25f;
+        [SerializeField, Min(0.05f)] private float shallowWaterDepth = 0.3f;
+        [SerializeField, Min(0.1f)] private float floodWaterDepth = 2f;
         [SerializeField]
         private AnimationCurve floodFillCurve =
             AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
@@ -42,9 +44,6 @@ namespace RestoreCastle3D
         private readonly List<CastlePiece3D> _pieces = new List<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _pieceSet = new HashSet<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _outlinedNeighbors = new HashSet<CastlePiece3D>();
-        private readonly Dictionary<CastlePiece3D, int> _score = new Dictionary<CastlePiece3D, int>();
-        private readonly Dictionary<(CastlePiece3D, CastlePiece3D), int> _contributions =
-            new Dictionary<(CastlePiece3D, CastlePiece3D), int>();
         private readonly HashSet<string> _consumedContacts = new HashSet<string>();
         private readonly CastleMaterial3D[] _offers = new CastleMaterial3D[3];
         private GameSceneContext _sceneContext;
@@ -54,7 +53,10 @@ namespace RestoreCastle3D
         private CastleFloodEffect3D _floodEffect;
         private Bounds _placementBounds;
         private CastleFloatingText3D _floatingText;
-        private CastlePiece3D _effectSource;
+        private GameObject _defenseFlag;
+        private Rigidbody _flagBody;
+        private BoxCollider _flagCollider;
+        private Material _flagMaterial;
         private Coroutine _stageFloodRoutine;
         private Camera _camera;
         private CastlePiece3D _outlinedPiece;
@@ -70,7 +72,6 @@ namespace RestoreCastle3D
         private int _rerolls;
         private int _extraRerolls;
         private float _objectYaw;
-        private float _nextHoverScoreRefresh;
         private bool _rulesOpen;
         private bool _paletteOpen = true;
         private bool _stageTransitioning;
@@ -97,11 +98,17 @@ namespace RestoreCastle3D
             _dropPreview = new CastleDropPreview3D();
             _floodEffect = new CastleFloodEffect3D();
             ResetGame();
+            Bounds lowerCreek = GameObject.Find("Flat Muddy Creek Bed After Cliff")
+                .GetComponent<BoxCollider>().bounds;
+            _floodEffect.ShowShallow(_placementBounds, lowerCreek,
+                groundY + shallowWaterDepth, lowerCreek.center.y + shallowWaterDepth);
         }
 
         private void Update()
         {
             if (_catalog == null) return;
+            if (_defenseFlag != null && _defenseFlag.transform.position.z <= DestructionBoundaryZ)
+                DestroyDefenseFlag();
             Mouse mouse = Mouse.current;
             // Track releases even while the fifth drop is finishing or a popup is open.
             if (mouse != null && mouse.leftButton.wasReleasedThisFrame)
@@ -110,7 +117,7 @@ namespace RestoreCastle3D
             UpdateCameraInput();
             if (!_stageTransitioning)
             {
-                ApplyContactDestruction();
+                ApplyContactGlue();
                 UpdateHoveredPiece();
             }
             if (_resolving || _awaitingStage || _finished || _rulesOpen)
@@ -236,6 +243,8 @@ namespace RestoreCastle3D
             SetOutlineTargets(null);
             _dropPreview?.Dispose();
             _floodEffect?.Dispose();
+            if (_defenseFlag != null) Destroy(_defenseFlag);
+            if (_flagMaterial != null) Destroy(_flagMaterial);
         }
 
         /// <summary>3D 물리 충돌체를 마우스 레이로 탐색해 원본 자재 상세 UI에 전달한다.</summary>
@@ -261,11 +270,6 @@ namespace RestoreCastle3D
             {
                 CastlePiece3D candidate = hit.collider.GetComponentInParent<CastlePiece3D>();
                 if (candidate != null && _pieceSet.Contains(candidate)) piece = candidate;
-            }
-            if (piece != null && Time.unscaledTime >= _nextHoverScoreRefresh)
-            {
-                RecalculateScores();
-                _nextHoverScoreRefresh = Time.unscaledTime + 0.2f;
             }
             SetOutlineTargets(piece);
             _hud.SetHoveredPiece(piece, position);
@@ -344,8 +348,6 @@ namespace RestoreCastle3D
         public int PlacementsThisRound => _placementsInRound;
         // The palette hides after each real drop; Esc/right-click reopens it.
         public bool IsRoundPlacing => _resolving || !_paletteOpen;
-        public int Durability => _score.Values.Sum();
-        public int TargetDurability => StageTarget(Mathf.Min(_stage, STAGE_COUNT - 1));
         public int RerollCount => _rerolls + _extraRerolls;
         public bool CanSelect => !_resolving && !_awaitingStage && !_finished && !_rulesOpen
             && _paletteOpen && _placementsInRound < PLACEMENTS_PER_ROUND;
@@ -359,15 +361,8 @@ namespace RestoreCastle3D
         /// <summary>실제로 배치되어 살아 있는 기물인지 확인한다.</summary>
         public bool IsPlacedPiece(CastlePiece3D piece) => piece != null && _pieceSet.Contains(piece);
 
-        /// <summary>배치한 기물의 카탈로그 정보와 현재 내구도를 툴팁에 제공한다.</summary>
+        /// <summary>배치한 기물의 카탈로그 정보를 제공한다.</summary>
         public CastleMaterial3D GetPieceMaterial(CastlePiece3D piece) => _catalog.Get(piece.MaterialId);
-        public int GetPieceReinforcement(CastlePiece3D piece)
-        {
-            if (_score.TryGetValue(piece, out int value)) return value;
-            CastleMaterial3D material = GetPieceMaterial(piece);
-            return material.baseReinforcement + piece.PermanentBonus;
-        }
-
         /// <summary>현재 충돌 상태에 따라 해당 기물에 닿는 기물 목록을 제공한다.</summary>
         public CastlePiece3D[] GetTouchingPieces(CastlePiece3D piece) => Adjacent(piece).ToArray();
         public bool AwaitingStage => _awaitingStage;
@@ -516,10 +511,9 @@ namespace RestoreCastle3D
 
             foreach (CastlePiece3D piece in _pieces)
                 if (piece != null) Destroy(piece.gameObject);
+            if (_defenseFlag != null) Destroy(_defenseFlag);
             _pieces.Clear();
             _pieceSet.Clear();
-            _score.Clear();
-            _contributions.Clear();
             _consumedContacts.Clear();
             _random = new System.Random(Environment.TickCount);
             _turn = 0;
@@ -535,15 +529,54 @@ namespace RestoreCastle3D
             HideDropPreview();
             _objectYaw = 0f;
             _rulesOpen = false;
-            _nextHoverScoreRefresh = 0f;
             _resolving = false;
             _awaitingStage = false;
             _finished = false;
             _cameraTarget = Vector3.zero;
             _rightGestureActive = false;
             UpdateCameraPosition();
+            CreateDefenseFlag();
             DealOffers();
-            _status = "재료를 떨어뜨려 집을 쌓으세요. Q/E: 재료 회전";
+            _status = "재료를 떨어뜨려 깃발을 지키세요. Q/E: 재료 회전";
+        }
+
+        /// <summary>월드 원점에 깃대와 붉은 깃발을 만들어 이번 게임의 보호 대상으로 둔다.</summary>
+        private void CreateDefenseFlag()
+        {
+            if (_flagMaterial == null)
+                _flagMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            _defenseFlag = new GameObject("Defense Flag");
+            _defenseFlag.transform.position = Vector3.zero;
+            CreateFlagPart("Pole", PrimitiveType.Cylinder, new Vector3(0f, -0.7f, 0f),
+                new Vector3(0.1f, 1.4f, 0.1f), new Color(0.72f, 0.53f, 0.25f));
+            CreateFlagPart("Banner", PrimitiveType.Cube, new Vector3(0.55f, 0.35f, 0f),
+                new Vector3(1f, 0.6f, 0.08f), new Color(0.9f, 0.15f, 0.12f));
+            CreateFlagPart("Base", PrimitiveType.Cube, new Vector3(0f, -2.08f, 0f),
+                new Vector3(0.55f, 0.12f, 0.55f), new Color(0.24f, 0.2f, 0.15f));
+            _flagCollider = _defenseFlag.AddComponent<BoxCollider>();
+            _flagCollider.center = new Vector3(0.25f, -0.65f, 0f);
+            _flagCollider.size = new Vector3(1.4f, 2.7f, 0.4f);
+            _flagBody = _defenseFlag.AddComponent<Rigidbody>();
+            _flagBody.mass = 1f;
+            _flagBody.linearDamping = 0.15f;
+            _flagBody.angularDamping = 0.5f;
+        }
+
+        /// <summary>깃발의 한 부분을 지정한 모양, 위치, 크기, 색상으로 만든다.</summary>
+        private void CreateFlagPart(string name, PrimitiveType shape, Vector3 position,
+            Vector3 scale, Color color)
+        {
+            GameObject part = GameObject.CreatePrimitive(shape);
+            part.name = name;
+            part.transform.SetParent(_defenseFlag.transform, false);
+            part.transform.localPosition = position;
+            part.transform.localScale = scale;
+            Renderer renderer = part.GetComponent<Renderer>();
+            part.GetComponent<Collider>().enabled = false;
+            renderer.sharedMaterial = _flagMaterial;
+            MaterialPropertyBlock colors = new MaterialPropertyBlock();
+            colors.SetColor("_BaseColor", color);
+            renderer.SetPropertyBlock(colors);
         }
 
         /// <summary>Resources/Prefabs에서 3D 기물을 로드하고 Rigidbody를 통한 중력 낙하를 준비한다.</summary>
@@ -609,12 +642,6 @@ namespace RestoreCastle3D
             bool finalDrop = _placementsInRound == PLACEMENTS_PER_ROUND;
             if (finalDrop) _resolving = true;
 
-            if (material.id == "bucket")
-            {
-                dropped.PermanentBonus += 6;
-                PublishChange(new CastleChange3D(dropped, dropped, CastleChangeKind.Durability,
-                    6, dropped.transform.position));
-            }
             if (material.id == "empty_bottle")
             {
                 _extraRerolls++;
@@ -657,7 +684,6 @@ namespace RestoreCastle3D
             yield return new WaitForSeconds(0.3f);
             _turn++;
             TickPeriodic();
-            RecalculateScores();
             if (_turn % ROUNDS_PER_STAGE == 0)
                 FinishStage();
             else
@@ -665,7 +691,7 @@ namespace RestoreCastle3D
                 _resolving = false;
                 DealOffers();
             }
-            if (!_awaitingStage) _status = "라운드 정산 완료: 현재 내구도 " + Durability;
+            if (!_awaitingStage) _status = "라운드 정산 완료";
         }
 
         /// <summary>원본 턴 기반 식물 성장 및 덩굴 번식을 물리 기물에 적용한다.</summary>
@@ -676,12 +702,8 @@ namespace RestoreCastle3D
                 if (piece == null || IsAbilityDisabled(piece)) continue;
                 int age = _turn - piece.PlacedTurn;
                 if (age <= 0) continue;
-                int woods = Adjacent(piece).Count(n => _catalog.Get(n.MaterialId).category == "목재");
-                if (piece.MaterialId == "branch" && age % 3 == 0) piece.PermanentBonus += woods;
-                if (piece.MaterialId == "leafy_branch" && age % 2 == 0) piece.PermanentBonus += woods;
                 if (piece.MaterialId == "living_tree" && age % 2 == 0)
                 {
-                    piece.PermanentBonus++;
                     piece.transform.localScale *= 1.1f;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
@@ -689,18 +711,6 @@ namespace RestoreCastle3D
                 if (piece.MaterialId == "bamboo")
                 {
                     BoxCollider collider = piece.GetComponent<BoxCollider>();
-                    Vector3 previousTop = collider.transform.TransformPoint(collider.center
-                        + Vector3.up * collider.size.y * 0.5f);
-                    Vector3 extensionCenter = previousTop + piece.transform.up * 0.5f;
-                    foreach (Collider hit in Physics.OverlapBox(extensionCenter,
-                        new Vector3(collider.size.x * 0.5f, 0.5f, collider.size.z * 0.5f),
-                        piece.transform.rotation, Physics.DefaultRaycastLayers,
-                        QueryTriggerInteraction.Ignore))
-                    {
-                        CastlePiece3D blocked = hit.GetComponentInParent<CastlePiece3D>();
-                        if (blocked != null && blocked != piece && blocked.MaterialId != "foundation")
-                            RemovePiece(blocked);
-                    }
                     collider.center += Vector3.up * 0.5f;
                     collider.size += Vector3.up;
                     foreach (Transform child in piece.transform)
@@ -710,52 +720,10 @@ namespace RestoreCastle3D
                         scale.y += 1f;
                         child.localScale = scale;
                     }
-                    piece.PermanentBonus++;
                     PublishChange(new CastleChange3D(piece, piece, CastleChangeKind.Growth,
                         0, piece.transform.position));
                 }
-                if (piece.MaterialId == "growing_vine" && age % 3 == 0)
-                    Spawn(_catalog.Get("vine"), piece.transform.position + new Vector3(1f, 2.2f, 0.3f));
             }
-        }
-
-        /// <summary>물리 접촉 즉시 성장 덩쿨·생성 덩쿨을 첫 대상에 영구 부착한다.</summary>
-        public void TryAttachVines(CastlePiece3D a, CastlePiece3D b)
-        {
-            if (_stageTransitioning || a == null || b == null ||
-                !_pieceSet.Contains(a) || !_pieceSet.Contains(b))
-                return;
-
-            bool canA = a.IsVine && !a.AbilitySuppressed && !a.HasAttachmentTarget;
-            bool canB = b.IsVine && !b.AbilitySuppressed && !b.HasAttachmentTarget;
-            CastlePiece3D vine, target;
-
-            if (canA && canB)
-            {
-                // Deterministic direction for a vine-vine contact; one
-                // connection must not suppress both vines at the same instant.
-                bool aIsVine = a.GetInstanceID() > b.GetInstanceID();
-                vine = aIsVine ? a : b;
-                target = aIsVine ? b : a;
-            }
-            else if (canA)
-            {
-                vine = a;
-                target = b;
-            }
-            else if (canB)
-            {
-                vine = b;
-                target = a;
-            }
-            else return;
-
-            if (!vine.TryAttachTo(target)) return;
-            PublishChange(new CastleChange3D(target, vine, CastleChangeKind.EffectDisabled,
-                0, target.transform.position));
-            // Preserve the target's own base reinforcement while also
-            // transferring that same base amount to the vine's permanent bonus.
-            vine.PermanentBonus += _catalog.Get(target.MaterialId).baseReinforcement;
         }
 
         /// <summary>접촉한 모든 기물을 접착제에 결합하고, 기물 제거 시에는 결합을 해제한다.</summary>
@@ -776,23 +744,9 @@ namespace RestoreCastle3D
             glue.TryGlueTo(target);
         }
 
-        /// <summary>덩쿨 부착을 우선 처리한 뒤 아직 특수능력이 있는 폐기물 덩어리만 파괴 효과를 낸다.</summary>
-        private void ApplyContactDestruction()
+        /// <summary>이전 물리 프레임부터 닿아 있는 기물에도 접착 효과를 적용한다.</summary>
+        private void ApplyContactGlue()
         {
-            // The first phase handles a contact that has persisted from a
-            // previous physics step without an OnCollisionEnter callback.
-            foreach (CastlePiece3D piece in _pieces.ToArray())
-            {
-                if (piece == null || !piece.IsVine || piece.AbilitySuppressed ||
-                    piece.HasAttachmentTarget)
-                    continue;
-                foreach (CastlePiece3D neighbor in Adjacent(piece).ToArray())
-                {
-                    TryAttachVines(piece, neighbor);
-                    if (piece.HasAttachmentTarget) break;
-                }
-            }
-
             // Retry existing contacts if their initial collision callback was missed.
             foreach (CastlePiece3D glue in _pieces.ToArray())
             {
@@ -803,24 +757,6 @@ namespace RestoreCastle3D
                     TryAttachGlue(glue, neighbor);
             }
 
-            foreach (CastlePiece3D lump in _pieces.ToArray())
-            {
-                if (lump == null || lump.MaterialId != "foul_smelling_lump" ||
-                    lump.AbilitySuppressed)
-                    continue;
-
-                foreach (CastlePiece3D neighbor in Adjacent(lump).ToArray())
-                {
-                    if (neighbor == null || !_pieceSet.Contains(neighbor) ||
-                        neighbor.IsVine || neighbor.MaterialId == "foundation" ||
-                        neighbor.MaterialId == "foul_smelling_lump")
-                        continue;
-
-                    string key = lump.GetInstanceID() + ":" + neighbor.GetInstanceID();
-                    if (_consumedContacts.Add(key))
-                        RemovePiece(neighbor);
-                }
-            }
         }
 
         /// <summary>접촉 그래프에서 소멸된 기물을 제외한 실제 인접 기물만 반환한다.</summary>
@@ -838,14 +774,12 @@ namespace RestoreCastle3D
         }
 
         /// <summary>
-        /// Z 경계를 넘은 기물만 제거하고 스테이지 전환 밖에서는 내구도를 갱신한다.
+        /// Z 경계를 넘은 기물만 제거한다.
         /// piece는 경계를 넘은 기물이다.
         /// </summary>
         internal void RemoveOutsideBoundary(CastlePiece3D piece)
         {
-            if (RemovePiece(piece, CastleChangeKind.Destroyed, BOUNDARY_DESTRUCTION_DELAY,
-                false) > 0 && !_stageTransitioning)
-                RecalculateScores();
+            RemovePiece(piece, CastleChangeKind.Destroyed, BOUNDARY_DESTRUCTION_DELAY, false);
         }
 
         /// <summary>기물을 제거하고 요청된 경우에만 연결 기물까지 연쇄 제거한다.</summary>
@@ -873,7 +807,6 @@ namespace RestoreCastle3D
                 if (current == _outlinedPiece) SetOutlineTargets(null);
                 _pieceSet.Remove(current);
                 _pieces.Remove(current);
-                _score.Remove(current);
                 PublishChange(new CastleChange3D(current, piece, reason, 0,
                     current.transform.position));
                 Destroy(current.gameObject, destructionDelay);
@@ -915,156 +848,59 @@ namespace RestoreCastle3D
             _status = "오크통 폭발: " + targets.Count + "개 주변 기물을 날렸습니다.";
         }
 
-        /// <summary>원본 자재의 내구도 효과를 접촉 기반 인접 그래프에서 재계산한다.</summary>
-        private void RecalculateScores()
-        {
-            var previousScores = new Dictionary<CastlePiece3D, int>(_score);
-            var previous = new Dictionary<(CastlePiece3D, CastlePiece3D), int>(_contributions);
-            _contributions.Clear();
-            _score.Clear();
-            foreach (CastlePiece3D piece in _pieces)
-                if (piece != null)
-                {
-                    int baseline = _catalog.Get(piece.MaterialId).baseReinforcement + piece.PermanentBonus;
-                    _score[piece] = baseline;
-                    _contributions[(piece, null)] = baseline;
-                }
-
-            foreach (CastlePiece3D piece in _score.Keys.ToArray())
-            {
-                if (IsAbilityDisabled(piece)) continue;
-                _effectSource = piece;
-                CastlePiece3D[] neighbors = Adjacent(piece).ToArray();
-                int Count(string category) => neighbors.Count(n => _catalog.Get(n.MaterialId).category == category);
-                switch (piece.MaterialId)
-                {
-                    case "large_stone": if (Count("석재") >= 2) AddBonus(piece, 2); break;
-                    case "fossil": if (neighbors.Count(n => n.MaterialId == "fossil") >= 3) AddBonus(piece, 10); break;
-                    case "tire": AddBonus(piece, -Count("쓰레기")); break;
-                    case "umbrella": if (_turn - piece.PlacedTurn <= 3) AddBonus(piece, 3); break;
-                    case "life_ring": AddBonus(piece, Mathf.Min(2, Count("쓰레기"))); break;
-                    case "rubber_duck": if (neighbors.Any(n => n.MaterialId == "life_ring")) AddBonus(piece, 4); break;
-                    case "dented_can": AddBonus(piece, Count("식물")); break;
-                    case "broken_game_controller":
-                        AddBonus(piece, neighbors.Where(n => _catalog.Get(n.MaterialId).category == "쓰레기")
-                            .Select(n => n.MaterialId).Distinct().Count());
-                        break;
-                    case "all_purpose_glue": AddBonus(piece, neighbors.Select(n => n.MaterialId).Distinct().Count()); break;
-                }
-                if (piece.MaterialId == "watering_can")
-                    foreach (CastlePiece3D n in neighbors.Where(n => _catalog.Get(n.MaterialId).category == "식물"))
-                        AddBonus(n, 1);
-                if (piece.MaterialId == "loose_work_glove")
-                    foreach (CastlePiece3D n in neighbors.Where(n => _catalog.Get(n.MaterialId).category == "목재"))
-                        AddBonus(n, 1);
-            }
-
-            foreach (CastlePiece3D piece in _score.Keys.ToArray())
-            {
-                if (IsAbilityDisabled(piece)) continue;
-                _effectSource = piece;
-                int penalty = piece.MaterialId == "waste_bag_small" ? 1 :
-                    piece.MaterialId == "waste_bag_medium" ? 2 : piece.MaterialId == "waste_bag_large" ? 3 : 0;
-                if (penalty == 0) continue;
-                foreach (CastlePiece3D neighbor in Adjacent(piece))
-                    if (_catalog.Get(neighbor.MaterialId).category != "쓰레기" &&
-                        _catalog.Get(neighbor.MaterialId).category != "폐기물")
-                        AddBonus(neighbor, -penalty);
-            }
-            Dictionary<CastlePiece3D, int> beforeLog = new Dictionary<CastlePiece3D, int>(_score);
-            foreach (CastlePiece3D piece in _score.Keys.ToArray())
-                if (!IsAbilityDisabled(piece) && piece.MaterialId == "log")
-                {
-                    _effectSource = piece;
-                    foreach (CastlePiece3D n in Adjacent(piece))
-                        if (_catalog.Get(n.MaterialId).category == "목재")
-                        {
-                            _effectSource = n;
-                            AddBonus(piece, beforeLog[n]);
-                        }
-                }
-            _effectSource = null;
-            foreach (var contribution in _contributions)
-            {
-                CastlePiece3D target = contribution.Key.Item1;
-                if (!previousScores.ContainsKey(target)) continue;
-                previous.TryGetValue(contribution.Key, out int oldAmount);
-                int delta = contribution.Value - oldAmount;
-                if (delta != 0)
-                    PublishChange(new CastleChange3D(target, contribution.Key.Item2,
-                         CastleChangeKind.Durability, delta, target.transform.position));
-            }
-            foreach (var contribution in previous)
-            {
-                CastlePiece3D target = contribution.Key.Item1;
-                if (!_score.ContainsKey(target) || _contributions.ContainsKey(contribution.Key) ||
-                    contribution.Value == 0) continue;
-                PublishChange(new CastleChange3D(target, contribution.Key.Item2,
-                    CastleChangeKind.Durability, -contribution.Value, target.transform.position));
-            }
-        }
-
-        /// <summary>재료의 현재 내구도에 임시 또는 인접 효과를 더한다.</summary>
-        private void AddBonus(CastlePiece3D target, int amount)
-        {
-            if (_score.ContainsKey(target))
-            {
-                _score[target] += amount;
-                var key = (target, _effectSource);
-                _contributions.TryGetValue(key, out int previous);
-                _contributions[key] = previous + amount;
-            }
-        }
-
-        /// <summary>현재 내구도로 스테이지를 판정하고 결과 팝업을 표시한다.</summary>
+        /// <summary>스테이지 완료 팝업을 표시한다.</summary>
         private void FinishStage()
         {
             SetOutlineTargets(null);
             HideDropPreview();
-            _stagePassed = Durability >= StageTarget(_stage);
-            _status = _stagePassed ? "닫기 버튼을 누르면 홍수가 시작됩니다."
-                : "목표 내구도에 도달하지 못했습니다.";
+            _stagePassed = true;
+            _status = "닫기 버튼을 누르면 홍수가 시작됩니다.";
             _awaitingStage = true;
             _resolving = false;
         }
 
         /// <summary>
-        /// 메쉬 범위를 캡처하고 물의 전면이 지나가는 동안 닿은 기물에 충격을 준다.
+        /// 한 차례의 격자 파도를 상류에서 하류로 흘려보내고 흐르는 물이 잦아들 때까지 기물에 힘을 적용한다.
         /// </summary>
         private IEnumerator ResolveStageFlood()
         {
             StageCullSnapshot snapshot = CaptureStageCullSnapshot();
-            var pushed = new HashSet<CastlePiece3D>();
-
-            _floodEffect.Begin(snapshot.CenterX, snapshot.Width,
-                snapshot.StartZ, snapshot.EndZ, snapshot.Cutoff, groundY);
+            float waveDuration = floodFillDuration
+                * (1f + _stage * FLOOD_DURATION_INCREASE_PER_STAGE);
+            float waveDepth = floodWaterDepth
+                * (1f + _stage * FLOOD_DEPTH_INCREASE_PER_STAGE);
+            var flow = new CastleFloodFlow3D(snapshot.CenterX, snapshot.Width,
+                snapshot.StartZ, snapshot.EndZ, groundY, waveDepth,
+                floodTravelDuration);
+            _floodEffect.Begin(flow);
 
             float elapsed = 0f;
-            while (elapsed < floodFillDuration)
+            while (elapsed < waveDuration)
             {
-                elapsed += Time.deltaTime;
-                float fraction = Mathf.Clamp01(elapsed / floodFillDuration);
-                float eased = floodFillCurve == null ? Mathf.SmoothStep(0f, 1f, fraction)
-                    : Mathf.Clamp01(floodFillCurve.Evaluate(fraction));
-                _floodEffect.SetFill(eased);
-                PushFloodedPieces(snapshot, snapshot.StartZ +
-                    (snapshot.EndZ - snapshot.StartZ) * eased, pushed);
-                yield return null;
+                yield return new WaitForFixedUpdate();
+                elapsed += Time.fixedDeltaTime;
+                float fraction = Mathf.Clamp01(elapsed / waveDuration);
+                float pulse = Mathf.Sin(Mathf.PI * fraction);
+                float inlet = floodFillCurve == null ? pulse
+                    : Mathf.Clamp01(floodFillCurve.Evaluate(pulse));
+                flow.Step(Time.fixedDeltaTime, _pieces, _flagBody, _flagCollider, inlet);
+                _floodEffect.UpdateSurface(flow);
             }
-            _floodEffect.SetFill(1f);
-            PushFloodedPieces(snapshot, snapshot.EndZ, pushed);
 
-            float drain = 0f;
-            while (drain < floodDrainDuration)
+            float residualVolume = flow.WaterVolume * 0.05f;
+            float stagnantTime = 0f;
+            float drainElapsed = 0f;
+            while (flow.WaterVolume > residualVolume && stagnantTime < 0.5f
+                && drainElapsed < floodTravelDuration * 4f)
             {
-                drain += Time.deltaTime;
-                float fraction = Mathf.Clamp01(drain / floodDrainDuration);
-                _floodEffect.SetDrain(fraction * fraction);
-                yield return null;
+                yield return new WaitForFixedUpdate();
+                drainElapsed += Time.fixedDeltaTime;
+                flow.Step(Time.fixedDeltaTime, _pieces, _flagBody, _flagCollider, 0f);
+                _floodEffect.UpdateSurface(flow);
+                stagnantTime = flow.MovingWaterVolume <= residualVolume
+                    ? stagnantTime + Time.fixedDeltaTime : 0f;
             }
             _floodEffect.Hide();
-
-            RecalculateScores();
             _stageTransitioning = false;
             _stageFloodRoutine = null;
             _resolving = false;
@@ -1075,100 +911,45 @@ namespace RestoreCastle3D
             _status = "홍수가 지나갔습니다. 다음 스테이지를 시작하세요.";
         }
 
-        /// <summary>살아 있는 기물의 렌더러 메쉬 범위와 물의 진행 범위를 캡처한다.</summary>
-        private StageCullSnapshot CaptureStageCullSnapshot()
+        /// <summary>깃발이 절벽 뒤 파괴 경계를 넘으면 홍수를 멈추고 실패 팝업을 표시한다.</summary>
+        private void DestroyDefenseFlag()
         {
-            var pieces = new List<CastlePiece3D>(_pieces.Count);
-            var bounds = new List<Bounds>(_pieces.Count);
-            float leftX = float.PositiveInfinity;
-            float rightX = float.NegativeInfinity;
-            float nearZ = float.PositiveInfinity;
-            float farZ = float.NegativeInfinity;
-
-            foreach (CastlePiece3D piece in _pieces)
+            if (_stageFloodRoutine != null)
             {
-                if (piece == null) continue;
-                Vector3 position = piece.transform.position;
-                leftX = Mathf.Min(leftX, position.x);
-                rightX = Mathf.Max(rightX, position.x);
-                nearZ = Mathf.Min(nearZ, position.z);
-                farZ = Mathf.Max(farZ, position.z);
-
-                if (piece.MaterialId == "foundation") continue;
-                Renderer[] renderers = piece.GetComponentsInChildren<Renderer>();
-                if (renderers.Length == 0) continue;
-                Bounds meshBounds = renderers[0].bounds;
-                for (int i = 1; i < renderers.Length; i++)
-                    meshBounds.Encapsulate(renderers[i].bounds);
-                pieces.Add(piece);
-                bounds.Add(meshBounds);
+                StopCoroutine(_stageFloodRoutine);
+                _stageFloodRoutine = null;
             }
-
-            // Include the whole camera viewport even when the pile is tiny.
-            Plane waterPlane = new Plane(Vector3.up, new Vector3(0f, FLOOD_SURFACE_Y, 0f));
-            Vector2[] corners = { Vector2.zero, new Vector2(Screen.width, 0f),
-                new Vector2(0f, Screen.height), new Vector2(Screen.width, Screen.height) };
-            foreach (Vector2 corner in corners)
-            {
-                Ray ray = _camera.ScreenPointToRay(corner);
-                if (!waterPlane.Raycast(ray, out float distance)) continue;
-                Vector3 pos = ray.GetPoint(distance);
-                leftX = Mathf.Min(leftX, pos.x);
-                rightX = Mathf.Max(rightX, pos.x);
-                nearZ = Mathf.Min(nearZ, pos.z);
-                farZ = Mathf.Max(farZ, pos.z);
-            }
-
-            if (float.IsPositiveInfinity(leftX))
-            {
-                leftX = nearZ = -10f;
-                rightX = farZ = 10f;
-            }
-
-            const float margin = 8f;
-            return new StageCullSnapshot(pieces.ToArray(), bounds.ToArray(),
-                FLOOD_SURFACE_Y, (leftX + rightX) * 0.5f,
-                Mathf.Max(1f, rightX - leftX + margin * 2f),
-                farZ + margin, nearZ - margin);
+            _defenseFlag.SetActive(false);
+            Destroy(_defenseFlag);
+            _defenseFlag = null;
+            _flagBody = null;
+            _flagCollider = null;
+            _floodEffect.Hide();
+            _stageTransitioning = false;
+            _resolving = false;
+            _stagePassed = false;
+            _awaitingStage = true;
+            _finished = false;
+            _status = "깃발이 절벽에 휘말려 파괴되었습니다. 닫기 버튼을 누르면 처음부터 다시 시작합니다.";
         }
 
-        /// <summary>파도 전면이 메쉬 범위에 닿은 기물에 (0, 1, 1) 방향 충격량을 한 번 적용한다.</summary>
-        private void PushFloodedPieces(StageCullSnapshot snapshot, float frontZ,
-            HashSet<CastlePiece3D> pushed)
+        /// <summary>파도가 풀밭으로 번지지 않도록 위쪽 강바닥의 실제 경계만 캡처한다.</summary>
+        private StageCullSnapshot CaptureStageCullSnapshot()
         {
-            for (int i = 0; i < snapshot.Pieces.Length; i++)
-            {
-                CastlePiece3D piece = snapshot.Pieces[i];
-                Bounds mesh = snapshot.Bounds[i];
-                if (piece == null || pushed.Contains(piece) ||
-                    mesh.min.y > snapshot.Cutoff ||
-                    mesh.min.z > snapshot.StartZ || mesh.max.z < snapshot.EndZ ||
-                    mesh.max.z < frontZ)
-                    continue;
-                pushed.Add(piece);
-                if (!piece.Body.isKinematic)
-                    piece.Body.AddForce(Vector3.back * FLOOD_IMPULSE,
-                        ForceMode.Impulse);
-            }
+            return new StageCullSnapshot(_placementBounds.center.x,
+                _placementBounds.size.x, _placementBounds.max.z, _placementBounds.min.z);
         }
 
         private sealed class StageCullSnapshot
         {
-            public readonly CastlePiece3D[] Pieces;
-            public readonly Bounds[] Bounds;
-            public readonly float Cutoff;
             public readonly float CenterX;
             public readonly float Width;
             public readonly float StartZ;
             public readonly float EndZ;
 
-            /// <summary>파도 접촉 검사에 필요한 기물 메쉬 범위와 물의 경계를 저장한다.</summary>
-            public StageCullSnapshot(CastlePiece3D[] pieces, Bounds[] bounds, float cutoff,
-                float centerX, float width, float startZ, float endZ)
+            /// <summary>홍수 격자를 만들 강의 중심, 폭, 상류와 하류 경계를 저장한다.</summary>
+            public StageCullSnapshot(float centerX, float width, float startZ, float endZ)
             {
-                Pieces = pieces;
-                Bounds = bounds;
-                Cutoff = cutoff;
                 CenterX = centerX;
                 Width = width;
                 StartZ = startZ;
@@ -1188,7 +969,5 @@ namespace RestoreCastle3D
             _stageFloodRoutine = StartCoroutine(ResolveStageFlood());
         }
 
-        /// <summary>스테이지별 목표 내구도를 50씩 증가시켜 반환한다.</summary>
-        private static int StageTarget(int stage) => 50 * (stage + 1);
     }
 }

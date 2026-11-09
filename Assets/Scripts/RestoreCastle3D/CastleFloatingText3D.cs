@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace RestoreCastle3D
 {
-    public enum CastleChangeKind { Durability, Destroyed, Flooded, EffectEnabled, EffectDisabled, Growth, Created, Resource }
+    public enum CastleChangeKind { Destroyed, Flooded, EffectEnabled, EffectDisabled, Growth, Created, Resource }
 
     public readonly struct CastleChange3D
     {
@@ -88,7 +88,7 @@ namespace RestoreCastle3D
                 text.font = _font;
                 text.alignment = TextAlignmentOptions.Center;
                 text.raycastTarget = false;
-                text.enableWordWrapping = false;
+                text.textWrappingMode = TextWrappingModes.NoWrap;
                 text.outlineWidth = 0.22f;
                 text.outlineColor = Color.black;
                 RectTransform rect = (RectTransform)label.transform;
@@ -102,9 +102,7 @@ namespace RestoreCastle3D
             entry.Offset = new Vector3(((slot % 7) - 3) * spread * 0.35f,
                 (slot % 5) * spread * 0.35f, 0f);
             entry.Started = Time.unscaledTime;
-            bool numeric = change.Kind == CastleChangeKind.Durability;
-            entry.Text.text = change.Label ?? (numeric ? "내구도 " +
-                (change.Amount > 0 ? "+" : "") + change.Amount : change.Kind switch
+            entry.Text.text = change.Label ?? (change.Kind switch
                 {
                     CastleChangeKind.Destroyed => "파괴!",
                     CastleChangeKind.Flooded => "침수!",
@@ -114,8 +112,7 @@ namespace RestoreCastle3D
                     CastleChangeKind.Created => "생성!",
                     _ => "획득!"
                 });
-            entry.Color = numeric ? (change.Amount >= 0 ? increaseColor : decreaseColor) :
-                change.Kind == CastleChangeKind.Destroyed ? destructionColor :
+            entry.Color = change.Kind == CastleChangeKind.Destroyed ? destructionColor :
                 change.Kind == CastleChangeKind.Flooded ? floodColor : effectColor;
             entry.Text.fontSize = fontSize * (change.Kind == CastleChangeKind.Destroyed ||
                 change.Kind == CastleChangeKind.Flooded ? 1.3f : 1f);
@@ -146,9 +143,6 @@ namespace RestoreCastle3D
             Vector3 position = entry.Origin + entry.Offset + Vector3.up * riseSpeed * duration * progress;
             if (entry.Kind == CastleChangeKind.Flooded)
                 position += Vector3.down * 0.35f * (1f - Mathf.Clamp01(progress * 4f));
-            if (entry.Kind == CastleChangeKind.Durability)
-                if (entry.Color == decreaseColor)
-                    position += Vector3.right * Mathf.Sin(progress * 55f) * 0.07f * (1f - progress);
             Vector3 screen = _camera.WorldToScreenPoint(position);
             entry.Text.enabled = screen.z > 0f;
             if (screen.z <= 0f) return;

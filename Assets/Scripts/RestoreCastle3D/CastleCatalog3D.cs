@@ -12,7 +12,6 @@ namespace RestoreCastle3D
         public string category;
         public bool startOnly;
         public bool spawnOnly;
-        public int baseReinforcement;
         public string[] abilities;
     }
 
