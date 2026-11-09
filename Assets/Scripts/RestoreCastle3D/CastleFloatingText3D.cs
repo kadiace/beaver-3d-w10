@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace RestoreCastle3D
 {
-    public enum CastleChangeKind { Durability, Destroyed, Flooded, EffectEnabled, EffectDisabled, Growth, Created, Resource }
+    public enum CastleChangeKind { Durability, Destroyed, Flooded, EffectEnabled, EffectDisabled, Growth, Created, Resource, ScoreAward }
 
     public readonly struct CastleChange3D
     {
@@ -66,8 +66,9 @@ namespace RestoreCastle3D
         {
             _camera = camera;
             _canvasRect = canvasRect;
-            _font = TMP_FontAsset.CreateFontAsset(Resources.Load<Font>("Fonts & Materials/NotoSansKR"));
-            _font.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+            Font font = Resources.Load<Font>("Fonts & Materials/NotoSansKR");
+            _font = font != null ? TMP_FontAsset.CreateFontAsset(font) : TMP_Settings.defaultFontAsset;
+            if (_font != null) _font.atlasPopulationMode = AtlasPopulationMode.Dynamic;
         }
 
         /// <summary>변화별 독립적인 레이블을 풀에서 꺼내 위치와 메시지를 설정한다.</summary>
@@ -102,7 +103,8 @@ namespace RestoreCastle3D
             entry.Offset = new Vector3(((slot % 7) - 3) * spread * 0.35f,
                 (slot % 5) * spread * 0.35f, 0f);
             entry.Started = Time.unscaledTime;
-            bool numeric = change.Kind == CastleChangeKind.Durability;
+            bool numeric = change.Kind == CastleChangeKind.Durability ||
+                change.Kind == CastleChangeKind.ScoreAward;
             entry.Text.text = change.Label ?? (numeric ? "내구도 " +
                 (change.Amount > 0 ? "+" : "") + change.Amount : change.Kind switch
                 {
@@ -114,10 +116,13 @@ namespace RestoreCastle3D
                     CastleChangeKind.Created => "생성!",
                     _ => "획득!"
                 });
-            entry.Color = numeric ? (change.Amount >= 0 ? increaseColor : decreaseColor) :
+            entry.Color = change.Kind == CastleChangeKind.ScoreAward ?
+                (change.Amount >= 0 ? effectColor : decreaseColor) :
+                numeric ? (change.Amount >= 0 ? increaseColor : decreaseColor) :
                 change.Kind == CastleChangeKind.Destroyed ? destructionColor :
                 change.Kind == CastleChangeKind.Flooded ? floodColor : effectColor;
-            entry.Text.fontSize = fontSize * (change.Kind == CastleChangeKind.Destroyed ||
+            entry.Text.fontSize = fontSize * (change.Kind == CastleChangeKind.ScoreAward ? 1.6f :
+                change.Kind == CastleChangeKind.Destroyed ||
                 change.Kind == CastleChangeKind.Flooded ? 1.3f : 1f);
             entry.Text.transform.SetAsLastSibling();
             _active.Add(entry);
@@ -155,7 +160,8 @@ namespace RestoreCastle3D
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screen, null,
                 out Vector2 local);
             entry.Text.rectTransform.anchoredPosition = local;
-            float pop = entry.Kind == CastleChangeKind.Destroyed ? 0.55f : 0.22f;
+            float pop = entry.Kind == CastleChangeKind.ScoreAward ? 0.8f :
+                entry.Kind == CastleChangeKind.Destroyed ? 0.55f : 0.22f;
             entry.Text.rectTransform.localScale = Vector3.one * (1f + pop *
                 (1f - Mathf.Clamp01(progress * 6f)));
             Color color = entry.Color;

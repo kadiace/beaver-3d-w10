@@ -103,6 +103,43 @@ namespace RestoreCastle3D
             _random = new System.Random(Environment.TickCount);
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
             ConfigureScene();
+            gameObject.AddComponent<CastleCreekScore3D>().Initialize(_camera, _catalog);
+        }
+
+        /// <summary>Weighted endless spawns: categories 5:5:2:6:2; general/advanced/rare 4:2:1.</summary>
+        private CastleMaterial3D ChooseCreekMaterial()
+        {
+            string[] categories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
+            int[] categoryWeights = { 5, 5, 2, 6, 2 };
+            string[] rarities = { "일반", "고급", "희귀" };
+            int[] rarityWeights = { 4, 2, 1 };
+            int categoryTotal = 0;
+            for (int i = 0; i < categories.Length; i++)
+                if (_spawnMaterials.Any(m => m.category == categories[i]))
+                    categoryTotal += categoryWeights[i];
+            int categoryRoll = _random.Next(categoryTotal);
+            string category = categories[0];
+            for (int i = 0; i < categories.Length; i++)
+            {
+                if (!_spawnMaterials.Any(m => m.category == categories[i])) continue;
+                categoryRoll -= categoryWeights[i];
+                if (categoryRoll < 0) { category = categories[i]; break; }
+            }
+            var candidates = _spawnMaterials.Where(m => m.category == category).ToArray();
+            int rarityTotal = 0;
+            for (int i = 0; i < rarities.Length; i++)
+                if (candidates.Any(m => m.rarity == rarities[i]))
+                    rarityTotal += rarityWeights[i];
+            int rarityRoll = _random.Next(rarityTotal);
+            string rarity = rarities[0];
+            for (int i = 0; i < rarities.Length; i++)
+            {
+                if (!candidates.Any(m => m.rarity == rarities[i])) continue;
+                rarityRoll -= rarityWeights[i];
+                if (rarityRoll < 0) { rarity = rarities[i]; break; }
+            }
+            var tier = candidates.Where(m => m.rarity == rarity).ToArray();
+            return tier[_random.Next(tier.Length)];
         }
 
         private void Update()
@@ -111,7 +148,7 @@ namespace RestoreCastle3D
             UpdateHeldPiece();
             if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
             {
-                CastleMaterial3D material = _spawnMaterials[_random.Next(_spawnMaterials.Length)];
+                CastleMaterial3D material = ChooseCreekMaterial();
                 Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
                 GameObject instance = Managers.Resource.Instantiate(
                     "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
@@ -119,7 +156,9 @@ namespace RestoreCastle3D
                         material.id == "growing_vine" || material.id == "sunflower"
                         ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity);
                 instance.name = material.name;
-                instance.GetComponent<CastlePiece3D>().EnableContinuousDrop();
+                CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
+                spawned.EnableContinuousDrop();
+                CastleCreekScore3D.Active.Register(spawned);
                 _nextSpawnTime += SPAWN_INTERVAL;
             }
             if (_spawnMaterials != null)
@@ -352,7 +391,7 @@ namespace RestoreCastle3D
                 RecalculateScores();
                 _nextHoverScoreRefresh = Time.unscaledTime + 0.2f;
             }
-            SetOutlineTargets(piece);
+            if (_spawnMaterials == null) SetOutlineTargets(piece);
             _hud?.SetHoveredPiece(piece, position);
             if (piece != null && piece.CanPickUp && mouse.leftButton.wasPressedThisFrame)
             {
@@ -364,7 +403,7 @@ namespace RestoreCastle3D
                     _holdOffset = Vector3.zero;
                 piece.PickUp();
                 if (_dropPreview == null) _dropPreview = new CastleDropPreview3D();
-                SetOutlineTargets(piece);
+                if (_spawnMaterials == null) SetOutlineTargets(piece);
             }
         }
 

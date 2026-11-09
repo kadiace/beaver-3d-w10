@@ -31,6 +31,7 @@ namespace RestoreCastle3D
         private Renderer[] _renderers;
         private bool _fuseStarted;
         private bool _fusePending;
+        private int _barrelArmSequence;
         private int _growthCount;
         private bool _continuousDrop;
         private bool _continuousBeforeSpring;
@@ -38,6 +39,8 @@ namespace RestoreCastle3D
         private bool _throwOrigin;
         private bool _held;
         private bool _removalScheduled;
+        private float _attachBlockedUntil;
+        private bool _settling;
         private int _initialChildCount;
         private Vector3 _initialColliderCenter;
         private Vector3 _initialColliderSize;
@@ -57,6 +60,10 @@ namespace RestoreCastle3D
         public int GrowthCount { get => _growthCount; set => _growthCount = value; }
         public bool CanPickUp => !_thrown && !_body.isKinematic && _attachedPieces.Count == 0;
         public bool WasThrown => _thrown;
+        public bool IsSettling => _settling;
+        public void MarkSettling() { _settling = true; _removalScheduled = true; }
+        public void BlockReattachment(float seconds) =>
+            _attachBlockedUntil = Mathf.Max(_attachBlockedUntil, Time.time + seconds);
 
         private void Awake()
         {
@@ -77,8 +84,8 @@ namespace RestoreCastle3D
         public void SetOutlineLayer(uint layer)
         {
             foreach (Renderer renderer in _renderers)
-                renderer.renderingLayerMask = (renderer.renderingLayerMask & ~22u) |
-                    (_springTarget != null ? 16u : layer == 0 && _throwOrigin ? 4u : layer);
+                renderer.renderingLayerMask = (renderer.renderingLayerMask & ~30u) |
+                    (layer != 0 ? layer : _springTarget != null ? 16u : _throwOrigin ? 4u : 0u);
         }
 
         /// <summary>드랍 가이드의 폐기물 디메리트 대상 여부에 따라 빨간 외곽선 레이어를 켜거나 끈다.</summary>
@@ -142,14 +149,28 @@ namespace RestoreCastle3D
 
         private void Update()
         {
+            if (_settling) return;
+            // The scoring boundary wins over the Y fallback if both are crossed this frame.
+            if (transform.position.z <= DESPAWN_Z && !_removalScheduled && !_held)
+            {
+                if (CastleCreekScore3D.Active != null)
+                {
+                    CastleCreekScore3D.Active.Settle(this);
+                    return;
+                }
+                if (_continuousDrop)
+                {
+                    _removalScheduled = true;
+                    StartCoroutine(ReturnContinuousDrop());
+                    return;
+                }
+            }
             if (transform.position.y < DESPAWN_Y)
             {
-                Despawn();
-                return;
+                if (CastleCreekScore3D.Active != null)
+                    CastleCreekScore3D.Active.Discard(this);
+                else Despawn();
             }
-            if (!_continuousDrop || _removalScheduled || transform.position.z > DESPAWN_Z) return;
-            _removalScheduled = true;
-            StartCoroutine(ReturnContinuousDrop());
         }
 
         private void FixedUpdate()
@@ -165,6 +186,11 @@ namespace RestoreCastle3D
         /// <summary>배치 기물은 게임의 추적 목록에서 제거하고 자동 낙하 기물은 리소스 풀로 반환한다.</summary>
         public void Despawn()
         {
+            if (CastleCreekScore3D.Active != null && !_settling)
+            {
+                CastleCreekScore3D.Active.Discard(this);
+                return;
+            }
             if (_game != null) _game.RemovePiece(this);
             else Managers.Resource.Destroy(gameObject);
         }
@@ -215,9 +241,13 @@ namespace RestoreCastle3D
                 box.center = _initialColliderCenter;
                 box.size = _initialColliderSize;
             }
+            CastleCreekScore3D.Active?.Unregister(this);
             _game = null;
+            _attachBlockedUntil = 0f;
+            _settling = false;
             _fuseStarted = false;
             _fusePending = false;
+            _barrelArmSequence = 0;
             _growthCount = 0;
             _continuousDrop = false;
             _continuousBeforeSpring = false;
@@ -244,8 +274,8 @@ namespace RestoreCastle3D
             if (_continuousDrop) return;
             AttachThrownPiece(collision);
             Register(collision);
-            if (materialId == "barrel" && _game != null && !_game.IsAbilityDisabled(this)
-                && !_fuseStarted)
+            if (CastleCreekScore3D.Active == null && materialId == "barrel" &&
+                _game != null && !_game.IsAbilityDisabled(this) && !_fuseStarted)
             {
                 _fuseStarted = true;
                 _fusePending = true;
@@ -311,6 +341,7 @@ namespace RestoreCastle3D
         private void RemoveSpringAttachment()
         {
             if (_springTarget == null) return;
+            CastlePiece3D previous = _springTarget;
             _springTarget._attachedPieces.Remove(this);
             _attachedPieces.Remove(_springTarget);
             _springTarget = null;
@@ -319,6 +350,21 @@ namespace RestoreCastle3D
             _continuousDrop = _continuousBeforeSpring;
             _continuousBeforeSpring = false;
             SetOutlineLayer(0);
+            if (CastleCreekScore3D.Active != null)
+            {
+                if (materialId == "barrel" && _attachedPieces.Count == 0)
+                {
+                    _barrelArmSequence++;
+                    _fuseStarted = false;
+                }
+                if (previous.materialId == "barrel" && previous._attachedPieces.Count == 0)
+                {
+                    previous._barrelArmSequence++;
+                    previous._fuseStarted = false;
+                }
+                if (!_settling && !previous._settling)
+                    CastleCreekScore3D.Active.Refresh(this, previous);
+            }
         }
 
         /// <summary>충돌한 두 기물을 양방향 접촉 그래프에 기록한다. 바닥 충돌은 제외한다.</summary>
@@ -329,8 +375,7 @@ namespace RestoreCastle3D
             _contacts.Add(other);
             other._contacts.Add(this);
             if (_thrown || other._thrown) return;
-            // Called on the physics contact frame, before the lump's Update
-            // destruction can run. A vine touching a foul lump always wins.
+            if (CastleCreekScore3D.Active != null) return;
             _game?.TryAttachVines(this, other);
             _game?.TryAttachMud(this, other);
         }
@@ -338,10 +383,34 @@ namespace RestoreCastle3D
         /// <summary>직접 던진 기물에만 아직 부착되지 않은 다른 기물을 스프링으로 결합한다.</summary>
         private void AttachThrownPiece(Collision collision)
         {
-            if (!_throwOrigin || _held) return;
+            if (!_throwOrigin || _held || _settling ||
+                Time.time < _attachBlockedUntil) return;
             CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
-            if (other == null || other == this || other._thrown ||
-                other._attachedPieces.Count != 0 || _attachedPieces.Contains(other)) return;
+            if (other == null || other == this || other._settling ||
+                Time.time < other._attachBlockedUntil || _attachedPieces.Contains(other)) return;
+
+            // A thrown barrel can also join an already attached group, then split the whole group.
+            bool barrelJoinsGroup = materialId == "barrel" && other._thrown &&
+                other._attachedPieces.Count != 0 && _springTarget == null &&
+                _attachedPieces.Count == 0;
+            if (barrelJoinsGroup)
+            {
+                SpringJoint link = gameObject.AddComponent<SpringJoint>();
+                link.connectedBody = other.Body;
+                link.autoConfigureConnectedAnchor = false;
+                link.anchor = transform.InverseTransformPoint(collision.GetContact(0).point);
+                link.connectedAnchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
+                ConfigureSpring(link);
+                _springTarget = other;
+                _springJoint = link;
+                _springDistanceLimit = SPRING_BREAK_DISTANCE;
+                _attachedPieces.Add(other);
+                other._attachedPieces.Add(this);
+                CastleCreekScore3D.Active?.Refresh(this, other);
+                TryArmBarrel();
+                return;
+            }
+            if (other._thrown || other._attachedPieces.Count != 0) return;
             other._continuousBeforeSpring = other._continuousDrop;
             if (other._continuousDrop)
             {
@@ -356,6 +425,20 @@ namespace RestoreCastle3D
             joint.autoConfigureConnectedAnchor = false;
             joint.anchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
             joint.connectedAnchor = transform.InverseTransformPoint(collision.GetContact(0).point);
+            ConfigureSpring(joint);
+            other._springTarget = this;
+            other._springJoint = joint;
+            other._springDistanceLimit = SPRING_BREAK_DISTANCE;
+            _attachedPieces.Add(other);
+            other._attachedPieces.Add(this);
+            other.MarkAttachmentGroupThrown();
+            CastleCreekScore3D.Active?.Refresh(this, other);
+            TryArmBarrel();
+            other.TryArmBarrel();
+        }
+
+        private static void ConfigureSpring(SpringJoint joint)
+        {
             joint.spring = SPRING_STRENGTH;
             joint.damper = SPRING_DAMPER;
             joint.minDistance = SPRING_DISTANCE;
@@ -364,12 +447,6 @@ namespace RestoreCastle3D
             joint.breakForce = SPRING_BREAK_FORCE;
             joint.breakTorque = SPRING_BREAK_TORQUE;
             joint.enableCollision = true;
-            other._springTarget = this;
-            other._springJoint = joint;
-            other._springDistanceLimit = SPRING_BREAK_DISTANCE;
-            _attachedPieces.Add(other);
-            other._attachedPieces.Add(this);
-            other.MarkAttachmentGroupThrown();
         }
 
         /// <summary>스프링과 기존 고정 조인트로 연결된 모든 기물을 재투척 불가 상태로 만든다.</summary>
@@ -386,6 +463,38 @@ namespace RestoreCastle3D
                 foreach (CastlePiece3D attached in piece._attachedPieces)
                     pending.Push(attached);
             }
+        }
+
+        /// <summary>Detach all spring edges; used by a barrel before applying impulse.</summary>
+        public void BreakAllAttachments()
+        {
+            foreach (CastlePiece3D other in new List<CastlePiece3D>(_attachedPieces))
+            {
+                if (other == null) continue;
+                CastlePiece3D child = _springTarget == other ? this :
+                    other._springTarget == this ? other : null;
+                if (child == null) continue;
+                if (child._springJoint != null) Destroy(child._springJoint);
+                child.RemoveSpringAttachment();
+            }
+        }
+
+        private void TryArmBarrel()
+        {
+            if (materialId != "barrel" || _fuseStarted || _attachedPieces.Count == 0 ||
+                CastleCreekScore3D.Active == null) return;
+            _fuseStarted = true;
+            StartCoroutine(DetonateCreekBarrel(++_barrelArmSequence));
+        }
+
+        private IEnumerator DetonateCreekBarrel(int sequence)
+        {
+            yield return new WaitForSeconds(1f);
+            if (sequence != _barrelArmSequence) yield break;
+            if (!_settling && _attachedPieces.Count > 0)
+                CastleCreekScore3D.Active?.Detonate(this);
+            else
+                _fuseStarted = false;
         }
 
         /// <summary>진흙에 접촉한 목재를 물리적으로 고정하고 부착 관계를 기록한다.</summary>

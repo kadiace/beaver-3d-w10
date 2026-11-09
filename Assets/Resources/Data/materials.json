@@ -1,30 +1,219 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "materials": [
-    { "id": "foundation", "name": "기반", "category": "목재", "startOnly": true, "baseReinforcement": 1, "abilities": [] },
-    { "id": "pebble", "name": "조약돌", "category": "석재", "rarity": "일반", "baseReinforcement": 2, "abilities": [] },
-    { "id": "large_stone", "name": "큰 돌", "category": "석재", "rarity": "희귀", "baseReinforcement": 2, "abilities": ["인접한 [석재]가 2개 이상이면 내구도 +4"] },
-    { "id": "fossil", "name": "화석", "category": "석재", "rarity": "희귀", "baseReinforcement": 0, "abilities": ["인접한 화석이 3개 이상이면 내구도 +10"] },
-    { "id": "gem", "name": "보석", "category": "석재", "rarity": "고급", "baseReinforcement": 1, "abilities": ["조약돌, 큰 돌, 화석 모두와 직접 인접하면 내구도 +15"] },
-    { "id": "plank", "name": "판자", "category": "목재", "rarity": "일반", "baseReinforcement": 1, "abilities": [] },
-    { "id": "branch", "name": "나뭇가지", "category": "목재", "rarity": "일반", "baseReinforcement": 0, "abilities": ["3라운드마다 인접한 [목재] 개수만큼 내구도 상승"] },
-    { "id": "leafy_branch", "name": "나뭇잎 붙은 나뭇가지", "category": "목재", "rarity": "희귀", "baseReinforcement": 0, "abilities": ["2라운드마다 인접한 [목재] 개수만큼 내구도 상승"] },
-    { "id": "log", "name": "통나무", "category": "목재", "rarity": "고급", "baseReinforcement": 4, "abilities": ["진흙과 인접해 있으면 내구도 +2"] },
-    { "id": "sunflower", "name": "해바라기", "category": "식물", "rarity": "일반", "baseReinforcement": 1, "abilities": ["강바닥에 밑면이 부착되면 고정되어 홍수에도 휩쓸리지 않는다. 그저 당신만 바라보고 있다."] },
-    { "id": "bamboo", "name": "대나무", "category": "식물", "rarity": "희귀", "baseReinforcement": 1, "abilities": ["강바닥에 밑면이 부착되면 고정되어 홍수에도 휩쓸리지 않는다. 1라운드마다 길어지고 경로의 오브젝트를 파괴한다. 최대 3번 성장하며 최대 길이에서 내구도 +2"] },
-    { "id": "growing_vine", "name": "성장 덩쿨", "category": "식물", "rarity": "희귀", "baseReinforcement": 1, "abilities": ["처음 닿은 오브젝트의 특수효과를 제거하고 부착한다. 대상의 기본 내구도를 추가로 얻는다. 2라운드마다 인접한 랜덤 위치에 덩쿨을 만든다. 대상 제거 시 함께 제거된다."] },
-    { "id": "vine", "name": "덩쿨", "category": "식물", "rarity": "미등장", "spawnOnly": true, "baseReinforcement": 1, "abilities": ["성장 덩쿨에 의해서만 생성된다. 처음 닿은 오브젝트의 특수효과를 제거하고 부착한다. 대상의 기본 내구도를 추가로 얻는다. 대상 제거 시 함께 제거된다."] },
-    { "id": "living_tree", "name": "살아있는 나무", "category": "식물", "rarity": "고급", "baseReinforcement": 1, "abilities": ["강바닥에 밑면이 부착되면 고정되어 홍수에도 휩쓸리지 않는다. 1라운드마다 커지고 2번 성장할 때마다 내구도 +1. 최대 8번 성장한다."] },
-    { "id": "mud", "name": "진흙", "category": "잡동사니", "rarity": "일반", "baseReinforcement": 0, "abilities": ["인접한 [목재]를 전부 부착한다. 진흙에 부착된 [목재]끼리는 인접한 것으로 간주한다."] },
-    { "id": "shoe", "name": "신발", "category": "잡동사니", "rarity": "일반", "baseReinforcement": 2, "abilities": [] },
-    { "id": "bucket", "name": "양동이", "category": "잡동사니", "rarity": "희귀", "baseReinforcement": 1, "abilities": ["인접한 [석재]에게 내구도 +1"] },
-    { "id": "watering_can", "name": "물뿌리개", "category": "잡동사니", "rarity": "희귀", "baseReinforcement": 1, "abilities": ["인접한 [식물]에게 내구도 +1"] },
-    { "id": "loose_work_glove", "name": "헐거운 노가다 목장갑", "category": "잡동사니", "rarity": "희귀", "baseReinforcement": 1, "abilities": ["인접한 [목재]에게 내구도 +1"] },
-    { "id": "life_jacket", "name": "구명조끼", "category": "잡동사니", "rarity": "희귀", "baseReinforcement": 5, "abilities": ["인접한 [잡동사니]에게 내구도 +1"] },
-    { "id": "broken_game_controller", "name": "고장난 게임 컨트롤러", "category": "잡동사니", "rarity": "희귀", "baseReinforcement": 0, "abilities": ["인접한 [잡동사니] 종류마다 내구도 +1"] },
-    { "id": "empty_bottle", "name": "빈 병", "category": "잡동사니", "rarity": "일반", "baseReinforcement": 1, "abilities": ["추가 리롤권 1개 획득"] },
-    { "id": "barrel", "name": "오크통", "category": "잡동사니", "rarity": "일반", "baseReinforcement": 2, "abilities": ["1초 뒤 주변 오브젝트를 밀어내는 충격파 발동"] },
-    { "id": "waste_bag_small", "name": "폐기물 봉지", "category": "쓰레기", "rarity": "일반", "baseReinforcement": 4, "abilities": ["일정 범위 내 [쓰레기]가 아닌 모든 오브젝트의 내구도 -2"] },
-    { "id": "foul_smelling_lump", "name": "고약한 냄새가 나는 덩어리", "category": "쓰레기", "rarity": "고급", "baseReinforcement": 10, "abilities": ["일정 범위 내 [쓰레기]를 제외한 모든 오브젝트를 파괴한다."] }
+    {
+      "id": "foundation",
+      "name": "기반",
+      "category": "목재",
+      "startOnly": true,
+      "abilities": []
+    },
+    {
+      "id": "pebble",
+      "name": "조약돌",
+      "category": "석재",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리의 다른 [석재] 1개당 +1점"
+      ]
+    },
+    {
+      "id": "large_stone",
+      "name": "큰 돌",
+      "category": "석재",
+      "rarity": "고급",
+      "abilities": [
+        "직접 부착된 [석재]가 2개 이상이면 +5점"
+      ]
+    },
+    {
+      "id": "fossil",
+      "name": "화석",
+      "category": "석재",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리에 다른 화석이 1개면 +3점, 2개 이상이면 +5점"
+      ]
+    },
+    {
+      "id": "gem",
+      "name": "보석",
+      "category": "석재",
+      "rarity": "희귀",
+      "abilities": [
+        "같은 덩어리에 조약돌, 큰 돌, 화석 중 2종류면 +5점, 3종류면 +8점"
+      ]
+    },
+    {
+      "id": "plank",
+      "name": "판자",
+      "category": "목재",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리의 다른 [목재] 1개당 +1점"
+      ]
+    },
+    {
+      "id": "branch",
+      "name": "나뭇가지",
+      "category": "목재",
+      "rarity": "일반",
+      "abilities": [
+        "직접 부착된 [목재] 1개당 +2점"
+      ]
+    },
+    {
+      "id": "leafy_branch",
+      "name": "나뭇잎 붙은 나뭇가지",
+      "category": "목재",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리의 [목재]가 자신 포함 2종류 이상이면 +3점, 3종류 이상이면 +5점"
+      ]
+    },
+    {
+      "id": "log",
+      "name": "통나무",
+      "category": "목재",
+      "rarity": "희귀",
+      "abilities": [
+        "같은 덩어리에 다른 [목재]가 있으면 +5점, 진흙도 있으면 추가 +2점"
+      ]
+    },
+    {
+      "id": "sunflower",
+      "name": "해바라기",
+      "category": "식물",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리에 다른 [식물]이 있으면 +2점"
+      ]
+    },
+    {
+      "id": "bamboo",
+      "name": "대나무",
+      "category": "식물",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리에 [목재] 또는 다른 [식물]이 있으면 +3점, 둘 다 있으면 +5점"
+      ]
+    },
+    {
+      "id": "growing_vine",
+      "name": "성장 덩쿨",
+      "category": "식물",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리에 [석재] 1개 이상이면 +3점, 2개 이상이면 +5점"
+      ]
+    },
+    {
+      "id": "living_tree",
+      "name": "살아있는 나무",
+      "category": "식물",
+      "rarity": "희귀",
+      "abilities": [
+        "같은 덩어리에 [목재] 또는 다른 [식물]이 있으면 +5점, 둘 다 있으면 +7점"
+      ]
+    },
+    {
+      "id": "mud",
+      "name": "진흙",
+      "category": "잡동사니",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리의 [목재] 1개당 +1점"
+      ]
+    },
+    {
+      "id": "shoe",
+      "name": "신발",
+      "category": "잡동사니",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리에 다른 [잡동사니]가 있으면 +2점"
+      ]
+    },
+    {
+      "id": "bucket",
+      "name": "양동이",
+      "category": "잡동사니",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리의 [석재] 1개당 +2점, 최대 +5점"
+      ]
+    },
+    {
+      "id": "watering_can",
+      "name": "물뿌리개",
+      "category": "잡동사니",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리의 [식물] 1개당 +2점, 최대 +5점"
+      ]
+    },
+    {
+      "id": "loose_work_glove",
+      "name": "헐거운 노가다 목장갑",
+      "category": "잡동사니",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리의 [목재] 1개당 +2점, 최대 +5점"
+      ]
+    },
+    {
+      "id": "life_jacket",
+      "name": "구명조끼",
+      "category": "잡동사니",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리에 자신 포함 [잡동사니]가 2개 이상이면 +3점, 3개 이상이면 +5점"
+      ]
+    },
+    {
+      "id": "broken_game_controller",
+      "name": "고장난 게임 컨트롤러",
+      "category": "잡동사니",
+      "rarity": "고급",
+      "abilities": [
+        "같은 덩어리의 다른 [잡동사니] 종류 1개당 +2점, 최대 +5점"
+      ]
+    },
+    {
+      "id": "empty_bottle",
+      "name": "빈 병",
+      "category": "잡동사니",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리에 자신과 다른 태그가 있으면 +2점"
+      ]
+    },
+    {
+      "id": "barrel",
+      "name": "오크통",
+      "category": "잡동사니",
+      "rarity": "일반",
+      "abilities": [
+        "다른 기물과 부착 1초 뒤 전체 덩어리의 Joint를 해제하며 폭발, 오크통 제거"
+      ]
+    },
+    {
+      "id": "waste_bag_small",
+      "name": "폐기물 봉지",
+      "category": "쓰레기",
+      "rarity": "일반",
+      "abilities": [
+        "같은 덩어리의 양수 시너지 합계 -50%, 중첩 가능"
+      ]
+    },
+    {
+      "id": "foul_smelling_lump",
+      "name": "고약한 냄새가 나는 덩어리",
+      "category": "쓰레기",
+      "rarity": "희귀",
+      "abilities": [
+        "같은 덩어리의 자신 제외 기물 1개당 -3점, 음수 점수 가능"
+      ]
+    }
   ]
 }
