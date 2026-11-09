@@ -3,7 +3,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace RestoreCastle3D
@@ -201,10 +200,11 @@ namespace RestoreCastle3D
             RefreshHud();
         }
 
+        /// <summary>일시 정지를 해제하고 매니저 정리를 거쳐 현재 게임 씬을 다시 로드한다.</summary>
         private void RestartRun()
         {
             ResumeWorld();
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            Managers.Scene.ReloadCurrentScene();
         }
 
         private void PauseWorld()
