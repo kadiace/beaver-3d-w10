@@ -358,16 +358,14 @@ namespace RestoreCastle3D
             _outlined.Add(_heldPiece);
         }
 
-        /// <summary>오크통 주변 2m의 기물을 비활성 물리 잔해로 날리고 오크통을 제거한다.</summary>
+        /// <summary>폭발에 닿은 연결 덩어리를 모두 제거 대상으로 등록하고 드래그를 즉시 취소한다.</summary>
         public void Detonate(CastlePiece3D barrel)
         {
             if (barrel == null || barrel.IsSettling || barrel.MaterialId != "barrel") return;
             List<CastlePiece3D> targets = barrel.ExplodeNearby();
+            GetComponent<CastleGame3D>().CancelBlastDrag(targets);
             foreach (CastlePiece3D target in targets)
                 Unregister(target);
-            barrel.MarkSettling();
-            Unregister(barrel);
-            Managers.Resource.Destroy(barrel.gameObject);
         }
 
         private void ShowPollutionIndicator(int amount)

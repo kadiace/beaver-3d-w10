@@ -25,6 +25,7 @@ namespace RestoreCastle3D
         private const float HELD_MAX_X = 12f;
         private const float HELD_MIN_Z = 15f;
         private const float HELD_MAX_Z = 45f;
+        private const float MAGNET_PICKUP_HEIGHT = 0.5f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float SCROLL_SENSITIVITY = 5f;
         private const float SPAWN_INTERVAL = 1f;
@@ -292,6 +293,17 @@ namespace RestoreCastle3D
             if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
         }
 
+        /// <summary>폭발에 휘말린 기물을 놓고 미리보기·가이드·입력 상태를 즉시 해제한다.</summary>
+        public void CancelBlastDrag(IReadOnlyCollection<CastlePiece3D> targets)
+        {
+            if (_heldPiece == null || !targets.Contains(_heldPiece)) return;
+            _heldPiece = null;
+            CastleCreekScore3D.Active?.SetHeldPiece(null);
+            _dropPreview?.Hide();
+            if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
+            SetOutlineTargets(null);
+        }
+
         /// <summary>Esc 또는 우클릭으로 현재 라운드의 고정 후보를 다시 연다.</summary>
         private void OpenCandidatePalette()
         {
@@ -461,12 +473,16 @@ namespace RestoreCastle3D
             if (piece != null && piece.CanPickUp && mouse.leftButton.wasPressedThisFrame)
             {
                 _heldPiece = piece;
-                _heldHeight = Mathf.Max(piece.transform.position.y + 1.5f, groundY + 2f);
+                _heldHeight = _spawnMaterials != null
+                    ? piece.transform.position.y + MAGNET_PICKUP_HEIGHT
+                    : Mathf.Max(piece.transform.position.y + 1.5f, groundY + 2f);
                 if (TryGetCursorXZ(position, out Vector3 cursor))
                     _holdOffset = piece.transform.position - new Vector3(cursor.x, piece.transform.position.y, cursor.z);
                 else
                     _holdOffset = Vector3.zero;
                 piece.PickUp();
+                piece.MoveHeld(new Vector3(piece.transform.position.x, _heldHeight,
+                    piece.transform.position.z));
                 if (_spawnMaterials != null)
                     CastleCreekScore3D.Active?.SetHeldPiece(piece);
                 if (_dropPreview == null) _dropPreview = new CastleDropPreview3D();
@@ -494,6 +510,12 @@ namespace RestoreCastle3D
                 _heldPiece = null;
                 if (_spawnMaterials != null)
                     CastleCreekScore3D.Active?.SetHeldPiece(null);
+                _dropPreview.Hide();
+                if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
+                return;
+            }
+            if (_spawnMaterials != null)
+            {
                 _dropPreview.Hide();
                 if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
                 return;
@@ -1191,7 +1213,7 @@ namespace RestoreCastle3D
         {
             if (barrel == null || barrel.IsSettling || !_pieceSet.Contains(barrel)) return;
             List<CastlePiece3D> targets = barrel.ExplodeNearby();
-            targets.Add(barrel);
+            CancelBlastDrag(targets);
             foreach (CastlePiece3D current in targets)
             {
                 if (current == _outlinedPiece) SetOutlineTargets(null);
@@ -1205,10 +1227,8 @@ namespace RestoreCastle3D
                 _pieces.Remove(current);
                 _score.Remove(current);
             }
-            barrel.MarkSettling();
-            Managers.Resource.Destroy(barrel.gameObject);
             _floodPreview.RequestRefresh();
-            _status = "오크통 폭발: " + (targets.Count - 1) + "개 주변 기물을 날렸습니다.";
+            _status = "오크통 폭발: " + (targets.Count - 1) + "개 연결 기물을 날렸습니다.";
         }
 
         /// <summary>원본 자재의 내구도 효과를 접촉 기반 인접 그래프에서 재계산한다.</summary>
