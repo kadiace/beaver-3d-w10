@@ -62,6 +62,15 @@ namespace RestoreCastle3D
         public int GrowthCount { get => _growthCount; set => _growthCount = value; }
         public bool CanPickUp => !_settling && !_thrown && !_body.isKinematic && _attachedPieces.Count == 0;
         public bool WasThrown => _thrown;
+        /// <summary>Mirror the collision attachment eligibility for a held-piece preview.</summary>
+        public bool CanAttachWhenThrownTo(CastlePiece3D other)
+        {
+            if (other == null || other == this || _settling || other._settling ||
+                Time.time < _attachBlockedUntil || Time.time < other._attachBlockedUntil ||
+                _attachedPieces.Count != 0) return false;
+            return (!other._thrown && other._attachedPieces.Count == 0) ||
+                (materialId == "barrel" && other._thrown && other._attachedPieces.Count != 0);
+        }
         public bool IsSettling => _settling;
         /// <summary>Lock an awarded group in place until its delayed pool return.</summary>
         public void MarkSettling()
