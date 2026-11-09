@@ -26,6 +26,7 @@ namespace RestoreCastle3D
         private const float HELD_MIN_Z = -15f;
         private const float HELD_MAX_Z = 45f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
+        private const float SCROLL_SENSITIVITY = 5f;
         private const float SPAWN_INTERVAL = 1f;
         private float CreekSpawnInterval => CastleCreekScore3D.Active?.CreekSpawnInterval ?? SPAWN_INTERVAL;
         private static readonly string[] CreekCategories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
@@ -758,7 +759,7 @@ namespace RestoreCastle3D
                 {
                     float steps = scroll / WINDOWS_SCROLL_UNITS_PER_TICK;
                     _camera.orthographicSize = Mathf.Clamp(
-                        _camera.orthographicSize * Mathf.Exp(-steps * 0.12f),
+                        _camera.orthographicSize * Mathf.Exp(-steps * SCROLL_SENSITIVITY),
                         6f, 13.5f);
                     UpdateCameraPosition();
                 }

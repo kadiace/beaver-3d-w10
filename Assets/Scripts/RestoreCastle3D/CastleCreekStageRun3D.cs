@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
@@ -52,9 +54,10 @@ namespace RestoreCastle3D
         private Image _pollutionFillImage;
         private GameObject _goalBar;
         private GameObject _overlay;
+        private GameObject _effectsOverlay;
         private Button _continueButton;
 
-        public bool IsPaused => _awaitingContinue || _gameOver;
+        public bool IsPaused => _awaitingContinue || _gameOver || (_effectsOverlay != null && _effectsOverlay.activeSelf);
         public bool IsEndless => _endless;
         public bool StageTimerStarted => _stageTimerStarted;
         public int Pollution => _pollution;
@@ -100,6 +103,8 @@ namespace RestoreCastle3D
         private void Update()
         {
             if (_score == null) return;
+            if (_effectsOverlay.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                HideEffects();
             if (!IsPaused)
             {
                 if (_endless)
@@ -225,7 +230,27 @@ namespace RestoreCastle3D
 
         private void OnDestroy()
         {
+            if (_effectsOverlay != null && _effectsOverlay.activeSelf) HideEffects();
             ResumeWorld();
+        }
+
+        /// <summary>모든 자재의 고유 능력을 표시하고 게임 시간을 멈춘다.</summary>
+        private void ShowEffects()
+        {
+            if (IsPaused) return;
+            _game.SuspendCreekInput();
+            _previousTimeScale = Time.timeScale;
+            Time.timeScale = 0f;
+            _effectsOverlay.SetActive(true);
+            _effectsOverlay.transform.SetAsLastSibling();
+        }
+
+        /// <summary>효과 표를 닫고 열기 전의 시간 배율을 복원한다.</summary>
+        private void HideEffects()
+        {
+            if (!_effectsOverlay.activeSelf) return;
+            _effectsOverlay.SetActive(false);
+            Time.timeScale = _previousTimeScale;
         }
 
         private void RefreshHud()
@@ -315,6 +340,81 @@ namespace RestoreCastle3D
                 new Color(0.95f, 0.53f, 0.28f), false);
             _pollutionFillImage = _pollutionFill.GetComponent<Image>();
             StretchFill(_pollutionFill);
+
+            RectTransform effectsButton = NewImage("Effects Table Button", root,
+                new Color(0.18f, 0.39f, 0.45f, 1f), true);
+            Place(effectsButton, new Vector2(0.5f, 1f), new Vector2(0f, 1f),
+                new Vector2(297f, -18f), new Vector2(118f, 48f));
+            effectsButton.gameObject.AddComponent<Button>().onClick.AddListener(ShowEffects);
+            Label("Effects Button Label", effectsButton, 20, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110f, 42f)).text = "효과 표";
+
+            RectTransform effectsOverlay = NewImage("Effects Table Overlay", root,
+                new Color(0.015f, 0.025f, 0.04f, 0.84f), true);
+            effectsOverlay.anchorMin = Vector2.zero;
+            effectsOverlay.anchorMax = Vector2.one;
+            effectsOverlay.offsetMin = Vector2.zero;
+            effectsOverlay.offsetMax = Vector2.zero;
+            _effectsOverlay = effectsOverlay.gameObject;
+            RectTransform table = NewImage("Effects Table", effectsOverlay,
+                new Color(0.085f, 0.14f, 0.19f, 1f), false);
+            table.anchorMin = new Vector2(0.5f, 0.5f);
+            table.anchorMax = new Vector2(0.5f, 0.5f);
+            table.pivot = new Vector2(0.5f, 0.5f);
+            table.sizeDelta = new Vector2(760f, 0f);
+            table.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Min(650f, Screen.height - 40f));
+            Label("Effects Title", table, 28, TextAlignmentOptions.Left,
+                new Vector2(0.5f, 1f), new Vector2(-340f, -12f), new Vector2(550f, 48f)).text = "오브젝트별 효과";
+            RectTransform close = NewImage("Close Effects", table,
+                new Color(0.35f, 0.46f, 0.50f, 1f), true);
+            Place(close, new Vector2(1f, 1f), new Vector2(1f, 1f),
+                new Vector2(-14f, -12f), new Vector2(52f, 46f));
+            close.gameObject.AddComponent<Button>().onClick.AddListener(HideEffects);
+            Label("Close Label", close, 28, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(48f, 42f)).text = "×";
+
+            RectTransform viewport = NewImage("Effects Viewport", table,
+                new Color(0.04f, 0.075f, 0.10f, 1f), true);
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = new Vector2(22f, 20f);
+            viewport.offsetMax = new Vector2(-22f, -72f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            RectTransform content = new GameObject("Effects Rows", typeof(RectTransform)).GetComponent<RectTransform>();
+            content.SetParent(viewport, false);
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            CastleCatalog3D catalog = new CastleCatalog3D();
+            float rowTop = 0f;
+            foreach (CastleMaterial3D material in catalog.All.OrderBy(m => m.category).ThenBy(m => m.name))
+            {
+                string abilities = material.abilities == null || material.abilities.Length == 0
+                    ? "고유 효과 없음" : string.Join(" · ", material.abilities.Where(a => !string.IsNullOrWhiteSpace(a)));
+                TextMeshProUGUI row = Label(material.id, content, 18, TextAlignmentOptions.TopLeft,
+                    new Vector2(0f, 1f), Vector2.zero, new Vector2(680f, 40f));
+                row.rectTransform.anchorMin = new Vector2(0f, 1f);
+                row.rectTransform.anchorMax = new Vector2(1f, 1f);
+                row.rectTransform.pivot = new Vector2(0f, 1f);
+                row.rectTransform.sizeDelta = new Vector2(-24f, 0f);
+                row.rectTransform.anchoredPosition = new Vector2(12f, -rowTop);
+                row.enableWordWrapping = true;
+                row.text = "<b>" + material.name + "</b>  [" + material.category + "]  " + abilities;
+                row.ForceMeshUpdate();
+                float height = Mathf.Max(42f, row.preferredHeight + 12f);
+                row.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+                rowTop += height + 4f;
+            }
+            content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, rowTop);
+            ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.scrollSensitivity = 35f;
+            _effectsOverlay.SetActive(false);
 
             RectTransform overlay = NewImage("Stage Result Overlay", root,
                 new Color(0.015f, 0.025f, 0.04f, 0.80f), true);

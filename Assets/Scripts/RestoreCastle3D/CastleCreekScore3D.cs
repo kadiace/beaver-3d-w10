@@ -29,6 +29,7 @@ namespace RestoreCastle3D
         private TextMeshProUGUI _scoreText;
         private TextMeshProUGUI _hoverText;
         private RectTransform _hoverPanel;
+        private Image _hoverBackground;
         private TextMeshProUGUI _edgeText;
         private TextMeshProUGUI _pollutionIndicator;
         private int _pollutionBurst;
@@ -79,18 +80,16 @@ namespace RestoreCastle3D
             _scoreText.rectTransform.sizeDelta = new Vector2(400, 76);
             _scoreText.text = "점수 0";
 
-            // Stable, readable panel: never attach it to a moving mouse cursor.
             var panelObject = new GameObject("Synergy Details Panel",
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
             panelObject.transform.SetParent(_rect, false);
             _hoverPanel = (RectTransform)panelObject.transform;
             _hoverPanel.anchorMin = _hoverPanel.anchorMax = new Vector2(0f, 1f);
             _hoverPanel.pivot = new Vector2(0f, 1f);
-            _hoverPanel.anchoredPosition = new Vector2(22f, -22f);
             _hoverPanel.sizeDelta = new Vector2(490f, 390f);
-            Image background = panelObject.GetComponent<Image>();
-            background.color = new Color(0.05f, 0.08f, 0.12f, 0.88f);
-            background.raycastTarget = false;
+            _hoverBackground = panelObject.GetComponent<Image>();
+            _hoverBackground.color = new Color(0.05f, 0.08f, 0.12f, 0.88f);
+            _hoverBackground.raycastTarget = false;
             _hoverText = CreateLabel("Synergy Details", 22, TextAlignmentOptions.TopLeft);
             _hoverText.transform.SetParent(_hoverPanel, false);
             _hoverText.rectTransform.anchorMin = Vector2.zero;
@@ -357,7 +356,6 @@ namespace RestoreCastle3D
             }
             _heldPiece.SetOutlineLayer(2u);
             _outlined.Add(_heldPiece);
-            _hoverPanel.gameObject.SetActive(false);
         }
 
         /// <summary>오크통 주변 2m의 기물을 비활성 물리 잔해로 날리고 오크통을 제거한다.</summary>
@@ -472,6 +470,8 @@ namespace RestoreCastle3D
             if (_heldPiece != null)
             {
                 UpdateHeldPreview();
+                if (_heldPiece != null)
+                    ShowDescription(_heldPiece, Mouse.current == null ? Vector2.zero : Mouse.current.position.ReadValue(), true);
                 return;
             }
 
@@ -503,6 +503,17 @@ namespace RestoreCastle3D
             next.SetOutlineLayer(2u);
             _outlined.Add(next);
 
+            Vector3 anchor = TrackedPiece == next
+                ? _camera.WorldToScreenPoint(next.transform.position)
+                : new Vector3(mouse.position.ReadValue().x, mouse.position.ReadValue().y, 1f);
+            ShowDescription(next, anchor, false);
+        }
+
+        /// <summary>선택된 기물의 효과를 커서 또는 추적 기물 옆에 배치하고 드래그 중 투명도를 낮춘다.</summary>
+        private void ShowDescription(CastlePiece3D next, Vector2 screen, bool dragging)
+        {
+            List<CastlePiece3D> group = CastleSynergy3D.Collect(next);
+            CastleSynergy3D.Result result = CastleSynergy3D.Evaluate(group, _catalog);
             CastleMaterial3D material = _catalog.Get(next.MaterialId);
             string description = material.abilities == null || material.abilities.Length == 0
                 ? "없음" : string.Join("\n", material.abilities);
@@ -515,6 +526,23 @@ namespace RestoreCastle3D
                         (result.Points.TryGetValue(p, out int value) ? value : 0)))
                     : "아직 부착된 기물 없음") +
                 "\n\n능력: " + description;
+            _hoverBackground.color = new Color(0.05f, 0.08f, 0.12f, dragging ? 0.44f : 0.88f);
+            Color textColor = Color.white;
+            textColor.a = dragging ? 0.5f : 1f;
+            _hoverText.color = textColor;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect, screen, null, out Vector2 local);
+            Rect bounds = _rect.rect;
+            float width = _hoverPanel.rect.width;
+            float height = _hoverPanel.rect.height;
+            float left = local.x + 20f;
+            if (left + width > bounds.xMax - 12f) left = local.x - width - 20f;
+            float top = local.y - 20f;
+            if (top - height < bounds.yMin + 12f) top = local.y + height + 20f;
+            left = Mathf.Clamp(left, bounds.xMin + 12f,
+                Mathf.Max(bounds.xMin + 12f, bounds.xMax - width - 12f));
+            top = Mathf.Clamp(top, bounds.yMin + height + 12f,
+                Mathf.Max(bounds.yMin + height + 12f, bounds.yMax - 12f));
+            _hoverPanel.anchoredPosition = new Vector2(left - bounds.xMin, top - bounds.yMax);
             _hoverPanel.gameObject.SetActive(true);
         }
 
