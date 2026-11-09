@@ -15,6 +15,9 @@ namespace RestoreCastle3D
         private const float SPRING_BREAK_FORCE = 10000f;
         private const float SPRING_BREAK_TORQUE = 10000f;
         private const float SPRING_BREAK_DISTANCE = 0.08f;
+        private const float SPRING_STABILIZER_SPACING = 0.35f;
+        private const float CREEK_FLOW_RESPONSE = 8f;
+        private const float CREEK_MAX_ACCELERATION = 8f;
         private const float BARREL_FUSE_SECONDS = 1f;
         private const float BARREL_BLAST_RADIUS = 2f;
         private const float BARREL_BLAST_IMPULSE = 30f;
@@ -29,7 +32,10 @@ namespace RestoreCastle3D
         private CastlePiece3D _attachmentTarget;
         private CastlePiece3D _springTarget;
         private SpringJoint _springJoint;
+        private readonly List<SpringJoint> _springStabilizers = new List<SpringJoint>(2);
         private float _springDistanceLimit;
+        private float _lastCreekFlowTime = float.NegativeInfinity;
+        private float _originalLinearDamping;
         private CastleGame3D _game;
         private Rigidbody _body;
         private Renderer[] _renderers;
@@ -85,6 +91,8 @@ namespace RestoreCastle3D
             if (_settling) return;
             _settling = true;
             _removalScheduled = true;
+            // Keep the existing horizontal momentum while gravity accelerates the cliff fall.
+            _body.linearDamping = 0f;
             StopAllCoroutines();
             _held = false;
             // Do not reset velocities, gravity, Rigidbody state, colliders or joints.
@@ -99,6 +107,7 @@ namespace RestoreCastle3D
         {
             _body = GetComponent<Rigidbody>();
             _originalDetectCollisions = _body.detectCollisions;
+            _originalLinearDamping = _body.linearDamping;
             _initialChildCount = transform.childCount;
             _initialScale = transform.localScale;
             if (TryGetComponent(out BoxCollider box))
@@ -220,11 +229,26 @@ namespace RestoreCastle3D
         {
             if (_settling) return;
             if (_springJoint == null || _springTarget == null || _springDistanceLimit <= 0f) return;
-            Vector3 anchor = transform.TransformPoint(_springJoint.anchor);
-            Vector3 connectedAnchor = _springTarget.transform.TransformPoint(_springJoint.connectedAnchor);
-            if ((anchor - connectedAnchor).sqrMagnitude <= _springDistanceLimit * _springDistanceLimit) return;
-            Destroy(_springJoint);
-            RemoveSpringAttachment();
+            if (SpringExceededLimit(_springJoint))
+            {
+                RemoveSpringAttachment();
+                return;
+            }
+            foreach (SpringJoint stabilizer in _springStabilizers)
+            {
+                if (!SpringExceededLimit(stabilizer)) continue;
+                RemoveSpringAttachment();
+                return;
+            }
+        }
+
+        private bool SpringExceededLimit(SpringJoint joint)
+        {
+            if (joint == null || joint.connectedBody == null) return true;
+            Vector3 anchor = transform.TransformPoint(joint.anchor);
+            Vector3 connectedAnchor = joint.connectedBody.transform.TransformPoint(joint.connectedAnchor);
+            return (anchor - connectedAnchor).sqrMagnitude >
+                _springDistanceLimit * _springDistanceLimit;
         }
 
         /// <summary>배치 기물은 게임의 추적 목록에서 제거하고 자동 낙하 기물은 리소스 풀로 반환한다.</summary>
@@ -294,6 +318,8 @@ namespace RestoreCastle3D
                 if (pair.Key != null) pair.Key.enabled = pair.Value;
             _settlementColliders.Clear();
             _body.detectCollisions = _originalDetectCollisions;
+            _body.linearDamping = _originalLinearDamping;
+            _lastCreekFlowTime = float.NegativeInfinity;
             _game = null;
             _attachBlockedUntil = 0f;
             _settling = false;
@@ -351,22 +377,44 @@ namespace RestoreCastle3D
             Register(collision);
         }
 
-        /// <summary>하천에 닿은 기물과 스프링으로 연결된 기물에 같은 -Z 속도를 적용한다.</summary>
+        /// <summary>Accelerate each connected chunk towards the creek speed once per physics step.</summary>
+        /// <remarks>
+        /// Directly assigning member velocities fights the joint solver, and erases X momentum.
+        /// Applying identical acceleration to the chunk preserves relative motion and joint cohesion.
+        /// </remarks>
         private void ApplyCreekFlow()
         {
-            CastlePiece3D origin = _springTarget != null ? _springTarget : this;
-            Vector3 velocity = origin._body.linearVelocity;
-            if (origin._settling) return;
-            float creekSpeed = CastleCreekScore3D.Active?.CreekSpeed ?? CREEK_SPEED;
-            if (!origin._body.isKinematic)
-                origin._body.linearVelocity = new Vector3(0f, velocity.y, -creekSpeed);
+            float stepTime = Time.fixedTime;
+            if (_lastCreekFlowTime == stepTime) return;
 
-            foreach (CastlePiece3D attached in origin._attachedPieces)
+            var members = new HashSet<CastlePiece3D>();
+            var pending = new Stack<CastlePiece3D>();
+            pending.Push(this);
+            float totalZVelocity = 0f;
+            int dynamicCount = 0;
+            while (pending.Count > 0)
             {
-                if (attached == null || attached._springTarget != origin || attached._body.isKinematic)
-                    continue;
-                velocity = attached._body.linearVelocity;
-                attached._body.linearVelocity = new Vector3(0f, velocity.y, -creekSpeed);
+                CastlePiece3D piece = pending.Pop();
+                if (piece == null || piece._settling || !members.Add(piece)) continue;
+                if (!piece._body.isKinematic)
+                {
+                    totalZVelocity += piece._body.linearVelocity.z;
+                    dynamicCount++;
+                }
+                foreach (CastlePiece3D neighbor in piece._attachedPieces)
+                    if (neighbor != null && !members.Contains(neighbor)) pending.Push(neighbor);
+            }
+            if (dynamicCount == 0) return;
+
+            float creekSpeed = CastleCreekScore3D.Active?.CreekSpeed ?? CREEK_SPEED;
+            float acceleration = Mathf.Clamp(
+                (-creekSpeed - totalZVelocity / dynamicCount) * CREEK_FLOW_RESPONSE,
+                -CREEK_MAX_ACCELERATION, CREEK_MAX_ACCELERATION);
+            foreach (CastlePiece3D piece in members)
+            {
+                piece._lastCreekFlowTime = stepTime;
+                if (!piece._body.isKinematic)
+                    piece._body.AddForce(Vector3.forward * acceleration, ForceMode.Acceleration);
             }
         }
 
@@ -398,18 +446,36 @@ namespace RestoreCastle3D
         /// <summary>스프링 파단 시 부착 기록과 재집기 상태를 일반 기물 상태로 복구한다.</summary>
         private void RemoveSpringAttachment()
         {
-            if (_springTarget == null) return;
             CastlePiece3D previous = _springTarget;
-            _springTarget._attachedPieces.Remove(this);
-            _attachedPieces.Remove(_springTarget);
+            DestroySpringLinks();
+            if (previous == null) return;
+            previous._attachedPieces.Remove(this);
+            _attachedPieces.Remove(previous);
             _springTarget = null;
-            _springJoint = null;
             _thrown = false;
             _continuousDrop = _continuousBeforeSpring;
             _continuousBeforeSpring = false;
             SetOutlineLayer(0);
             if (CastleCreekScore3D.Active != null && !_settling && !previous._settling)
                 CastleCreekScore3D.Active.Refresh(this, previous);
+        }
+
+        private void DestroySpringLinks()
+        {
+            if (_springJoint != null)
+            {
+                _springJoint.connectedBody = null;
+                Destroy(_springJoint);
+            }
+            _springJoint = null;
+            foreach (SpringJoint stabilizer in _springStabilizers)
+            {
+                if (stabilizer == null) continue;
+                stabilizer.connectedBody = null;
+                Destroy(stabilizer);
+            }
+            _springStabilizers.Clear();
+            _springDistanceLimit = 0f;
         }
 
         /// <summary>충돌한 두 기물을 양방향 접촉 그래프에 기록한다. 바닥 충돌은 제외한다.</summary>
@@ -442,15 +508,9 @@ namespace RestoreCastle3D
                 _springTarget == null && _attachedPieces.Count == 0;
             if (joinsExistingChunk)
             {
-                SpringJoint link = gameObject.AddComponent<SpringJoint>();
-                link.connectedBody = other.Body;
-                link.autoConfigureConnectedAnchor = false;
-                link.anchor = transform.InverseTransformPoint(collision.GetContact(0).point);
-                link.connectedAnchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
-                ConfigureSpring(link);
-                _springTarget = other;
-                _springJoint = link;
-                _springDistanceLimit = SPRING_BREAK_DISTANCE;
+                if (collision.contactCount == 0) return;
+                ContactPoint contact = collision.GetContact(0);
+                CreateSpringAttachment(other, contact.point, contact.normal);
                 _attachedPieces.Add(other);
                 other._attachedPieces.Add(this);
                 CastleCreekScore3D.Active?.Refresh(this, other);
@@ -466,19 +526,45 @@ namespace RestoreCastle3D
             }
             other._body.isKinematic = false;
             other._body.useGravity = true;
-            SpringJoint joint = other.gameObject.AddComponent<SpringJoint>();
-            joint.connectedBody = _body;
-            joint.autoConfigureConnectedAnchor = false;
-            joint.anchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
-            joint.connectedAnchor = transform.InverseTransformPoint(collision.GetContact(0).point);
-            ConfigureSpring(joint);
-            other._springTarget = this;
-            other._springJoint = joint;
-            other._springDistanceLimit = SPRING_BREAK_DISTANCE;
+            if (collision.contactCount == 0) return;
+            ContactPoint firstContact = collision.GetContact(0);
+            other.CreateSpringAttachment(this, firstContact.point, firstContact.normal);
             _attachedPieces.Add(other);
             other._attachedPieces.Add(this);
             other.MarkAttachmentGroupThrown();
             CastleCreekScore3D.Active?.Refresh(this, other);
+        }
+
+        /// <summary>
+        /// The center spring holds the collision contact; two offset springs keep the pieces
+        /// from sliding/rotating around that single point, while retaining elastic flex.
+        /// </summary>
+        private void CreateSpringAttachment(CastlePiece3D target, Vector3 worldPoint, Vector3 normal)
+        {
+            Vector3 tangent = Vector3.Cross(normal, Vector3.up);
+            if (tangent.sqrMagnitude < 0.01f)
+                tangent = Vector3.Cross(normal, Vector3.right);
+            tangent.Normalize();
+            Vector3 bitangent = Vector3.Cross(normal.normalized, tangent).normalized;
+
+            _springJoint = AddSpringAt(target, worldPoint);
+            _springStabilizers.Add(AddSpringAt(target,
+                worldPoint + tangent * SPRING_STABILIZER_SPACING));
+            _springStabilizers.Add(AddSpringAt(target,
+                worldPoint + bitangent * SPRING_STABILIZER_SPACING));
+            _springTarget = target;
+            _springDistanceLimit = SPRING_BREAK_DISTANCE;
+        }
+
+        private SpringJoint AddSpringAt(CastlePiece3D target, Vector3 worldPoint)
+        {
+            SpringJoint joint = gameObject.AddComponent<SpringJoint>();
+            joint.connectedBody = target.Body;
+            joint.autoConfigureConnectedAnchor = false;
+            joint.anchor = transform.InverseTransformPoint(worldPoint);
+            joint.connectedAnchor = target.transform.InverseTransformPoint(worldPoint);
+            ConfigureSpring(joint);
+            return joint;
         }
 
         private static void ConfigureSpring(SpringJoint joint)
@@ -519,11 +605,6 @@ namespace RestoreCastle3D
                 CastlePiece3D child = _springTarget == other ? this :
                     other._springTarget == this ? other : null;
                 if (child == null) continue;
-                if (child._springJoint != null)
-                {
-                    child._springJoint.connectedBody = null;
-                    Destroy(child._springJoint);
-                }
                 child.RemoveSpringAttachment();
             }
 
