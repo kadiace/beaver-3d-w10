@@ -156,6 +156,19 @@ namespace RestoreCastle3D
             }
         }
 
+        /// <summary>Fallen-out objects leave without score; only the Z=-15 boundary awards points.</summary>
+        public void Discard(CastlePiece3D piece)
+        {
+            if (piece == null || piece.IsSettling) return;
+            var group = CastleSynergy3D.Collect(piece);
+            foreach (var member in group) member.MarkSettling();
+            foreach (var member in group)
+            {
+                Unregister(member);
+                Managers.Resource.Destroy(member.gameObject);
+            }
+        }
+
         public void Detonate(CastlePiece3D barrel)
         {
             if (barrel == null || barrel.IsSettling) return;
