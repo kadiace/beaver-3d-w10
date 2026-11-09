@@ -37,6 +37,7 @@ namespace RestoreCastle3D
         private uint _requestedOutlineLayer;
         private bool _fuseStarted;
         private bool _fusePending;
+        private float _fuseStartedAt;
         private int _growthCount;
         private bool _continuousDrop;
         private bool _continuousBeforeSpring;
@@ -75,8 +76,7 @@ namespace RestoreCastle3D
                 Time.time < _attachBlockedUntil || Time.time < other._attachBlockedUntil)
                 return false;
             if (_held && _magnetRoot == this)
-                return other._magnetRoot == null &&
-                    !CastleSynergy3D.Collect(this).Contains(other);
+                return other._magnetRoot == null && !other._held;
             if (_attachedPieces.Count != 0) return false;
             return (!other._thrown && other._attachedPieces.Count == 0) ||
                 (other._thrown && other._attachedPieces.Count != 0 && _springTarget == null);
@@ -171,6 +171,7 @@ namespace RestoreCastle3D
             _continuousDrop = false;
             _removalScheduled = false;
             StopAllCoroutines();
+            if (_fusePending && _fuseStarted) StartCoroutine(Detonate());
             _body.isKinematic = true;
             _body.useGravity = false;
             _body.linearVelocity = Vector3.zero;
@@ -355,6 +356,7 @@ namespace RestoreCastle3D
             _settling = false;
             _fuseStarted = false;
             _fusePending = false;
+            _fuseStartedAt = 0f;
             _growthCount = 0;
             _continuousDrop = false;
             _continuousBeforeSpring = false;
@@ -421,6 +423,7 @@ namespace RestoreCastle3D
                 AbilitySuppressed) return;
             _barrelIgnitionTarget = touched;
             _fuseStarted = true;
+            _fuseStartedAt = Time.time;
             _fusePending = true;
             StartCoroutine(Detonate());
         }
@@ -834,7 +837,8 @@ namespace RestoreCastle3D
         /// <summary>첫 충돌부터 1초 경과 시 소유자에게 폭발을 요청한다.</summary>
         private IEnumerator Detonate()
         {
-            yield return new WaitForSeconds(BARREL_FUSE_SECONDS);
+            yield return new WaitForSeconds(Mathf.Max(0f,
+                BARREL_FUSE_SECONDS - (Time.time - _fuseStartedAt)));
             if (!_settling && !AbilitySuppressed)
             {
                 if (CastleCreekScore3D.Active != null)
