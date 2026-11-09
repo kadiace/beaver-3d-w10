@@ -22,7 +22,7 @@ namespace RestoreCastle3D
         private const float CAMERA_MIN_TARGET_Z = -15f;
         private const float CAMERA_MAX_TARGET_Z = 30f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
-        private const float SPAWN_INTERVAL = 0.02f;
+        private const float SPAWN_INTERVAL = 1f;
         private static readonly string[] CreekCategories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
         private static readonly int[] CreekCategoryWeights = { 2, 2, 2, 3, 1 };
         private static readonly string[] CreekRarities = { "일반", "고급", "희귀" };

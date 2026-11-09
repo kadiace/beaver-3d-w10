@@ -7,7 +7,7 @@ namespace RestoreCastle3D
     [RequireComponent(typeof(Rigidbody))]
     public sealed class CastlePiece3D : MonoBehaviour
     {
-        private const float CREEK_SPEED = 3f;
+        private const float CREEK_SPEED = 1f;
         private const float SPRING_STRENGTH = 10000f;
         private const float SPRING_DAMPER = 500f;
         private const float SPRING_DISTANCE = 0f;
