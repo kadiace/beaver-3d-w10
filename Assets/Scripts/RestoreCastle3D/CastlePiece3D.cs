@@ -72,7 +72,7 @@ namespace RestoreCastle3D
                 (materialId == "barrel" && other._thrown && other._attachedPieces.Count != 0);
         }
         public bool IsSettling => _settling;
-        /// <summary>Lock an awarded group in place until its delayed pool return.</summary>
+        /// <summary>Finalize scoring, but keep physics and joints intact for the cliff fall.</summary>
         public void MarkSettling()
         {
             if (_settling) return;
@@ -80,17 +80,8 @@ namespace RestoreCastle3D
             _removalScheduled = true;
             StopAllCoroutines();
             _held = false;
-            _body.linearVelocity = Vector3.zero;
-            _body.angularVelocity = Vector3.zero;
-            _body.useGravity = false;
-            _body.isKinematic = true;
-            _body.detectCollisions = false;
-            _settlementColliders.Clear();
-            foreach (Collider collider in GetComponentsInChildren<Collider>(true))
-            {
-                _settlementColliders[collider] = collider.enabled;
-                collider.enabled = false;
-            }
+            // Do not reset velocities, gravity, Rigidbody state, colliders or joints.
+            // Score/hover/pickup/joint creation are independently blocked by IsSettling.
             SetOutlineLayer(0);
             SetPenaltyOutline(false);
         }
