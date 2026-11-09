@@ -18,6 +18,8 @@ namespace RestoreCastle3D
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float WASTE_EFFECT_RADIUS = 2.5f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
+        private const float CAMERA_MIN_POSITION_X = -20f;
+        private const float CAMERA_MAX_POSITION_X = 2f;
         private const float CAMERA_MIN_TARGET_Z = -15f;
         private const float CAMERA_MAX_TARGET_Z = 30f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
@@ -641,7 +643,7 @@ namespace RestoreCastle3D
             ResetGame();
         }
 
-        /// <summary>우클릭 드래그로 주시점을 Z축으로 이동하고 일반 휠로 줌을 조절한다.</summary>
+        /// <summary>우클릭 드래그로 카메라의 월드 X/Z 위치를 이동하고 휠로 줌을 조절한다.</summary>
         private void UpdateCameraInput()
         {
             Mouse mouse = Mouse.current;
@@ -684,6 +686,13 @@ namespace RestoreCastle3D
                 {
                     if (_spawnMaterials != null)
                         CastleCreekScore3D.Active?.StopTracking();
+                    // _cameraTarget is the look-at position. Clamp the actual camera
+                    // transform.position.x, accounting for the fixed camera offset.
+                    float cameraOffsetX = _camera.transform.forward.x * 20f;
+                    _cameraTarget.x = Mathf.Clamp(
+                        _cameraTarget.x - delta.x * 0.025f,
+                        CAMERA_MIN_POSITION_X + cameraOffsetX,
+                        CAMERA_MAX_POSITION_X + cameraOffsetX);
                     _cameraTarget.z = Mathf.Clamp(
                         _cameraTarget.z - delta.y * 0.025f,
                         CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z);
