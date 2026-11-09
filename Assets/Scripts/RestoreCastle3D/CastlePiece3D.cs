@@ -12,7 +12,7 @@ namespace RestoreCastle3D
         private const float BARREL_BLAST_RADIUS = 2f;
         private const float BARREL_BLAST_IMPULSE = 30f;
         private const float BLAST_DEBRIS_LIFETIME = 2f;
-        private const float DESPAWN_Z = -15f;
+        private const float DESPAWN_Z = 15f;
         private const float DESPAWN_Y = -10f;
 
         [SerializeField] private string materialId;
