@@ -193,7 +193,7 @@ namespace RestoreCastle3D
             if (piece == null || piece.IsSettling) return;
             var group = CastleSynergy3D.Collect(piece);
             if (group.Count == 0) return;
-            // Called from CastlePiece3D's z=-15 settlement, regardless of tag or score.
+            // Called from CastlePiece3D's z=15 settlement, regardless of tag or score.
             _run?.OnScoringBoundaryReached();
             // Snapshot score and membership before any joint/collider state changes.
             int earned = CastleSynergy3D.Evaluate(group, _catalog).Total;
@@ -207,10 +207,10 @@ namespace RestoreCastle3D
             foreach (var member in group) center += member.transform.position;
             center /= group.Count;
             _score += earned;
-            // Count only trash objects physically at Z=-15, not other attached members.
+            // Count only trash objects physically at Z=15, not other attached members.
             // Y despawns and explosion debris never award pollution.
             List<CastlePiece3D> boundaryTrash = group.Where(member =>
-                member != null && member.transform.position.z <= -15f &&
+                member != null && member.transform.position.z <= 15f &&
                 _catalog.Get(member.MaterialId)?.category == "쓰레기").ToList();
             if (boundaryTrash.Count > 0 && _run != null)
             {
@@ -254,7 +254,7 @@ namespace RestoreCastle3D
                     Managers.Resource.Destroy(member.gameObject);
         }
 
-        /// <summary>Fallen-out objects leave without score; only the Z=-15 boundary awards points.</summary>
+        /// <summary>Fallen-out objects leave without score; only the Z=15 boundary awards points.</summary>
         public void Discard(CastlePiece3D piece)
         {
             if (piece == null || piece.IsSettling) return;

@@ -31,7 +31,7 @@ Material:
     - _ContactWidth: 0.55
     - _ContactStrength: 0.88
     - _WaterfallFoam: 0
-    - _ImpactCenterZ: -15
+    - _ImpactCenterZ: 15
     - _ImpactLength: 11
     - _ImpactStrength: 0.88
     m_Colors:

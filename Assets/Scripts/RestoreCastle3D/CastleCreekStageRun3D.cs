@@ -122,7 +122,7 @@ namespace RestoreCastle3D
 
         /// <summary>
         /// Begin this stage's countdown when its first piece actually crosses the
-        /// downstream scoring boundary (z = -15), even if that piece earns zero points.
+        /// downstream scoring boundary (z = 15), even if that piece earns zero points.
         /// Further settlements must never restart or extend the countdown.
         /// </summary>
         public void OnScoringBoundaryReached()
