@@ -19,8 +19,8 @@ namespace RestoreCastle3D
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
         private const float CAMERA_MIN_POSITION_X = -20f;
         private const float CAMERA_MAX_POSITION_X = 2f;
-        private const float CAMERA_MIN_TARGET_Z = 0f;
-        private const float CAMERA_MAX_TARGET_Z = 30f;
+        private const float CAMERA_MIN_TARGET_Z = 20f;
+        private const float CAMERA_MAX_TARGET_Z = 35f;
         private const float HELD_MIN_X = -12f;
         private const float HELD_MAX_X = 12f;
         private const float HELD_MIN_Z = 15f;
@@ -574,7 +574,7 @@ namespace RestoreCastle3D
             _camera.orthographic = true;
             _camera.orthographicSize = 10.5f;
             _camera.transform.rotation = Quaternion.Euler(45f, 45f, 0f);
-            _cameraTarget = Vector3.zero;
+            _cameraTarget = new Vector3(0f, 0f, 30f);
             UpdateCameraPosition();
             _placementBounds = GameObject.Find("Flat Muddy Creek Bed")
                 .GetComponent<BoxCollider>().bounds;
