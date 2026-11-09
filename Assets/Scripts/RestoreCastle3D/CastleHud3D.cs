@@ -51,6 +51,9 @@ namespace RestoreCastle3D
         private RectTransform _candidatePanel;
         private Vector2 _candidatePanelShown;
         private float _candidateSlide;
+        private RectTransform _placementControlsPanel;
+        private Vector2 _placementControlsPanelShown;
+        private float _placementControlsSlide;
         private CastleDropGuideGraphic3D _dropGuide;
 
         /// <summary>게임 인스턴스 및 원본 HUD 프리팹의 버튼과 상태 텍스트를 연결한다.</summary>
@@ -93,6 +96,11 @@ namespace RestoreCastle3D
 
             _candidatePanel = transform.Find("CandidateSelectionRow").GetComponent<RectTransform>();
             _candidatePanelShown = _candidatePanel.anchoredPosition;
+            _placementControlsPanel = transform.Find("PlacementControlsPanel").GetComponent<RectTransform>();
+            _placementControlsPanelShown = _placementControlsPanel.anchoredPosition;
+            float controlsHideDistance = _placementControlsPanel.rect.height + _placementControlsPanelShown.y + 32f;
+            _placementControlsPanel.anchoredPosition = _placementControlsPanelShown
+                + Vector2.down * controlsHideDistance;
 
             // One Graphic combines all dashes into a single UI draw call.
             GameObject guide = new GameObject("Drop Prediction Dashed Line",
@@ -173,7 +181,7 @@ Esc 또는 짧은 우클릭: 선택 취소 후 후보 목록 열기
             Refresh();
         }
 
-        /// <summary>첫 실제 드랍을 시작할 때 아래로 숨기고 다음 라운드에 다시 올린다.</summary>
+        /// <summary>선택 상태에 따라 후보 패널과 조작 안내 패널을 반대 방향으로 전환한다.</summary>
         private void AnimateCandidatePanel()
         {
             if (_candidatePanel == null) return;
@@ -186,6 +194,16 @@ Esc 또는 짧은 우클릭: 선택 취소 후 후보 목록 열기
             float hideDistance = _candidatePanel.rect.height + _candidatePanelShown.y + 32f;
             _candidatePanel.anchoredPosition = _candidatePanelShown
                 + Vector2.down * hideDistance * eased;
+
+            float controlsTarget = _game.IsPlacementEditing ? 1f : 0f;
+            _placementControlsSlide = Mathf.MoveTowards(_placementControlsSlide, controlsTarget,
+                Time.unscaledDeltaTime / Mathf.Max(0.05f, candidateSlideDuration));
+            float controlsEased = candidateSlideCurve == null
+                ? Mathf.SmoothStep(0f, 1f, _placementControlsSlide)
+                : candidateSlideCurve.Evaluate(_placementControlsSlide);
+            float controlsHideDistance = _placementControlsPanel.rect.height + _placementControlsPanelShown.y + 32f;
+            _placementControlsPanel.anchoredPosition = _placementControlsPanelShown
+                + Vector2.down * controlsHideDistance * (1f - controlsEased);
         }
 
         /// <summary>실제 낙하 시작점과 현재 미리보기의 화면 좌표를 실시간 점선으로 연결한다.</summary>

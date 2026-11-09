@@ -232,7 +232,35 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "<b>목표와 진행</b>\n라운드당 5개 배치 · 스테이지당 5라운드 · 총 5스테이지\n현재 내구도는 살아 있는 자재와 능력 효과의 합입니다.\n스테이지 끝에 목표 내구도 이상이면 통과하며, 부족하면 처음부터 다시 시작합니다.\n통과 후 홍수가 발생합니다. 살아남은 자재는 다음 스테이지에도 남습니다.\n\n<b>배치와 리롤</b>\n후보 선택 후 좌클릭으로 낙하합니다. 같은 라운드의 후보 3종은 반복 선택할 수 있습니다.\nEsc 또는 짧은 우클릭: 선택 취소 후 후보 목록 열기\n기본 리롤은 스테이지마다 3회이며, 첫 배치 이후에는 사용할 수 없습니다.\n자재에 마우스를 올리면 내구도와 고유 능력을 확인할 수 있습니다.\n\n<b>조작</b>\n우클릭 드래그: 카메라 이동 / 스크롤: 확대·축소\n우클릭 중 스크롤: 카메라 회전 / Q·E: 자재 회전\n\n<b>결합과 파괴</b>\n자재끼리 닿으면 결합합니다. 강한 충격으로 끊어질 수 있으며 재충돌하면 다시 붙습니다.\n홍수나 폭발 등에 밀려 절벽 뒤 경계를 넘은 자재는 파괴됩니다.\n\n<b>오크통</b>\n다른 자재와 처음 충돌하면 폭발을 예약합니다.\n라운드 낙하 정산이 끝나면 1초 후 한 번 폭발해 주변을 밀어냅니다.\n빨강·노랑 깜빡임: 폭발 대기 / 진회색: 폭발 완료"
+  m_Text: "<b>\uBAA9\uD45C\uC640 \uC9C4\uD589</b>\n\uB77C\uC6B4\uB4DC\uB2F9 5\uAC1C
+    \uBC30\uCE58 \xB7 \uC2A4\uD14C\uC774\uC9C0\uB2F9 5\uB77C\uC6B4\uB4DC \xB7 \uCD1D
+    5\uC2A4\uD14C\uC774\uC9C0\n\uD604\uC7AC \uB0B4\uAD6C\uB3C4\uB294 \uC0B4\uC544
+    \uC788\uB294 \uC790\uC7AC\uC640 \uB2A5\uB825 \uD6A8\uACFC\uC758 \uD569\uC785\uB2C8\uB2E4.\n\uC2A4\uD14C\uC774\uC9C0
+    \uB05D\uC5D0 \uBAA9\uD45C \uB0B4\uAD6C\uB3C4 \uC774\uC0C1\uC774\uBA74 \uD1B5\uACFC\uD558\uBA70,
+    \uBD80\uC871\uD558\uBA74 \uCC98\uC74C\uBD80\uD130 \uB2E4\uC2DC \uC2DC\uC791\uD569\uB2C8\uB2E4.\n\uD1B5\uACFC
+    \uD6C4 \uD64D\uC218\uAC00 \uBC1C\uC0DD\uD569\uB2C8\uB2E4. \uC0B4\uC544\uB0A8\uC740
+    \uC790\uC7AC\uB294 \uB2E4\uC74C \uC2A4\uD14C\uC774\uC9C0\uC5D0\uB3C4 \uB0A8\uC2B5\uB2C8\uB2E4.\n\n<b>\uBC30\uCE58\uC640
+    \uB9AC\uB864</b>\n\uD6C4\uBCF4 \uC120\uD0DD \uD6C4 \uC88C\uD074\uB9AD\uC73C\uB85C
+    \uB099\uD558\uD569\uB2C8\uB2E4. \uAC19\uC740 \uB77C\uC6B4\uB4DC\uC758 \uD6C4\uBCF4
+    3\uC885\uC740 \uBC18\uBCF5 \uC120\uD0DD\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\nEsc
+    \uB610\uB294 \uC9E7\uC740 \uC6B0\uD074\uB9AD: \uC120\uD0DD \uCDE8\uC18C \uD6C4
+    \uD6C4\uBCF4 \uBAA9\uB85D \uC5F4\uAE30\n\uAE30\uBCF8 \uB9AC\uB864\uC740 \uC2A4\uD14C\uC774\uC9C0\uB9C8\uB2E4
+    3\uD68C\uC774\uBA70, \uCCAB \uBC30\uCE58 \uC774\uD6C4\uC5D0\uB294 \uC0AC\uC6A9\uD560
+    \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.\n\uC790\uC7AC\uC5D0 \uB9C8\uC6B0\uC2A4\uB97C
+    \uC62C\uB9AC\uBA74 \uB0B4\uAD6C\uB3C4\uC640 \uACE0\uC720 \uB2A5\uB825\uC744 \uD655\uC778\uD560
+    \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\n<b>\uC870\uC791</b>\n\uC6B0\uD074\uB9AD \uB4DC\uB798\uADF8:
+    \uCE74\uBA54\uB77C \uC774\uB3D9 / \uC2A4\uD06C\uB864: \uD655\uB300\xB7\uCD95\uC18C\n\uC6B0\uD074\uB9AD
+    \uC911 \uC2A4\uD06C\uB864: \uCE74\uBA54\uB77C \uD68C\uC804 / Q\xB7E: \uC790\uC7AC
+    \uD68C\uC804\n\n<b>\uACB0\uD569\uACFC \uD30C\uAD34</b>\n\uC790\uC7AC\uB07C\uB9AC
+    \uB2FF\uC73C\uBA74 \uACB0\uD569\uD569\uB2C8\uB2E4. \uAC15\uD55C \uCDA9\uACA9\uC73C\uB85C
+    \uB04A\uC5B4\uC9C8 \uC218 \uC788\uC73C\uBA70 \uC7AC\uCDA9\uB3CC\uD558\uBA74 \uB2E4\uC2DC
+    \uBD99\uC2B5\uB2C8\uB2E4.\n\uD64D\uC218\uB098 \uD3ED\uBC1C \uB4F1\uC5D0 \uBC00\uB824
+    \uC808\uBCBD \uB4A4 \uACBD\uACC4\uB97C \uB118\uC740 \uC790\uC7AC\uB294 \uD30C\uAD34\uB429\uB2C8\uB2E4.\n\n<b>\uC624\uD06C\uD1B5</b>\n\uB2E4\uB978
+    \uC790\uC7AC\uC640 \uCC98\uC74C \uCDA9\uB3CC\uD558\uBA74 \uD3ED\uBC1C\uC744 \uC608\uC57D\uD569\uB2C8\uB2E4.\n\uB77C\uC6B4\uB4DC
+    \uB099\uD558 \uC815\uC0B0\uC774 \uB05D\uB098\uBA74 1\uCD08 \uD6C4 \uD55C \uBC88
+    \uD3ED\uBC1C\uD574 \uC8FC\uBCC0\uC744 \uBC00\uC5B4\uB0C5\uB2C8\uB2E4.\n\uBE68\uAC15\xB7\uB178\uB791
+    \uAE5C\uBE61\uC784: \uD3ED\uBC1C \uB300\uAE30 / \uC9C4\uD68C\uC0C9: \uD3ED\uBC1C
+    \uC644\uB8CC"
 --- !u!1 &224108683
 GameObject:
   m_ObjectHideFlags: 0
@@ -1328,6 +1356,7 @@ RectTransform:
   - {fileID: 1706647840}
   - {fileID: 1113348943}
   - {fileID: 2080833044}
+  - {fileID: 904300000000000002}
   - {fileID: 632882238}
   - {fileID: 1470635698}
   - {fileID: 356047910}
@@ -3860,6 +3889,162 @@ MonoBehaviour:
     m_VerticalOverflow: 1
     m_LineSpacing: 1
   m_Text: 
+--- !u!1 &904300000000000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 904300000000000002}
+  - component: {fileID: 904300000000000003}
+  - component: {fileID: 904300000000000004}
+  m_Layer: 0
+  m_Name: PlacementControlsPanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &904300000000000002
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904300000000000001}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 904300000000000012}
+  m_Father: {fileID: 738214545}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchoredPosition: {x: 0, y: 16}
+  m_SizeDelta: {x: 600, y: 104}
+  m_Pivot: {x: 0.5, y: 0}
+--- !u!222 &904300000000000003
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904300000000000001}
+  m_CullTransparentMesh: 1
+--- !u!114 &904300000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904300000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.1, g: 0.17, b: 0.22, a: 0.96}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!1 &904300000000000011
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 904300000000000012}
+  - component: {fileID: 904300000000000013}
+  - component: {fileID: 904300000000000014}
+  m_Layer: 0
+  m_Name: ControlsText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &904300000000000012
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904300000000000011}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 904300000000000002}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: -32, y: -20}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &904300000000000013
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904300000000000011}
+  m_CullTransparentMesh: 1
+--- !u!114 &904300000000000014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904300000000000011}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_FontSize: 22
+    m_FontStyle: 0
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 4
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: "\uC88C\uD074\uB9AD: \uC790\uC7AC \uBC30\uCE58\nEsc / \uC6B0\uD074\uB9AD:
+    \uC120\uD0DD \uCDE8\uC18C\nQ / E: \uC790\uC7AC \uD68C\uC804"
 --- !u!1001 &96331354
 PrefabInstance:
   m_ObjectHideFlags: 0

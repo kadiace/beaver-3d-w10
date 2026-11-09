@@ -341,8 +341,10 @@ namespace RestoreCastle3D
         public float RotationSpeed { get; set; } = 90f;
         public float CameraYawPerScrollStep { get; set; } = 5f;
         public int PlacementsThisRound => _placementsInRound;
-        // The palette hides after each real drop; Esc/right-click reopens it.
+        // Selecting a material hides the palette; Esc or a short right-click reopens it.
         public bool IsRoundPlacing => _resolving || !_paletteOpen;
+        public bool IsPlacementEditing => _selected >= 0 && !_paletteOpen &&
+            !_resolving && !_awaitingStage && !_finished && !_rulesOpen;
         public int Durability => _score.Values.Sum();
         public int TargetDurability => StageTarget(Mathf.Min(_stage, STAGE_COUNT - 1));
         public int RerollCount => _rerolls + _extraRerolls;
@@ -382,6 +384,7 @@ namespace RestoreCastle3D
         {
             if (!CanSelect || index < 0 || index >= _offers.Length) return;
             _selected = index;
+            _paletteOpen = false;
             _status = _offers[index].name + " 선택 (남은 배치 "
                 + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회)";
         }
