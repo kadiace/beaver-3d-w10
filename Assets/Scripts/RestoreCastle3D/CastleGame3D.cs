@@ -21,7 +21,7 @@ namespace RestoreCastle3D
         private const float CAMERA_MIN_TARGET_Z = -15f;
         private const float CAMERA_MAX_TARGET_Z = 30f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
-        private const float SPAWN_INTERVAL = 0.1f;
+        private const float SPAWN_INTERVAL = 0.02f;
 
         private static readonly float _livingTreeScalePerGrowth =
             1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
