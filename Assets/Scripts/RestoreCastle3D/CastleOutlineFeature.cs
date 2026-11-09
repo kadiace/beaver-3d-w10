@@ -77,7 +77,8 @@ namespace RestoreCastle3D
                 _layer = layer;
                 _material = material;
                 _maskMaterial = maskMaterial;
-                renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+                // Water renders in the transparent queue. Draw outlines afterwards to keep them visible.
+                renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
 
                 StencilState maskStencil = new StencilState(true, (byte)stencilBit,
                     (byte)stencilBit, CompareFunction.Always, StencilOp.Replace,

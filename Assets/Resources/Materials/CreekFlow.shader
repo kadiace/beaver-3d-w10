@@ -23,7 +23,8 @@ Shader "Castle Creek/Flowing Creek Bed"
         {
             Tags { "LightMode"="UniversalForward" }
             Cull Back
-            ZWrite On
+            // Water is drawn after opaque geometry, but must not hide later outline depth tests.
+            ZWrite Off
             ZTest LEqual
             Blend One Zero
 
