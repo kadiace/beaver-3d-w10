@@ -278,7 +278,7 @@
     },
     {
       "id": "waste_bag_medium",
-      "name": "폐기물 봉지(중)",
+      "name": "쓰레기 봉투",
       "category": "폐기물",
       "baseReinforcement": 6,
       "abilities": [
