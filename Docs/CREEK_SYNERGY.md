@@ -37,3 +37,28 @@ The score engine attaches the discount to bag entries and flat deductions to fou
 ## Legacy compatibility
 
 The previous stage/round-based `CastleGame3D` and `CastleHud3D` implementations remain in source for compatibility, but the endless-spawn branch does not enter them. New material data does not carry `baseReinforcement`; this no longer contributes to endless-creek scoring. Legacy-stage cleanup remains independent of the endless-creek scoring path.
+
+## 0.02-second spawning and pooled Rigidbody placement
+
+The continuous spawner uses a 0.02-second interval. The pooled prefab's Rigidbody uses `Interpolate`.
+Previously, `PoolManager.Pool.Pop()` set only `Transform.position/rotation` after
+reparenting, and a pool miss created an **active** prefab at its original (0,0,0)
+position. The Rigidbody's cached physics/interpolation pose could remain at that
+old location and override the intended spawn position on a physics step.
+
+`Pool.Pop()` now deactivates new objects for placement, synchronizes both
+the Transform and Rigidbody positions/rotations, clears dynamic Rigidbody
+velocities, and resets/restores interpolation around the teleport.
+
+**Regression check in Unity Editor (Edit Mode):**
+
+1. Select **Tools > Beaver > Test 0.02s Pooled Rigidbody Spawn Pose**.
+2. The test runs 100 physics steps of 0.02 seconds, spawning/recycling 7
+   interpolated Rigidbodies per step (700 placements), including pool misses
+   beyond the default 5-item preload.
+3. The test fails if Transform/Rigidbody world positions or Rigidbody rotation
+   diverge from the requested spawn pose, before or after the physics step.
+4. Then run the actual Game scene at 0.02 seconds per spawn and check that
+   freshly spawned pieces no longer move back to (0,0,0).
+
+The editor tool is provided but was not executed in the remote environment.
