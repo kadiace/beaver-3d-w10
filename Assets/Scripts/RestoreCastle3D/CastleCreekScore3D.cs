@@ -1,8 +1,10 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace RestoreCastle3D
 {
@@ -10,10 +12,15 @@ namespace RestoreCastle3D
     public sealed class CastleCreekScore3D : MonoBehaviour
     {
         public static CastleCreekScore3D Active { get; private set; }
+        private const float AwardedGroupLifetime = 2f;
+        private const float PreviewRefreshInterval = 0.15f;
+        private const float PreviewDistance = 18f;
 
         private readonly HashSet<CastlePiece3D> _registered = new HashSet<CastlePiece3D>();
         private readonly Dictionary<CastlePiece3D, int> _lastPoints = new Dictionary<CastlePiece3D, int>();
         private readonly HashSet<CastlePiece3D> _outlined = new HashSet<CastlePiece3D>();
+        private readonly Dictionary<CastlePiece3D, int> _previewCandidates =
+            new Dictionary<CastlePiece3D, int>();
         private CastleCatalog3D _catalog;
         private Camera _camera;
         private Canvas _canvas;
@@ -21,6 +28,7 @@ namespace RestoreCastle3D
         private CastleFloatingText3D _floating;
         private TextMeshProUGUI _scoreText;
         private TextMeshProUGUI _hoverText;
+        private RectTransform _hoverPanel;
         private TextMeshProUGUI _edgeText;
         private TMP_FontAsset _font;
         private float _displayedScore;
@@ -33,8 +41,14 @@ namespace RestoreCastle3D
         private Vector3 _edgePosition;
         private bool _batching;
         private CastlePiece3D _hovered;
+        private CastlePiece3D _trackedPiece;
+        private CastlePiece3D _heldPiece;
+        private float _nextPreviewRefresh;
 
         public int TotalScore => _score;
+        public CastlePiece3D TrackedPiece =>
+            _trackedPiece != null && _trackedPiece.isActiveAndEnabled && !_trackedPiece.IsSettling &&
+            _registered.Contains(_trackedPiece) ? _trackedPiece : null;
 
         public void Initialize(Camera camera, CastleCatalog3D catalog)
         {
@@ -58,10 +72,27 @@ namespace RestoreCastle3D
             _scoreText.rectTransform.sizeDelta = new Vector2(400, 76);
             _scoreText.text = "점수 0";
 
-            _hoverText = CreateLabel("Synergy Details", 24, TextAlignmentOptions.TopLeft);
-            _hoverText.rectTransform.pivot = new Vector2(0, 1);
-            _hoverText.rectTransform.sizeDelta = new Vector2(380, 250);
-            _hoverText.gameObject.SetActive(false);
+            // Stable, readable panel: never attach it to a moving mouse cursor.
+            var panelObject = new GameObject("Synergy Details Panel",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            panelObject.transform.SetParent(_rect, false);
+            _hoverPanel = (RectTransform)panelObject.transform;
+            _hoverPanel.anchorMin = _hoverPanel.anchorMax = new Vector2(0f, 1f);
+            _hoverPanel.pivot = new Vector2(0f, 1f);
+            _hoverPanel.anchoredPosition = new Vector2(22f, -22f);
+            _hoverPanel.sizeDelta = new Vector2(490f, 330f);
+            Image background = panelObject.GetComponent<Image>();
+            background.color = new Color(0.05f, 0.08f, 0.12f, 0.88f);
+            background.raycastTarget = false;
+            _hoverText = CreateLabel("Synergy Details", 22, TextAlignmentOptions.TopLeft);
+            _hoverText.transform.SetParent(_hoverPanel, false);
+            _hoverText.rectTransform.anchorMin = Vector2.zero;
+            _hoverText.rectTransform.anchorMax = Vector2.one;
+            _hoverText.rectTransform.offsetMin = new Vector2(16f, 12f);
+            _hoverText.rectTransform.offsetMax = new Vector2(-16f, -14f);
+            _hoverText.enableWordWrapping = true;
+            _hoverText.overflowMode = TextOverflowModes.Ellipsis;
+            _hoverPanel.gameObject.SetActive(false);
             _edgeText = CreateLabel("Offscreen Score Indicator", 34, TextAlignmentOptions.Center);
             _edgeText.rectTransform.sizeDelta = new Vector2(240, 80);
             _edgeText.gameObject.SetActive(false);
@@ -98,22 +129,29 @@ namespace RestoreCastle3D
             _lastPoints.Remove(piece);
             _outlined.Remove(piece);
             if (_hovered == piece) _hovered = null;
+            if (_trackedPiece == piece) _trackedPiece = null;
+            if (_heldPiece == piece) _heldPiece = null;
+            _previewCandidates.Remove(piece);
+            if (_outlined.Remove(piece) && piece != null && piece.isActiveAndEnabled)
+                piece.SetOutlineLayer(0);
         }
 
         /// <summary>Recalculate only components touched by an added or removed edge.</summary>
         public void Refresh(CastlePiece3D a, CastlePiece3D b = null)
         {
             if (_catalog == null || _batching) return;
+            if (a != null && a.IsSettling || b != null && b.IsSettling) return;
             var visited = new HashSet<CastlePiece3D>();
             foreach (var start in new[] { a, b })
             {
-                if (start == null || !start.isActiveAndEnabled || visited.Contains(start)) continue;
+                if (start == null || !start.isActiveAndEnabled || start.IsSettling ||
+                    visited.Contains(start)) continue;
                 List<CastlePiece3D> group = CastleSynergy3D.Collect(start);
                 foreach (var p in group) visited.Add(p);
                 var calculated = CastleSynergy3D.Evaluate(group, _catalog);
                 foreach (CastlePiece3D p in group)
                 {
-                    if (!_registered.Contains(p)) continue;
+                    if (!_registered.Contains(p) || p.IsSettling) continue;
                     int next = calculated.Points.TryGetValue(p, out int score) ? score : 0;
                     _lastPoints.TryGetValue(p, out int old);
                     _lastPoints[p] = next;
@@ -130,9 +168,14 @@ namespace RestoreCastle3D
             if (piece == null || piece.IsSettling) return;
             var group = CastleSynergy3D.Collect(piece);
             if (group.Count == 0) return;
-            // Freeze every member before invoking resource pooling callbacks.
-            foreach (var member in group) member.MarkSettling();
+            // Snapshot score and membership before any joint/collider state changes.
             int earned = CastleSynergy3D.Evaluate(group, _catalog).Total;
+            foreach (var member in group)
+            {
+                member.MarkSettling();
+                Unregister(member);
+            }
+            _nextPreviewRefresh = 0f;
             Vector3 center = Vector3.zero;
             foreach (var member in group) center += member.transform.position;
             center /= group.Count;
@@ -149,11 +192,16 @@ namespace RestoreCastle3D
                         earned, center, label + (earned > 0 ? " 획득!" : " 감점!")));
                 else ShowEdgeIndicator(center, label);
             }
-            foreach (var member in group)
-            {
-                Unregister(member);
-                Managers.Resource.Destroy(member.gameObject);
-            }
+            // All members remain visible but inert for two seconds. No second settlement.
+            StartCoroutine(ReturnSettledGroup(group));
+        }
+
+        private IEnumerator ReturnSettledGroup(List<CastlePiece3D> group)
+        {
+            yield return new WaitForSeconds(AwardedGroupLifetime);
+            foreach (CastlePiece3D member in group)
+                if (member != null && member.IsSettling)
+                    Managers.Resource.Destroy(member.gameObject);
         }
 
         /// <summary>Fallen-out objects leave without score; only the Z=-15 boundary awards points.</summary>
@@ -167,6 +215,89 @@ namespace RestoreCastle3D
                 Unregister(member);
                 Managers.Resource.Destroy(member.gameObject);
             }
+        }
+
+        /// <summary>Called by gameplay input when a pickup is held or released.</summary>
+        public void SetHeldPiece(CastlePiece3D piece)
+        {
+            _heldPiece = piece != null && !piece.IsSettling ? piece : null;
+            _nextPreviewRefresh = 0f;
+            _previewCandidates.Clear();
+            if (_heldPiece != null) StopTracking();
+            ClearOutlines();
+            _hoverPanel.gameObject.SetActive(false);
+        }
+
+        /// <summary>Right-click focus; using the same raycast selection criteria as hover.</summary>
+        public bool TrackUnderCursor(Vector2 cursor)
+        {
+            CastlePiece3D candidate = PickAt(cursor);
+            _trackedPiece = candidate;
+            _hovered = candidate;
+            if (candidate == null) _hoverPanel.gameObject.SetActive(false);
+            return candidate != null;
+        }
+
+        public void StopTracking()
+        {
+            _trackedPiece = null;
+        }
+
+        private CastlePiece3D PickAt(Vector2 position)
+        {
+            if (_camera == null) return null;
+            if (!Physics.Raycast(_camera.ScreenPointToRay(position), out RaycastHit hit, 300f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return null;
+            CastlePiece3D candidate = hit.collider.GetComponentInParent<CastlePiece3D>();
+            return candidate != null && _registered.Contains(candidate) && !candidate.IsSettling
+                ? candidate : null;
+        }
+
+        private void ClearOutlines()
+        {
+            foreach (CastlePiece3D p in _outlined)
+                if (p != null && p.isActiveAndEnabled) p.SetOutlineLayer(0);
+            _outlined.Clear();
+        }
+
+        private void UpdateHeldPreview()
+        {
+            if (_heldPiece == null || !_heldPiece.isActiveAndEnabled || _heldPiece.IsSettling ||
+                !_registered.Contains(_heldPiece))
+            {
+                SetHeldPiece(null);
+                return;
+            }
+
+            if (Time.unscaledTime >= _nextPreviewRefresh)
+            {
+                _previewCandidates.Clear();
+                _nextPreviewRefresh = Time.unscaledTime + PreviewRefreshInterval;
+                foreach (CastlePiece3D candidate in _registered)
+                {
+                    if (candidate == null || candidate == _heldPiece || candidate.IsSettling ||
+                        !candidate.isActiveAndEnabled ||
+                        Vector3.Distance(candidate.transform.position,
+                            _heldPiece.transform.position) > PreviewDistance)
+                        continue;
+                    Vector3 vp = _camera.WorldToViewportPoint(candidate.transform.position);
+                    if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f)
+                        continue;
+                    int delta = CastleSynergy3D.PreviewAttachmentDelta(_heldPiece, candidate, _catalog);
+                    if (delta != 0) _previewCandidates[candidate] = delta;
+                }
+            }
+            ClearOutlines();
+            foreach (var pair in _previewCandidates)
+            {
+                if (pair.Key == null || !pair.Key.isActiveAndEnabled || pair.Key.IsSettling ||
+                    !_registered.Contains(pair.Key)) continue;
+                pair.Key.SetOutlineLayer(pair.Value < 0 ? 8u : 4u);
+                _outlined.Add(pair.Key);
+            }
+            _heldPiece.SetOutlineLayer(2u);
+            _outlined.Add(_heldPiece);
+            _hoverPanel.gameObject.SetActive(false);
         }
 
         public void Detonate(CastlePiece3D barrel)
