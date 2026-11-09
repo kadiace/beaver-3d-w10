@@ -103,6 +103,7 @@ namespace RestoreCastle3D
             _random = new System.Random(Environment.TickCount);
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
             ConfigureScene();
+            gameObject.AddComponent<CastleCreekScore3D>().Initialize(_camera, _catalog);
         }
 
         private void Update()
@@ -119,7 +120,9 @@ namespace RestoreCastle3D
                         material.id == "growing_vine" || material.id == "sunflower"
                         ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity);
                 instance.name = material.name;
-                instance.GetComponent<CastlePiece3D>().EnableContinuousDrop();
+                CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
+                spawned.EnableContinuousDrop();
+                CastleCreekScore3D.Active.Register(spawned);
                 _nextSpawnTime += SPAWN_INTERVAL;
             }
             if (_spawnMaterials != null)
