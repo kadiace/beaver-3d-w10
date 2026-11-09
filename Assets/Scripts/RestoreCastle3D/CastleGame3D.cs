@@ -643,7 +643,7 @@ namespace RestoreCastle3D
             ResetGame();
         }
 
-        /// <summary>우클릭 드래그로 카메라의 월드 X/Z 위치를 이동하고 휠로 줌을 조절한다.</summary>
+        /// <summary>우클릭 드래그를 ISO 카메라 화면 방향에 투영해 월드 XZ 평면을 이동한다.</summary>
         private void UpdateCameraInput()
         {
             Mouse mouse = Mouse.current;
@@ -686,17 +686,28 @@ namespace RestoreCastle3D
                 {
                     if (_spawnMaterials != null)
                         CastleCreekScore3D.Active?.StopTracking();
-                    // _cameraTarget is the look-at position. Clamp the actual camera
-                    // transform.position.x, accounting for the fixed camera offset.
-                    float cameraOffsetX = _camera.transform.forward.x * 20f;
-                    _cameraTarget.x = Mathf.Clamp(
-                        _cameraTarget.x - delta.x * 0.025f,
-                        CAMERA_MIN_POSITION_X + cameraOffsetX,
-                        CAMERA_MAX_POSITION_X + cameraOffsetX);
-                    _cameraTarget.z = Mathf.Clamp(
-                        _cameraTarget.z - delta.y * 0.025f,
-                        CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z);
-                    UpdateCameraPosition();
+                    // Convert the screen-space drag into a world-space XZ displacement
+                    // using the isometric camera. Both axes now move together as the
+                    // camera's rotation dictates, with zoom-sensitive world distance.
+                    Plane panPlane = new Plane(Vector3.up, Vector3.zero);
+                    Vector2 screenCenter = _camera.pixelRect.center;
+                    Ray fromRay = _camera.ScreenPointToRay(screenCenter);
+                    Ray toRay = _camera.ScreenPointToRay(screenCenter + delta);
+                    if (panPlane.Raycast(fromRay, out float fromDistance) &&
+                        panPlane.Raycast(toRay, out float toDistance))
+                    {
+                        Vector3 pan = fromRay.GetPoint(fromDistance) -
+                            toRay.GetPoint(toDistance);
+                        float cameraOffsetX = _camera.transform.forward.x * 20f;
+                        _cameraTarget.x = Mathf.Clamp(
+                            _cameraTarget.x + pan.x,
+                            CAMERA_MIN_POSITION_X + cameraOffsetX,
+                            CAMERA_MAX_POSITION_X + cameraOffsetX);
+                        _cameraTarget.z = Mathf.Clamp(
+                            _cameraTarget.z + pan.z,
+                            CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z);
+                        UpdateCameraPosition();
+                    }
                 }
 
             }
