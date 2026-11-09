@@ -130,18 +130,20 @@ internal static class CreekSynergySmokeTests
             var shoe = f.Make("shoe");
             return f.Preview(trash, shoe);
         }, ref passed);
-        Check("Awarded piece locks colliders and restores pooled state", 1, f =>
+        Check("Awarded piece keeps physics while interaction locks", 1, f =>
         {
             var piece = f.Make("pebble");
             var collider = piece.gameObject.AddComponent<BoxCollider>();
+            piece.Body.linearVelocity = new Vector3(2f, -3f, -4f);
+            piece.Body.angularVelocity = new Vector3(1f, 2f, 3f);
             piece.MarkSettling();
             bool locked = piece.IsSettling && !piece.CanPickUp &&
-                !collider.enabled && !piece.Body.detectCollisions &&
-                piece.Body.isKinematic;
+                collider.enabled && piece.Body.detectCollisions &&
+                !piece.Body.isKinematic && piece.Body.useGravity &&
+                piece.Body.linearVelocity == new Vector3(2f, -3f, -4f) &&
+                piece.Body.angularVelocity == new Vector3(1f, 2f, 3f);
             piece.gameObject.SetActive(false);
-            bool restored = !piece.IsSettling && collider.enabled &&
-                piece.Body.detectCollisions && !piece.Body.isKinematic;
-            return locked && restored ? 1 : 0;
+            return locked && !piece.IsSettling ? 1 : 0;
         }, ref passed);
         Debug.Log("Creek synergy smoke tests passed: " + passed + "/14");
     }
