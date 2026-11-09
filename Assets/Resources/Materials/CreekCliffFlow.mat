@@ -25,11 +25,18 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _FlowScale: 0.42
+    - _FlowScale: 0.28
     - _FlowSpeed: 3.6
     - _VerticalFlow: 1
+    - _ContactWidth: 0.55
+    - _ContactStrength: 0.9
+    - _WaterfallFoam: 0.2
+    - _ImpactCenterZ: 0
+    - _ImpactLength: 11
+    - _ImpactStrength: 0
     m_Colors:
-    - _FlowColor: {r: 0.4, g: 0.81, b: 0.9, a: 1}
-    - _WaterColor: {r: 0.12, g: 0.45, b: 0.62, a: 1}
+    - _FlowColor: {r: 0.30, g: 0.65, b: 0.77, a: 1}
+    - _FoamColor: {r: 0.90, g: 0.97, b: 1, a: 1}
+    - _WaterColor: {r: 0.12, g: 0.44, b: 0.61, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
