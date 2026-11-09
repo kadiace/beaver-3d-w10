@@ -120,14 +120,26 @@ public class PoolManager
         return item;
     }
 
+    /// <summary>기물을 풀에 반환하되 씬 초기화로 풀이 제거됐다면 파괴한다.</summary>
     public void Push(GameObject item)
     {
         string key = item.GetComponent<Poolable>().PoolKey;
-        _pools[key].Push(item);
+        if (_pools.TryGetValue(key, out Pool pool))
+            pool.Push(item);
+        else
+            Object.Destroy(item);
     }
 
+    /// <summary>꺼내진 기물과 보관 중인 기물을 모두 파괴하고 풀 등록 상태를 초기화한다.</summary>
     public void Clear()
     {
+        // Popped instances may have been reparented outside their pool's persistent root.
+        foreach (GameObject item in _keys.Keys)
+        {
+            if (item != null)
+                Object.Destroy(item);
+        }
+
         foreach (Pool pool in _pools.Values)
             pool.Clear();
 
