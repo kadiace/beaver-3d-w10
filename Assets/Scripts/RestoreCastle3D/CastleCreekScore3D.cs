@@ -194,6 +194,8 @@ namespace RestoreCastle3D
             if (piece == null || piece.IsSettling) return;
             var group = CastleSynergy3D.Collect(piece);
             if (group.Count == 0) return;
+            // Called from CastlePiece3D's z=-15 settlement, regardless of tag or score.
+            _run?.OnScoringBoundaryReached();
             // Snapshot score and membership before any joint/collider state changes.
             int earned = CastleSynergy3D.Evaluate(group, _catalog).Total;
             foreach (var member in group)

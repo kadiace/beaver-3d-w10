@@ -30,6 +30,8 @@ namespace RestoreCastle3D
         private int _stageStartScore;
         private int _pollution;
         private float _remaining;
+        private bool _stageTimerStarted;
+        private float _stageStartedAt;
         private float _endlessElapsed;
         private float _lastPollutionTime = float.NegativeInfinity;
         private int _lastPollutionAdded;
@@ -55,6 +57,7 @@ namespace RestoreCastle3D
 
         public bool IsPaused => _awaitingContinue || _gameOver;
         public bool IsEndless => _endless;
+        public bool StageTimerStarted => _stageTimerStarted;
         public int Pollution => _pollution;
         public int StageNumber => _stageIndex + 1;
         public int StageScore => _score == null ? 0 : _score.TotalScore - _stageStartScore;
@@ -102,12 +105,28 @@ namespace RestoreCastle3D
             {
                 if (_endless)
                     _endlessElapsed += Time.deltaTime;
-                else
+                else if (_stageTimerStarted)
                 {
-                    _remaining = Mathf.Max(0f, _remaining - Time.deltaTime);
+                    // An absolute start time makes the full 30 seconds independent of
+                    // MonoBehaviour Update order on the first arrival frame.
+                    _remaining = Mathf.Max(0f, _stageDuration - (Time.time - _stageStartedAt));
                     if (_remaining <= 0f) FinishStage();
                 }
             }
+            RefreshHud();
+        }
+
+        /// <summary>
+        /// Begin this stage's countdown when its first piece actually crosses the
+        /// downstream scoring boundary (z = -15), even if that piece earns zero points.
+        /// Further settlements must never restart or extend the countdown.
+        /// </summary>
+        public void OnScoringBoundaryReached()
+        {
+            if (IsPaused || _endless || _stageTimerStarted) return;
+            _stageTimerStarted = true;
+            _stageStartedAt = Time.time;
+            _remaining = _stageDuration;
             RefreshHud();
         }
 
@@ -173,6 +192,8 @@ namespace RestoreCastle3D
             else
             {
                 _stageStartScore = _score.TotalScore;
+                _stageTimerStarted = false;
+                _stageStartedAt = 0f;
                 _remaining = _stageDuration;
             }
             _overlay.SetActive(false);
@@ -222,7 +243,9 @@ namespace RestoreCastle3D
             }
             else
             {
-                _timerLabel.text = "남은 시간 " + Mathf.CeilToInt(_remaining).ToString("00") + "초";
+                _timerLabel.text = _stageTimerStarted
+                    ? "남은 시간 " + Mathf.CeilToInt(_remaining).ToString("00") + "초"
+                    : "첫 기물 도착 대기";
                 _goalLabel.text = "이번 스테이지 점수  " + StageScore + " / " + TargetScore + "점";
                 _goalBar.SetActive(true);
                 SetFill(_goalFill, (float)Mathf.Max(0, StageScore) / TargetScore);
@@ -236,7 +259,7 @@ namespace RestoreCastle3D
             _pollutionFillImage.color = danger ? new Color(0.98f, 0.25f, 0.24f) :
                 new Color(0.95f, 0.53f, 0.28f);
             _pollutionLabel.color = danger ? new Color(1f, 0.43f, 0.39f) : Color.white;
-            _timerLabel.color = !_endless && _remaining <= 5f ?
+            _timerLabel.color = !_endless && _stageTimerStarted && _remaining <= 5f ?
                 new Color(1f, 0.48f, 0.36f) : Color.white;
         }
 
