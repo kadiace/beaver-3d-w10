@@ -24,6 +24,7 @@ namespace RestoreCastle3D
         private CastlePiece3D _attachmentTarget;
         private CastlePiece3D _springTarget;
         private CastlePiece3D _magnetRoot;
+        private CastlePiece3D _barrelIgnitionTarget;
         private FixedJoint _springJoint;
         private float _lastCreekFlowTime = float.NegativeInfinity;
         private float _originalLinearDamping;
@@ -176,10 +177,27 @@ namespace RestoreCastle3D
             _body.angularVelocity = Vector3.zero;
         }
 
-        /// <summary>커서의 XZ 좌표를 따라 기물을 옮기고 물리 충돌 좌표를 동기화한다.</summary>
+        /// <summary>잡은 기물을 XZ로 이동시키되 빠른 드래그 경로의 충돌도 따라가며 자석으로 연결한다.</summary>
         public void MoveHeld(Vector3 position)
         {
             if (_settling) return;
+            Vector3 displacement = position - _body.position;
+            if (_held && _magnetRoot == this && displacement.sqrMagnitude > 0.0001f)
+            {
+                Vector3 start = _body.position;
+                Vector3 direction = displacement.normalized;
+                RaycastHit[] hits = _body.SweepTestAll(direction, displacement.magnitude,
+                    QueryTriggerInteraction.Ignore);
+                System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+                foreach (RaycastHit hit in hits)
+                {
+                    CastlePiece3D other = hit.collider.GetComponentInParent<CastlePiece3D>();
+                    if (other == null || other == this || other._magnetRoot == this) continue;
+                    _body.position = start + direction * hit.distance;
+                    Physics.SyncTransforms();
+                    TryMagnetAttach(other, hit.point);
+                }
+            }
             _body.position = position;
             Physics.SyncTransforms();
         }
@@ -303,6 +321,7 @@ namespace RestoreCastle3D
             _springTarget = null;
             _springJoint = null;
             _magnetRoot = null;
+            _barrelIgnitionTarget = null;
             foreach (FixedJoint joint in GetComponents<FixedJoint>())
             {
                 joint.connectedBody = null;
@@ -392,14 +411,15 @@ namespace RestoreCastle3D
                 collider.gameObject.name == "Flat Muddy Creek Bed" ||
                 collider.gameObject.name == "Upper Flat Muddy Creek Bed" ||
                 collider.gameObject.name == "Flat Muddy Creek Bed After Cliff")
-                IgniteBarrel();
+                IgniteBarrel(other);
         }
 
-        /// <summary>드래그 접촉으로 오크통이 점화되면 1초 후 폭발하도록 예약한다.</summary>
-        private void IgniteBarrel()
+        /// <summary>최초 접촉한 기물을 기억하고 오크통 폭발을 1초 후 예약한다.</summary>
+        private void IgniteBarrel(CastlePiece3D touched = null)
         {
             if (materialId != "barrel" || _fuseStarted || _settling ||
                 AbilitySuppressed) return;
+            _barrelIgnitionTarget = touched;
             _fuseStarted = true;
             _fusePending = true;
             StartCoroutine(Detonate());
@@ -421,8 +441,8 @@ namespace RestoreCastle3D
                 other == this || _settling || other._settling || other._held ||
                 Time.time < _attachBlockedUntil || Time.time < other._attachBlockedUntil)
                 return;
-            if (materialId == "barrel") { IgniteBarrel(); return; }
-            if (other.materialId == "barrel") { other.IgniteBarrel(); return; }
+            if (materialId == "barrel") { IgniteBarrel(other); return; }
+            if (other.materialId == "barrel") { other.IgniteBarrel(this); return; }
             List<CastlePiece3D> incoming = CastleSynergy3D.Collect(other);
             if (incoming.Contains(_magnetRoot) || incoming.Exists(piece =>
                 piece._settling || piece._held || piece._magnetRoot != null))
@@ -719,6 +739,11 @@ namespace RestoreCastle3D
         {
             var targets = new HashSet<CastlePiece3D> { this };
             Vector3 origin = _body.worldCenterOfMass;
+            if (_barrelIgnitionTarget != null && _barrelIgnitionTarget.isActiveAndEnabled &&
+                !_barrelIgnitionTarget._settling)
+                foreach (CastlePiece3D member in CastleSynergy3D.Collect(_barrelIgnitionTarget))
+                    if (!member._settling && member.materialId != "foundation")
+                        targets.Add(member);
             foreach (Collider collider in Physics.OverlapSphere(origin, BARREL_BLAST_RADIUS,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
