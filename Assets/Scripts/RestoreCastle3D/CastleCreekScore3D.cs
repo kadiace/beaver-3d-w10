@@ -289,7 +289,12 @@ namespace RestoreCastle3D
                     // is a prerequisite but does not yet award points.
                     if (delta != 0 ||
                         CastleSynergy3D.HasPotentialTagSynergy(_heldPiece, candidate, _catalog))
-                        _previewCandidates[candidate] = delta;
+                    {
+                        bool potentialWaste = _catalog.Get(_heldPiece.MaterialId).category == "쓰레기" ||
+                            _catalog.Get(candidate.MaterialId).category == "쓰레기";
+                        _previewCandidates[candidate] = delta != 0 ? delta :
+                            potentialWaste ? -1 : 0;
+                    }
                 }
             }
             ClearOutlines();
