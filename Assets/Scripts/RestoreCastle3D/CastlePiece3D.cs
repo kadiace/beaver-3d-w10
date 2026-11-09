@@ -364,9 +364,31 @@ namespace RestoreCastle3D
             if (!_throwOrigin || _held || _settling ||
                 Time.time < _attachBlockedUntil) return;
             CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
-            if (other == null || other == this || other._thrown || other._settling ||
-                Time.time < other._attachBlockedUntil || other._attachedPieces.Count != 0 ||
-                _attachedPieces.Contains(other)) return;
+            if (other == null || other == this || other._settling ||
+                Time.time < other._attachBlockedUntil || _attachedPieces.Contains(other)) return;
+
+            // A thrown barrel can also join an already attached group, then split the whole group.
+            bool barrelJoinsGroup = materialId == "barrel" && other._thrown &&
+                other._attachedPieces.Count != 0 && _springTarget == null &&
+                _attachedPieces.Count == 0;
+            if (barrelJoinsGroup)
+            {
+                SpringJoint link = gameObject.AddComponent<SpringJoint>();
+                link.connectedBody = other.Body;
+                link.autoConfigureConnectedAnchor = false;
+                link.anchor = transform.InverseTransformPoint(collision.GetContact(0).point);
+                link.connectedAnchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
+                ConfigureSpring(link);
+                _springTarget = other;
+                _springJoint = link;
+                _springDistanceLimit = SPRING_BREAK_DISTANCE;
+                _attachedPieces.Add(other);
+                other._attachedPieces.Add(this);
+                CastleCreekScore3D.Active?.Refresh(this, other);
+                TryArmBarrel();
+                return;
+            }
+            if (other._thrown || other._attachedPieces.Count != 0) return;
             other._continuousBeforeSpring = other._continuousDrop;
             if (other._continuousDrop)
             {
@@ -381,14 +403,7 @@ namespace RestoreCastle3D
             joint.autoConfigureConnectedAnchor = false;
             joint.anchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
             joint.connectedAnchor = transform.InverseTransformPoint(collision.GetContact(0).point);
-            joint.spring = SPRING_STRENGTH;
-            joint.damper = SPRING_DAMPER;
-            joint.minDistance = SPRING_DISTANCE;
-            joint.maxDistance = SPRING_DISTANCE;
-            joint.tolerance = SPRING_TOLERANCE;
-            joint.breakForce = SPRING_BREAK_FORCE;
-            joint.breakTorque = SPRING_BREAK_TORQUE;
-            joint.enableCollision = true;
+            ConfigureSpring(joint);
             other._springTarget = this;
             other._springJoint = joint;
             other._springDistanceLimit = SPRING_BREAK_DISTANCE;
@@ -398,6 +413,18 @@ namespace RestoreCastle3D
             CastleCreekScore3D.Active?.Refresh(this, other);
             TryArmBarrel();
             other.TryArmBarrel();
+        }
+
+        private static void ConfigureSpring(SpringJoint joint)
+        {
+            joint.spring = SPRING_STRENGTH;
+            joint.damper = SPRING_DAMPER;
+            joint.minDistance = SPRING_DISTANCE;
+            joint.maxDistance = SPRING_DISTANCE;
+            joint.tolerance = SPRING_TOLERANCE;
+            joint.breakForce = SPRING_BREAK_FORCE;
+            joint.breakTorque = SPRING_BREAK_TORQUE;
+            joint.enableCollision = true;
         }
 
         /// <summary>스프링과 기존 고정 조인트로 연결된 모든 기물을 재투척 불가 상태로 만든다.</summary>
