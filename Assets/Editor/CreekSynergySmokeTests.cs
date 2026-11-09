@@ -145,7 +145,41 @@ internal static class CreekSynergySmokeTests
             piece.gameObject.SetActive(false);
             return locked && !piece.IsSettling ? 1 : 0;
         }, ref passed);
-        Debug.Log("Creek synergy smoke tests passed: " + passed + "/14");
+        Check("New ordinary piece can join an already attached chunk", 6, f =>
+        {
+            var oldA = f.Make("pebble");
+            var oldB = f.Make("pebble");
+            var dropped = f.Make("pebble");
+            f.Link(oldA, oldB);
+            oldA.Throw(); // Marks the original connected chunk as thrown.
+            if (!dropped.CanAttachWhenThrownTo(oldB))
+                throw new Exception("Already-attached chunk rejects new non-barrel drop");
+            f.Link(dropped, oldB);
+            if (CastleSynergy3D.Collect(dropped).Count != 3)
+                throw new Exception("New piece is missing from the merged chunk");
+            return f.Score(oldA);
+        }, ref passed);
+        Check("Same chunk cannot create duplicate connection", 1, f =>
+        {
+            var oldA = f.Make("pebble");
+            var oldB = f.Make("pebble");
+            var dropped = f.Make("pebble");
+            f.Link(oldA, oldB);
+            oldA.Throw();
+            f.Link(dropped, oldB);
+            return !dropped.CanAttachWhenThrownTo(oldA) ? 1 : 0;
+        }, ref passed);
+        Check("Settled chunk rejects new attachments", 1, f =>
+        {
+            var oldA = f.Make("pebble");
+            var oldB = f.Make("pebble");
+            var dropped = f.Make("pebble");
+            f.Link(oldA, oldB);
+            oldA.Throw();
+            oldB.MarkSettling();
+            return !dropped.CanAttachWhenThrownTo(oldB) ? 1 : 0;
+        }, ref passed);
+        Debug.Log("Creek synergy smoke tests passed: " + passed + "/17");
     }
 
     private static void Check(string name, int expected, Func<Fixture, int> scenario, ref int passed)
