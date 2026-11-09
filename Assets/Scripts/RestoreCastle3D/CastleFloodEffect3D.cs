@@ -12,7 +12,6 @@ namespace RestoreCastle3D
         private const float MinimumDepth = 6f;
 
         private GameObject _water;
-        private Material _material;
         private float _centerX;
         private float _width;
         private float _startZ;
@@ -71,9 +70,7 @@ namespace RestoreCastle3D
         public void Dispose()
         {
             if (_water != null) Object.Destroy(_water);
-            if (_material != null) Object.Destroy(_material);
             _water = null;
-            _material = null;
         }
 
         private void EnsureWater()
@@ -86,35 +83,10 @@ namespace RestoreCastle3D
             Collider collider = _water.GetComponent<Collider>();
             if (collider != null) collider.enabled = false;
 
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            _material = new Material(shader);
-            _material.name = "Stage Flood Transparent Blue";
-            Color blue = new Color(0.08f, 0.43f, 0.98f, 0.43f);
-
-            if (_material.HasProperty("_BaseColor"))
-                _material.SetColor("_BaseColor", blue);
-            if (_material.HasProperty("_Color"))
-                _material.SetColor("_Color", blue);
-            if (_material.HasProperty("_Surface"))
-                _material.SetFloat("_Surface", 1f);
-            if (_material.HasProperty("_Blend"))
-                _material.SetFloat("_Blend", 0f);
-            if (_material.HasProperty("_SrcBlend"))
-                _material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
-            if (_material.HasProperty("_DstBlend"))
-                _material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
-            if (_material.HasProperty("_ZWrite"))
-                _material.SetFloat("_ZWrite", 0f);
-
-            _material.SetOverrideTag("RenderType", "Transparent");
-            _material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            _material.DisableKeyword("_ALPHATEST_ON");
-            _material.renderQueue = (int)RenderQueue.Transparent;
+            Material material = Resources.Load<Material>("Arts/Material/Stage Flood Transparent Blue");
 
             MeshRenderer renderer = _water.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = _material;
+            renderer.sharedMaterial = material;
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             renderer.receiveShadows = false;
             _water.SetActive(false);

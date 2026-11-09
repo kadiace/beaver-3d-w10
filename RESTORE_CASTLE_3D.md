@@ -36,7 +36,7 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 
 ## 스테이지 홍수와 기물 제거
 
-- 스테이지 통과 팝업을 닫으면 파란 홍수 큐브가 +Z에서 -Z로 확장되며 물 표면은 월드 Y=-1.95로 고정됩니다. 홍수에 닿은 기물에는 -Z 방향으로 한 번 충격량을 적용합니다.
+- 스테이지 통과 팝업을 닫으면 파란 홍수 큐브가 +Z에서 -Z로 확장되며 물 표면은 월드 Y=-1.95로 고정됩니다. 씬의 River Surface와 홍수 큐브는 `Assets/Resources/Arts/Material/Stage Flood Transparent Blue.mat`을 함께 사용합니다. 홍수에 닿은 기물에는 -Z 방향으로 한 번 충격량을 적용합니다.
 - 홍수 충격량은 `Game` 씬의 `@SceneContext`에 있는 `GameSceneContext` 컴포넌트의 `Flood > Flood Impulse`에서 조절합니다. 기본값은 60이고 0 이상을 사용하며, 변경 후 아직 충격을 받지 않은 기물부터 적용됩니다.
 - 각 기물은 물리 갱신마다 자신의 루트 월드 Z 좌표를 확인하며, 기준 이하가 되면 제거됩니다. 이 판정은 홍수 이외의 힘에도 항상 적용됩니다. 기반은 제외합니다.
 - 경계의 초기값은 Z=-28.2이며, `Game` 씬의 `@SceneContext`에 있는 `GameSceneContext` 컴포넌트의 `Destruction Boundary Z`에서 조절합니다. 별도의 경계 콜라이더는 필요하지 않습니다.
