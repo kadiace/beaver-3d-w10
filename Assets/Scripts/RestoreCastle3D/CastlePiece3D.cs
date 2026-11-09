@@ -151,7 +151,9 @@ namespace RestoreCastle3D
             if (_settling) return;
             if (transform.position.y < DESPAWN_Y)
             {
-                Despawn();
+                if (CastleCreekScore3D.Active != null)
+                    CastleCreekScore3D.Active.Discard(this);
+                else Despawn();
                 return;
             }
             if (transform.position.z > DESPAWN_Z || _removalScheduled || _held) return;
@@ -180,7 +182,7 @@ namespace RestoreCastle3D
         {
             if (CastleCreekScore3D.Active != null && !_settling)
             {
-                CastleCreekScore3D.Active.Settle(this);
+                CastleCreekScore3D.Active.Discard(this);
                 return;
             }
             if (_game != null) _game.RemovePiece(this);
