@@ -23,10 +23,8 @@ namespace RestoreCastle3D
         private Text _round;
         private Text _durability;
         private Text _target;
-        private Text _rerollStat;
         private Text _rerollAction;
         private Text _detail;
-        private Text _effects;
         private Text _stageTitle;
         private Text _stageBody;
         private Text _completeBody;
@@ -37,7 +35,6 @@ namespace RestoreCastle3D
         private GameObject _completePopup;
         private GameObject _rulesPopup;
         private Button _rerollButton;
-        private Button _topRerollButton;
         private CastlePiece3D _hoveredPiece;
         private int _hoveredCard = -1;
         private const float TooltipMargin = 14f;
@@ -61,9 +58,7 @@ namespace RestoreCastle3D
             _round = FindText("TopBar/RoundStat/Value");
             _durability = FindText("TopBar/DurabilityStat/Value");
             _target = FindText("TopBar/TargetStat/Value");
-            _rerollStat = FindText("TopBar/RerollStat/Label");
             _detail = FindText("PlacementDetailPanel/DetailText");
-            _effects = FindText("ActiveEffectsPanel/Hint");
             _stagePopup = transform.Find("StageResultPopup").gameObject;
             _stageTitle = FindText("StageResultPopup/Heading/TitleText");
             _stageBody = FindText("StageResultPopup/Contents/BodyText");
@@ -127,8 +122,8 @@ namespace RestoreCastle3D
             _rerollButton = transform.Find("CandidateSelectionRow/CandidateActions/RerollActionButton").GetComponent<Button>();
             _rerollAction = _rerollButton.GetComponentInChildren<Text>();
             _rerollButton.onClick.AddListener(_game.Reroll);
-            _topRerollButton = transform.Find("TopBar/RerollStat").GetComponent<Button>();
-            _topRerollButton.onClick.AddListener(_game.Reroll);
+            transform.Find("TopBar/RerollStat").gameObject.SetActive(false);
+            transform.Find("ActiveEffectsPanel").gameObject.SetActive(false);
 
             // The 2D manual removal action was replaced by the barrel explosion in 3D.
             transform.Find("TopBar/BombStat").gameObject.SetActive(false);
@@ -215,7 +210,6 @@ Q/E: 기물 회전 / Esc: 선택 취소
                     + " / " + _game.PlacementsPerRound : "");
             _durability.transform.parent.gameObject.SetActive(false);
             _target.transform.parent.gameObject.SetActive(false);
-            _rerollStat.text = "리롤 " + _game.RerollCount;
             _rerollAction.text = "리롤\n" + _game.RerollCount;
             if (_game.IsRoundPlacing && _hoveredCard >= 0)
             {
@@ -223,16 +217,12 @@ Q/E: 기물 회전 / Esc: 선택 취소
                 _tooltip.SetActive(false);
             }
             _rerollButton.interactable = _game.CanReroll && _game.RerollCount > 0;
-            _topRerollButton.interactable = _rerollButton.interactable;
             _detail.text = _game.StatusMessage ?? "";
             if (_hoveredPiece != null && !_game.IsPlacedPiece(_hoveredPiece))
             {
                 _hoveredPiece = null;
                 if (_hoveredCard < 0) _tooltip.SetActive(false);
             }
-            _effects.text = _hoveredPiece == null
-                ? "자재에 마우스를 올리면 접촉 이웃을 확인할 수 있습니다."
-                : BuildPlacedDetails(_hoveredPiece);
             if (_hoveredPiece != null && _hoveredCard < 0 && _tooltip.activeSelf)
             {
                 string description = AbilityTooltip(_hoveredPiece.MaterialId);
@@ -400,34 +390,6 @@ Q/E: 기물 회전 / Esc: 선택 취소
             string description = abilities.Length == 0 ? "고유 능력 없음" : string.Join("\n", abilities);
             return material.name + "\n\n"
                 + description + "\n\n[" + material.category + "]";
-        }
-
-        /// <summary>배치 기물 정보 패널에 접촉 자재와 고유 능력을 표시한다.</summary>
-        private string BuildPlacedDetails(CastlePiece3D piece)
-        {
-            CastleMaterial3D material = _game.GetPieceMaterial(piece);
-            if (material == null) return "";
-            CastlePiece3D[] neighbors = _game.GetTouchingPieces(piece);
-            List<string> lines = new List<string>
-            {
-                "[" + material.category + "]",
-                material.name
-            };
-            if (piece.AbilitySuppressed) lines.Add("특수능력: 덩쿨 부착으로 제거됨");
-            else if (piece.HasAttachmentTarget) lines.Add("덩쿨: 최초 접촉 기물에 영구 부착");
-            lines.Add("접촉 자재:");
-            if (neighbors.Length == 0) lines.Add("· 없음");
-            else
-                foreach (CastlePiece3D neighbor in neighbors.OrderBy(n => n.PlacedTurn))
-                    lines.Add("· " + _game.GetPieceMaterial(neighbor).name);
-            lines.Add("");
-            if (piece.AbilitySuppressed)
-                lines.Add("고유 능력 무효화됨");
-            else if (material.abilities == null || material.abilities.Length == 0)
-                lines.Add("고유 능력 없음");
-            else
-                lines.AddRange(material.abilities.Where(x => !string.IsNullOrWhiteSpace(x)));
-            return string.Join("\n", lines);
         }
 
         /// <summary>텍스트에 맞게 크기를 제한한 뒤 전체 패널을 화면 안으로 배치한다.</summary>
