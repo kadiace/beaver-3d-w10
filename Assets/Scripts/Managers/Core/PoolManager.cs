@@ -19,14 +19,52 @@ public class PoolManager
                 Push(Create());
         }
 
-        /// <summary>풀의 기물을 지정된 부모 아래에 배치하고 위치를 맞춘 뒤 활성화한다.</summary>
+        /// <summary>
+        /// Place a pooled object in both Transform and physics space before reactivating it.
+        /// Interpolated Rigidbodies otherwise can restore their previous physics pose (often
+        /// prefab origin) after Transform.position has already been assigned.
+        /// </summary>
         public GameObject Pop(Transform parent, Vector3? position, Quaternion? rotation)
         {
             GameObject item = _items.Count > 0 ? _items.Pop() : Create();
-            item.transform.SetParent(parent != null ? parent : _root, false);
-            if (position.HasValue) item.transform.position = position.Value;
-            if (rotation.HasValue) item.transform.rotation = rotation.Value;
+
+            // Create() instantiates active prefabs. Keep even new objects inactive while
+            // reparenting and setting their spawn pose, just like previously pooled ones.
+            if (item.activeSelf) item.SetActive(false);
+
+            Transform itemTransform = item.transform;
+            itemTransform.SetParent(parent != null ? parent : _root, false);
+            if (position.HasValue) itemTransform.position = position.Value;
+            if (rotation.HasValue) itemTransform.rotation = rotation.Value;
+
+            Vector3 spawnPosition = itemTransform.position;
+            Quaternion spawnRotation = itemTransform.rotation;
+
+            Rigidbody body = item.GetComponent<Rigidbody>();
+            RigidbodyInterpolation interpolation = RigidbodyInterpolation.None;
+            if (body != null)
+            {
+                interpolation = body.interpolation;
+                // Clear the cached interpolation pose when teleporting a reused Rigidbody.
+                body.interpolation = RigidbodyInterpolation.None;
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                body.position = spawnPosition;
+                body.rotation = spawnRotation;
+            }
+
             item.SetActive(true);
+
+            if (body != null)
+            {
+                // Rigidbody.position can be updated by physics during activation; explicitly
+                // resynchronize both representations before interpolation is enabled again.
+                body.position = spawnPosition;
+                body.rotation = spawnRotation;
+                itemTransform.SetPositionAndRotation(spawnPosition, spawnRotation);
+                body.interpolation = interpolation;
+            }
+
             return item;
         }
 
