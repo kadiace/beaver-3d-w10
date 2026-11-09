@@ -7,7 +7,8 @@ public class ResourceManager
         return Resources.Load<T>(path);
     }
 
-    public GameObject Instantiate(string path, Transform parent = null)
+    public GameObject Instantiate(string path, Transform parent = null,
+        Vector3? position = null, Quaternion? rotation = null)
     {
         GameObject prefab = Load<GameObject>(path);
         if (prefab == null)
@@ -17,9 +18,11 @@ public class ResourceManager
         }
 
         if (prefab.GetComponent<Poolable>() != null)
-            return Managers.Pool.Pop(path, parent);
+            return Managers.Pool.Pop(path, parent, position: position, rotation: rotation);
 
         GameObject go = Object.Instantiate(prefab, parent);
+        if (position.HasValue) go.transform.position = position.Value;
+        if (rotation.HasValue) go.transform.rotation = rotation.Value;
         go.name = Util.RemoveUnityCloneSuffix(go.name);
 
         return go;

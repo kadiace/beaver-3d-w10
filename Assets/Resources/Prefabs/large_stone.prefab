@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5561573808983649087}
   - component: {fileID: 3577851795077573462}
   - component: {fileID: 6948495986620368041}
+  - component: {fileID: 7707952768079497907}
   m_Layer: 0
   m_Name: large_stone
   m_TagString: Untagged
@@ -156,3 +157,15 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: 6cc2f6970b5b04e429106f45464a7d99, type: 2}
+--- !u!114 &7707952768079497907
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdf38c4058f44b70b973f3b6cb68020f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Poolable

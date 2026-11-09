@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6248003781063645937}
   - component: {fileID: 1768311626585503599}
   - component: {fileID: 5650258962000872632}
+  - component: {fileID: 5080546490811631835}
   m_Layer: 0
   m_Name: gem
   m_TagString: Untagged
@@ -156,3 +157,15 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: 2653929e62afaa44e8701d0bd8fd2028, type: 2}
+--- !u!114 &5080546490811631835
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4471878382253509574}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdf38c4058f44b70b973f3b6cb68020f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Poolable

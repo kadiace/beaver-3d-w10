@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 7987839440964076781}
   - component: {fileID: 7817155150210993772}
   - component: {fileID: 1160922881709338743}
+  - component: {fileID: 6081670116347512447}
   m_Layer: 0
   m_Name: waste_bag_small
   m_TagString: Untagged
@@ -157,6 +158,18 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: 6341bca302e76da45ac7183cadc6e60b, type: 2}
+--- !u!114 &6081670116347512447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdf38c4058f44b70b973f3b6cb68020f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Poolable
 --- !u!1 &4572364798875696736
 GameObject:
   m_ObjectHideFlags: 0

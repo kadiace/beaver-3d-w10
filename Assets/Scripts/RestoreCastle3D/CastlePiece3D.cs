@@ -9,6 +9,7 @@ namespace RestoreCastle3D
     {
         private const float CREEK_SPEED = 3f;
         private const float DESPAWN_Z = -15f;
+        private const float DESPAWN_Y = -10f;
 
         [SerializeField] private string materialId;
 
@@ -23,6 +24,10 @@ namespace RestoreCastle3D
         private int _growthCount;
         private bool _continuousDrop;
         private bool _removalScheduled;
+        private int _initialChildCount;
+        private Vector3 _initialColliderCenter;
+        private Vector3 _initialColliderSize;
+        private Vector3 _initialScale;
 
         public string MaterialId => materialId;
         public Rigidbody Body => _body;
@@ -41,6 +46,13 @@ namespace RestoreCastle3D
         private void Awake()
         {
             _body = GetComponent<Rigidbody>();
+            _initialChildCount = transform.childCount;
+            _initialScale = transform.localScale;
+            if (TryGetComponent(out BoxCollider box))
+            {
+                _initialColliderCenter = box.center;
+                _initialColliderSize = box.size;
+            }
             _renderers = System.Array.FindAll(GetComponentsInChildren<Renderer>(true),
                 renderer => renderer.gameObject.name != "Penalty Range");
             SetOutlineLayer(0);
@@ -68,6 +80,8 @@ namespace RestoreCastle3D
             _game = game;
             PlacedTurn = turn;
             if (id != null) materialId = id;
+            _body.linearVelocity = Vector3.zero;
+            _body.angularVelocity = Vector3.zero;
         }
 
         /// <summary>자동 낙하 모드로 전환하여 기존 충돌 능력을 비활성화하고 중력을 켠다.</summary>
@@ -80,9 +94,76 @@ namespace RestoreCastle3D
 
         private void Update()
         {
+            if (transform.position.y < DESPAWN_Y)
+            {
+                Despawn();
+                return;
+            }
             if (!_continuousDrop || _removalScheduled || transform.position.z > DESPAWN_Z) return;
             _removalScheduled = true;
-            Destroy(gameObject, 1f);
+            StartCoroutine(ReturnContinuousDrop());
+        }
+
+        /// <summary>배치 기물은 게임의 추적 목록에서 제거하고 자동 낙하 기물은 리소스 풀로 반환한다.</summary>
+        public void Despawn()
+        {
+            if (_game != null) _game.RemovePiece(this);
+            else Managers.Resource.Destroy(gameObject);
+        }
+
+        /// <summary>하천을 벗어난 자동 낙하 기물을 1초 뒤 리소스 풀로 반환한다.</summary>
+        private IEnumerator ReturnContinuousDrop()
+        {
+            yield return new WaitForSeconds(1f);
+            Managers.Resource.Destroy(gameObject);
+        }
+
+        private void OnDisable()
+        {
+            StopAllCoroutines();
+            foreach (CastlePiece3D other in _attachedPieces)
+                if (other != null) other._attachedPieces.Remove(this);
+            foreach (CastlePiece3D other in _contacts)
+                if (other != null) other._contacts.Remove(this);
+            _attachedPieces.Clear();
+            _contacts.Clear();
+            _attachmentTarget = null;
+            foreach (FixedJoint joint in GetComponents<FixedJoint>())
+            {
+                joint.connectedBody = null;
+                Destroy(joint);
+            }
+            for (int i = transform.childCount - 1; i >= _initialChildCount; i--)
+            {
+                GameObject child = transform.GetChild(i).gameObject;
+                child.SetActive(false);
+                child.transform.SetParent(null);
+                Destroy(child);
+            }
+            if (TryGetComponent(out BoxCollider box))
+            {
+                box.center = _initialColliderCenter;
+                box.size = _initialColliderSize;
+            }
+            _game = null;
+            _fuseStarted = false;
+            _fusePending = false;
+            _growthCount = 0;
+            _continuousDrop = false;
+            _removalScheduled = false;
+            AbilitySuppressed = false;
+            PermanentBonus = 0;
+            RiverAnchored = false;
+            PlacedTurn = 0;
+            transform.localScale = _initialScale;
+            Transform penaltyRange = transform.Find("Penalty Range");
+            if (penaltyRange != null) penaltyRange.gameObject.SetActive(false);
+            SetOutlineLayer(0);
+            SetPenaltyOutline(false);
+            _body.isKinematic = false;
+            _body.useGravity = true;
+            _body.linearVelocity = Vector3.zero;
+            _body.angularVelocity = Vector3.zero;
         }
 
         private void OnCollisionEnter(Collision collision)

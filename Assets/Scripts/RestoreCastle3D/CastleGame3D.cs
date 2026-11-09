@@ -107,8 +107,9 @@ namespace RestoreCastle3D
             {
                 CastleMaterial3D material = _spawnMaterials[_random.Next(_spawnMaterials.Length)];
                 Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
-                GameObject prefab = Resources.Load<GameObject>("Prefabs/" + CastleCatalog3D.PrefabId(material.id));
-                GameObject instance = Instantiate(prefab, position, Quaternion.identity);
+                GameObject instance = Managers.Resource.Instantiate(
+                    "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
+                    position: position, rotation: Quaternion.identity);
                 instance.name = material.name;
                 instance.GetComponent<CastlePiece3D>().EnableContinuousDrop();
                 _nextSpawnTime += SPAWN_INTERVAL;
@@ -397,9 +398,8 @@ namespace RestoreCastle3D
                 events.AddComponent<EventSystem>();
                 events.AddComponent<InputSystemUIInputModule>();
             }
-            GameObject source = Resources.Load<GameObject>("Prefabs/UIs/RestoreCastleHud");
-            if (source == null) throw new InvalidOperationException("Missing original RestoreCastle HUD prefab.");
-            GameObject instance = Instantiate(source);
+            GameObject instance = Managers.Resource.Instantiate("Prefabs/UIs/RestoreCastleHud");
+            if (instance == null) throw new InvalidOperationException("Missing original RestoreCastle HUD prefab.");
             instance.name = "RestoreCastleHud";
             _hud = instance.AddComponent<CastleHud3D>();
             _hud.Initialize(this);
@@ -565,7 +565,7 @@ namespace RestoreCastle3D
             _stageTransitioning = false;
 
             foreach (CastlePiece3D piece in _pieces)
-                if (piece != null) Destroy(piece.gameObject);
+                if (piece != null) Managers.Resource.Destroy(piece.gameObject);
             _pieces.Clear();
             _pieceSet.Clear();
             _score.Clear();
@@ -598,9 +598,10 @@ namespace RestoreCastle3D
         /// <summary>Resources/Prefabs에서 3D 기물을 로드하고 Rigidbody를 통한 중력 낙하를 준비한다.</summary>
         private CastlePiece3D Spawn(CastleMaterial3D material, Vector3 position, bool anchored = false)
         {
-            GameObject prefab = Resources.Load<GameObject>("Prefabs/" + CastleCatalog3D.PrefabId(material.id));
-            if (prefab == null) throw new InvalidOperationException("Missing 3D prefab: " + material.id);
-            GameObject instance = Instantiate(prefab, position, Quaternion.Euler(0f, _objectYaw, 0f));
+            GameObject instance = Managers.Resource.Instantiate(
+                "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
+                position: position, rotation: Quaternion.Euler(0f, _objectYaw, 0f));
+            if (instance == null) throw new InvalidOperationException("Missing 3D prefab: " + material.id);
             instance.name = material.name;
             CastlePiece3D piece = instance.GetComponent<CastlePiece3D>();
             piece.Initialize(this, _turn, material.id);
@@ -924,7 +925,7 @@ namespace RestoreCastle3D
         }
 
         /// <summary>기물이 제거되면 덩쿨 FixedJoint로 연결된 모든 기물도 함께 제거한다.</summary>
-        private int RemovePiece(CastlePiece3D piece, CastleChangeKind reason = CastleChangeKind.Destroyed)
+        public int RemovePiece(CastlePiece3D piece, CastleChangeKind reason = CastleChangeKind.Destroyed)
         {
             if (piece == null || !_pieceSet.Contains(piece)) return 0;
 
@@ -941,7 +942,7 @@ namespace RestoreCastle3D
                 _score.Remove(current);
                 PublishChange(new CastleChange3D(current, piece, reason, 0,
                     current.transform.position));
-                Destroy(current.gameObject);
+                Managers.Resource.Destroy(current.gameObject);
             }
             _floodPreview.RequestRefresh();
             return connected.Count;

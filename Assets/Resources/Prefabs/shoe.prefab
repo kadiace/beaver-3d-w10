@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 796066410864894133}
   - component: {fileID: 1290001135600365228}
   - component: {fileID: 6717302640085555571}
+  - component: {fileID: 917098187024498333}
   m_Layer: 0
   m_Name: shoe
   m_TagString: Untagged
@@ -156,3 +157,15 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: 654eb91bf2a9f344e9741bcbccdd2e07, type: 2}
+--- !u!114 &917098187024498333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdf38c4058f44b70b973f3b6cb68020f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Poolable

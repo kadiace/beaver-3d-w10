@@ -19,10 +19,13 @@ public class PoolManager
                 Push(Create());
         }
 
-        public GameObject Pop(Transform parent)
+        /// <summary>풀의 기물을 지정된 부모 아래에 배치하고 위치를 맞춘 뒤 활성화한다.</summary>
+        public GameObject Pop(Transform parent, Vector3? position, Quaternion? rotation)
         {
             GameObject item = _items.Count > 0 ? _items.Pop() : Create();
-            item.transform.SetParent(parent, false);
+            item.transform.SetParent(parent != null ? parent : _root, false);
+            if (position.HasValue) item.transform.position = position.Value;
+            if (rotation.HasValue) item.transform.rotation = rotation.Value;
             item.SetActive(true);
             return item;
         }
@@ -59,7 +62,9 @@ public class PoolManager
         _root = root.transform;
     }
 
-    public GameObject Pop(string prefabPath, Transform parent = null, int preloadCount = 5)
+    /// <summary>프리팹 키의 풀에서 기물을 꺼내 지정된 위치에 활성화한다.</summary>
+    public GameObject Pop(string prefabPath, Transform parent = null, int preloadCount = 5,
+        Vector3? position = null, Quaternion? rotation = null)
     {
         if (!_pools.TryGetValue(prefabPath, out Pool pool))
         {
@@ -67,7 +72,7 @@ public class PoolManager
             pool = CreatePool(prefabPath, prefab, preloadCount);
         }
 
-        GameObject item = pool.Pop(parent);
+        GameObject item = pool.Pop(parent, position, rotation);
         _keys[item] = prefabPath;
         Poolable poolable = item.GetComponent<Poolable>();
         poolable.PoolKey = prefabPath;

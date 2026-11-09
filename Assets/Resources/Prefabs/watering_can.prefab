@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 7306050067174893105}
   - component: {fileID: 3830808554128995110}
   - component: {fileID: 1742655341179115222}
+  - component: {fileID: 3712261858300737500}
   m_Layer: 0
   m_Name: watering_can
   m_TagString: Untagged
@@ -156,3 +157,15 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: cc16be6a95b1baf4d8c35c22e8f835bb, type: 2}
+--- !u!114 &3712261858300737500
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdf38c4058f44b70b973f3b6cb68020f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Poolable
