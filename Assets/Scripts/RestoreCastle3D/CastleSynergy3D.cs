@@ -32,7 +32,32 @@ namespace RestoreCastle3D
             return group;
         }
 
-        public static Result Evaluate(List<CastlePiece3D> group, CastleCatalog3D catalog)
+        /// <summary>
+        /// Score a candidate group. Optional virtual endpoints let UI preview a hypothetical
+        /// new direct Joint without mutating live physics or attachment records.
+        /// </summary>
+        /// <summary>Delta of attaching a held single piece to a target and its existing component.</summary>
+        public static int PreviewAttachmentDelta(CastlePiece3D held,
+            CastlePiece3D target, CastleCatalog3D catalog)
+        {
+            if (held == null || target == null || held == target || catalog == null ||
+                held.IsSettling || target.IsSettling ||
+                !held.isActiveAndEnabled || !target.isActiveAndEnabled) return 0;
+
+            List<CastlePiece3D> component = Collect(target);
+            if (component.Contains(held) || component.Exists(p => p.IsSettling)) return 0;
+            int before = Evaluate(component, catalog).Total;
+            // Picked-up pieces are singletons in the current game mode.
+            List<CastlePiece3D> heldGroup = Collect(held);
+            before += Evaluate(heldGroup, catalog).Total;
+            var combined = new List<CastlePiece3D>(component);
+            foreach (CastlePiece3D p in heldGroup)
+                if (!combined.Contains(p)) combined.Add(p);
+            return Evaluate(combined, catalog, held, target).Total - before;
+        }
+
+        public static Result Evaluate(List<CastlePiece3D> group, CastleCatalog3D catalog,
+            CastlePiece3D virtualA = null, CastlePiece3D virtualB = null)
         {
             var result = new Result();
             if (group == null || group.Count < 2) return result;
@@ -46,6 +71,10 @@ namespace RestoreCastle3D
             {
                 var others = group.Where(p => p != piece).ToList();
                 var direct = piece.AttachedPieces.Where(p => p != null && others.Contains(p)).ToList();
+                CastlePiece3D virtualNeighbor = piece == virtualA ? virtualB :
+                    piece == virtualB ? virtualA : null;
+                if (virtualNeighbor != null && others.Contains(virtualNeighbor) &&
+                    !direct.Contains(virtualNeighbor)) direct.Add(virtualNeighbor);
                 int Other(string tag) => others.Count(p => Cat(p) == tag);
                 int Direct(string tag) => direct.Count(p => Cat(p) == tag);
                 bool OtherHas(string id) => others.Any(p => Id(p) == id);
