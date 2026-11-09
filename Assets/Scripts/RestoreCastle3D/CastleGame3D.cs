@@ -355,7 +355,7 @@ namespace RestoreCastle3D
                 RecalculateScores();
                 _nextHoverScoreRefresh = Time.unscaledTime + 0.2f;
             }
-            SetOutlineTargets(piece);
+            if (_spawnMaterials == null) SetOutlineTargets(piece);
             _hud?.SetHoveredPiece(piece, position);
             if (piece != null && piece.CanPickUp && mouse.leftButton.wasPressedThisFrame)
             {
@@ -367,7 +367,7 @@ namespace RestoreCastle3D
                     _holdOffset = Vector3.zero;
                 piece.PickUp();
                 if (_dropPreview == null) _dropPreview = new CastleDropPreview3D();
-                SetOutlineTargets(piece);
+                if (_spawnMaterials == null) SetOutlineTargets(piece);
             }
         }
 
