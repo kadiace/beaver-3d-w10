@@ -31,6 +31,7 @@ namespace RestoreCastle3D
         private Renderer[] _renderers;
         private bool _fuseStarted;
         private bool _fusePending;
+        private int _barrelArmSequence;
         private int _growthCount;
         private bool _continuousDrop;
         private bool _continuousBeforeSpring;
@@ -149,22 +150,27 @@ namespace RestoreCastle3D
         private void Update()
         {
             if (_settling) return;
+            // The scoring boundary wins over the Y fallback if both are crossed this frame.
+            if (transform.position.z <= DESPAWN_Z && !_removalScheduled && !_held)
+            {
+                if (CastleCreekScore3D.Active != null)
+                {
+                    CastleCreekScore3D.Active.Settle(this);
+                    return;
+                }
+                if (_continuousDrop)
+                {
+                    _removalScheduled = true;
+                    StartCoroutine(ReturnContinuousDrop());
+                    return;
+                }
+            }
             if (transform.position.y < DESPAWN_Y)
             {
                 if (CastleCreekScore3D.Active != null)
                     CastleCreekScore3D.Active.Discard(this);
                 else Despawn();
-                return;
             }
-            if (transform.position.z > DESPAWN_Z || _removalScheduled || _held) return;
-            if (CastleCreekScore3D.Active != null)
-            {
-                CastleCreekScore3D.Active.Settle(this);
-                return;
-            }
-            if (!_continuousDrop) return;
-            _removalScheduled = true;
-            StartCoroutine(ReturnContinuousDrop());
         }
 
         private void FixedUpdate()
@@ -241,6 +247,7 @@ namespace RestoreCastle3D
             _settling = false;
             _fuseStarted = false;
             _fusePending = false;
+            _barrelArmSequence = 0;
             _growthCount = 0;
             _continuousDrop = false;
             _continuousBeforeSpring = false;
@@ -343,8 +350,21 @@ namespace RestoreCastle3D
             _continuousDrop = _continuousBeforeSpring;
             _continuousBeforeSpring = false;
             SetOutlineLayer(0);
-            if (!_settling && !previous._settling)
-                CastleCreekScore3D.Active?.Refresh(this, previous);
+            if (CastleCreekScore3D.Active != null)
+            {
+                if (materialId == "barrel" && _attachedPieces.Count == 0)
+                {
+                    _barrelArmSequence++;
+                    _fuseStarted = false;
+                }
+                if (previous.materialId == "barrel" && previous._attachedPieces.Count == 0)
+                {
+                    previous._barrelArmSequence++;
+                    previous._fuseStarted = false;
+                }
+                if (!_settling && !previous._settling)
+                    CastleCreekScore3D.Active.Refresh(this, previous);
+            }
         }
 
         /// <summary>충돌한 두 기물을 양방향 접촉 그래프에 기록한다. 바닥 충돌은 제외한다.</summary>
@@ -464,12 +484,13 @@ namespace RestoreCastle3D
             if (materialId != "barrel" || _fuseStarted || _attachedPieces.Count == 0 ||
                 CastleCreekScore3D.Active == null) return;
             _fuseStarted = true;
-            StartCoroutine(DetonateCreekBarrel());
+            StartCoroutine(DetonateCreekBarrel(++_barrelArmSequence));
         }
 
-        private IEnumerator DetonateCreekBarrel()
+        private IEnumerator DetonateCreekBarrel(int sequence)
         {
             yield return new WaitForSeconds(1f);
+            if (sequence != _barrelArmSequence) yield break;
             if (!_settling && _attachedPieces.Count > 0)
                 CastleCreekScore3D.Active?.Detonate(this);
             else
