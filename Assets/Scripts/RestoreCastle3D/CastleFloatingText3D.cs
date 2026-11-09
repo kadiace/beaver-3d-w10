@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace RestoreCastle3D
 {
-    public enum CastleChangeKind { Durability, Destroyed, Flooded, EffectEnabled, EffectDisabled, Growth, Created, Resource, ScoreAward }
+    public enum CastleChangeKind { Durability, Destroyed, Flooded, EffectEnabled, EffectDisabled, Growth, Created, Resource, ScoreAward, Pollution }
 
     public readonly struct CastleChange3D
     {
@@ -116,12 +116,14 @@ namespace RestoreCastle3D
                     CastleChangeKind.Created => "생성!",
                     _ => "획득!"
                 });
-            entry.Color = change.Kind == CastleChangeKind.ScoreAward ?
+            entry.Color = change.Kind == CastleChangeKind.Pollution ?
+                new Color32(255, 67, 78, 255) : change.Kind == CastleChangeKind.ScoreAward ?
                 (change.Amount >= 0 ? effectColor : decreaseColor) :
                 numeric ? (change.Amount >= 0 ? increaseColor : decreaseColor) :
                 change.Kind == CastleChangeKind.Destroyed ? destructionColor :
                 change.Kind == CastleChangeKind.Flooded ? floodColor : effectColor;
-            entry.Text.fontSize = fontSize * (change.Kind == CastleChangeKind.ScoreAward ? 1.6f :
+            entry.Text.fontSize = fontSize * (change.Kind == CastleChangeKind.ScoreAward ||
+                change.Kind == CastleChangeKind.Pollution ? 1.6f :
                 change.Kind == CastleChangeKind.Destroyed ||
                 change.Kind == CastleChangeKind.Flooded ? 1.3f : 1f);
             entry.Text.transform.SetAsLastSibling();
@@ -160,7 +162,8 @@ namespace RestoreCastle3D
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screen, null,
                 out Vector2 local);
             entry.Text.rectTransform.anchoredPosition = local;
-            float pop = entry.Kind == CastleChangeKind.ScoreAward ? 0.8f :
+            float pop = entry.Kind == CastleChangeKind.ScoreAward ||
+                entry.Kind == CastleChangeKind.Pollution ? 0.8f :
                 entry.Kind == CastleChangeKind.Destroyed ? 0.55f : 0.22f;
             entry.Text.rectTransform.localScale = Vector3.one * (1f + pop *
                 (1f - Mathf.Clamp01(progress * 6f)));

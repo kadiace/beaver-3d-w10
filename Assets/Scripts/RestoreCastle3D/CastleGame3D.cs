@@ -23,6 +23,7 @@ namespace RestoreCastle3D
         private const float CAMERA_MAX_TARGET_Z = 30f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float SPAWN_INTERVAL = 1f;
+        private float CreekSpawnInterval => CastleCreekScore3D.Active?.CreekSpawnInterval ?? SPAWN_INTERVAL;
         private static readonly string[] CreekCategories = { "석재", "목재", "식물", "잡동사니", "쓰레기" };
         private static readonly int[] CreekCategoryWeights = { 2, 2, 2, 3, 1 };
         private static readonly string[] CreekRarities = { "일반", "고급", "희귀" };
@@ -105,7 +106,7 @@ namespace RestoreCastle3D
             _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly).ToArray();
             _random = new System.Random(Environment.TickCount);
             BuildCreekSpawnTable();
-            _nextSpawnTime = Time.time + SPAWN_INTERVAL;
+            _nextSpawnTime = Time.time + CreekSpawnInterval;
             ConfigureScene();
             gameObject.AddComponent<CastleCreekScore3D>().Initialize(_camera, _catalog);
         }
@@ -185,6 +186,8 @@ namespace RestoreCastle3D
 
         private void Update()
         {
+            if (_spawnMaterials != null && CastleCreekScore3D.Active != null &&
+                CastleCreekScore3D.Active.IsRunPaused) return;
             UpdateCameraInput();
             UpdateHeldPiece();
             if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
@@ -201,7 +204,7 @@ namespace RestoreCastle3D
                 spawned.EnableContinuousDrop();
                 CastleCreekScore3D.Active.Register(spawned);
 
-                _nextSpawnTime += SPAWN_INTERVAL;
+                _nextSpawnTime += CreekSpawnInterval;
             }
             if (_spawnMaterials != null)
             {
@@ -267,6 +270,19 @@ namespace RestoreCastle3D
             HideDropPreview();
             StartCoroutine(DropAndResolve(_offers[_selected],
                 new Vector3(placement.x, dropHeight, placement.z)));
+        }
+
+        /// <summary>Release Creek dragging before pausing for stage results.</summary>
+        public void SuspendCreekInput()
+        {
+            if (_heldPiece != null)
+            {
+                _heldPiece.Throw();
+                _heldPiece = null;
+            }
+            CastleCreekScore3D.Active?.SetHeldPiece(null);
+            _dropPreview?.Hide();
+            if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
         }
 
         /// <summary>Esc 또는 우클릭으로 현재 라운드의 고정 후보를 다시 연다.</summary>
