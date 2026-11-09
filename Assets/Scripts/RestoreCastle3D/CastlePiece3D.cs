@@ -221,8 +221,9 @@ namespace RestoreCastle3D
 
         private void Update()
         {
-            if (_settling || (CastleCreekScore3D.Active != null &&
-                CastleCreekScore3D.Active.IsRunPaused)) return;
+            if (_settling || (_magnetRoot != null && _magnetRoot._held) ||
+                (CastleCreekScore3D.Active != null &&
+                 CastleCreekScore3D.Active.IsRunPaused)) return;
             // The scoring boundary wins over the Y fallback if both are crossed this frame.
             if (transform.position.z <= DESPAWN_Z && !_removalScheduled && !_held)
             {

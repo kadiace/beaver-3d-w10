@@ -514,6 +514,12 @@ namespace RestoreCastle3D
                 if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
                 return;
             }
+            if (_spawnMaterials != null)
+            {
+                _dropPreview.Hide();
+                if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
+                return;
+            }
             _dropPreview.ShowHeld(_catalog.Get(_heldPiece.MaterialId), _heldPiece, canDrop);
             if (!_dropPreview.IsVisible) return;
             if (_heldGuide == null) CreateHeldGuide();
