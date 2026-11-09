@@ -285,7 +285,11 @@ namespace RestoreCastle3D
                     if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f)
                         continue;
                     int delta = CastleSynergy3D.PreviewAttachmentDelta(_heldPiece, candidate, _catalog);
-                    if (delta != 0) _previewCandidates[candidate] = delta;
+                    // Multi-piece abilities still deserve an outline if the first link
+                    // is a prerequisite but does not yet award points.
+                    if (delta != 0 ||
+                        CastleSynergy3D.HasPotentialTagSynergy(_heldPiece, candidate, _catalog))
+                        _previewCandidates[candidate] = delta;
                 }
             }
             ClearOutlines();
