@@ -57,7 +57,7 @@ namespace RestoreCastle3D
         }
 
         /// <summary>잡은 기물의 바로 아래에서 -Y로 탐색해 자기 충돌체를 제외한 착지 고스트를 표시한다.</summary>
-        public void ShowHeld(CastleMaterial3D info, CastlePiece3D held)
+        public void ShowHeld(CastleMaterial3D info, CastlePiece3D held, bool canDrop)
         {
             if (_instance == null || _materialId != info.id) Rebuild(info);
             if (_instance == null) return;
@@ -84,7 +84,7 @@ namespace RestoreCastle3D
             _instance.transform.SetPositionAndRotation(
                 new Vector3(position.x, surfaceY - _colliderBottomY + VisualOffset, position.z),
                 held.transform.rotation);
-            SetTint(true);
+            SetTint(canDrop);
             if (!_instance.activeSelf) _instance.SetActive(true);
         }
 

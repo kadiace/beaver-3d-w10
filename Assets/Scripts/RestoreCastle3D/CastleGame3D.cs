@@ -21,6 +21,10 @@ namespace RestoreCastle3D
         private const float CAMERA_MAX_POSITION_X = 2f;
         private const float CAMERA_MIN_TARGET_Z = -15f;
         private const float CAMERA_MAX_TARGET_Z = 30f;
+        private const float HELD_MIN_X = -12f;
+        private const float HELD_MAX_X = 12f;
+        private const float HELD_MIN_Z = -15f;
+        private const float HELD_MAX_Z = 45f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float SPAWN_INTERVAL = 1f;
         private float CreekSpawnInterval => CastleCreekScore3D.Active?.CreekSpawnInterval ?? SPAWN_INTERVAL;
@@ -31,6 +35,8 @@ namespace RestoreCastle3D
 
         private static readonly float _livingTreeScalePerGrowth =
             1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
+        private static readonly Color _heldGuideValidColor = new Color(0.33f, 0.96f, 0.92f, 0.86f);
+        private static readonly Color _heldGuideInvalidColor = new Color(1f, 0.18f, 0.18f, 0.86f);
 
         [Header("3D drop")]
         [SerializeField, Min(2f)] private float dropHeight = 7f;
@@ -472,7 +478,16 @@ namespace RestoreCastle3D
         {
             if (_heldPiece == null) return;
             Mouse mouse = Mouse.current;
-            if (mouse == null || !mouse.leftButton.isPressed)
+            if (mouse == null) return;
+            Vector2 screen = mouse.position.ReadValue();
+            bool hasCursor = TryGetCursorXZ(screen, out Vector3 cursor);
+            if (hasCursor)
+                _heldPiece.MoveHeld(new Vector3(cursor.x + _holdOffset.x, _heldHeight,
+                    cursor.z + _holdOffset.z));
+            Vector3 heldPosition = _heldPiece.transform.position;
+            bool canDrop = hasCursor && heldPosition.x >= HELD_MIN_X && heldPosition.x <= HELD_MAX_X &&
+                heldPosition.z >= HELD_MIN_Z && heldPosition.z <= HELD_MAX_Z;
+            if (mouse.leftButton.wasReleasedThisFrame && canDrop)
             {
                 _heldPiece.Throw();
                 _heldPiece = null;
@@ -482,13 +497,10 @@ namespace RestoreCastle3D
                 if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
                 return;
             }
-            Vector2 screen = mouse.position.ReadValue();
-            if (TryGetCursorXZ(screen, out Vector3 cursor))
-                _heldPiece.MoveHeld(new Vector3(cursor.x + _holdOffset.x, _heldHeight,
-                    cursor.z + _holdOffset.z));
-            _dropPreview.ShowHeld(_catalog.Get(_heldPiece.MaterialId), _heldPiece);
+            _dropPreview.ShowHeld(_catalog.Get(_heldPiece.MaterialId), _heldPiece, canDrop);
             if (!_dropPreview.IsVisible) return;
             if (_heldGuide == null) CreateHeldGuide();
+            _heldGuide.color = canDrop ? _heldGuideValidColor : _heldGuideInvalidColor;
             Vector3 start = _camera.WorldToScreenPoint(_heldPiece.transform.position);
             Vector3 end = _camera.WorldToScreenPoint(_dropPreview.LandingPosition);
             _heldGuide.gameObject.SetActive(start.z > 0f && end.z > 0f);
@@ -511,7 +523,7 @@ namespace RestoreCastle3D
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             _heldGuide = guide.GetComponent<CastleDropGuideGraphic3D>();
-            _heldGuide.color = new Color(0.33f, 0.96f, 0.92f, 0.86f);
+            _heldGuide.color = _heldGuideValidColor;
             _heldGuide.raycastTarget = false;
         }
 
