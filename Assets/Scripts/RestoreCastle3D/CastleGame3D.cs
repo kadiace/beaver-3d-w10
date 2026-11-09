@@ -97,7 +97,6 @@ namespace RestoreCastle3D
         private CastleMaterial3D[] _spawnMaterials;
         private CastleMaterial3D[][] _creekSpawnCells;
         private double[] _creekSpawnWeights;
-        private bool _loggedMudSpawn;
         private float _nextSpawnTime;
         private Vector2 _rightDragDisplacement;
         private bool _rightGestureActive;
@@ -166,21 +165,7 @@ namespace RestoreCastle3D
                 }
             }
 
-            // Visibility investigation: mud is common odds-and-ends, not spawnOnly/startOnly.
-            int mudCell = Array.FindIndex(_creekSpawnCells,
-                cell => cell.Any(material => material.id == "mud"));
-            GameObject mudPrefab = Resources.Load<GameObject>("Prefabs/mud");
-            if (mudCell < 0 || mudPrefab == null || mudPrefab.GetComponent<CastlePiece3D>() == null ||
-                mudPrefab.GetComponentInChildren<Renderer>(true) == null)
-                Debug.LogError("[Creek Spawn] 진흙(mud)이 스폰 데이터/프리팹에서 누락되었습니다.");
-            else
-            {
-                double chance = _creekSpawnWeights[mudCell] / _creekSpawnCells[mudCell].Length;
-                Debug.Log($"[Creek Spawn] 진흙 스폰 가능, 예상 확률 {chance:P2}.");
-            }
-        }
-
-        private CastleMaterial3D ChooseCreekMaterial()
+            // Visibility investigatioial3D ChooseCreekMaterial()
         {
             double roll = _random.NextDouble() * _creekSpawnWeights.Sum();
             for (int i = 0; i < _creekSpawnWeights.Length; i++)
@@ -216,11 +201,7 @@ namespace RestoreCastle3D
                 CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
                 spawned.EnableContinuousDrop();
                 CastleCreekScore3D.Active.Register(spawned);
-                if (material.id == "mud" && !_loggedMudSpawn)
-                {
-                    _loggedMudSpawn = true;
-                    Debug.Log($"[Creek Spawn] 첫 진흙 스폰 위치: {spawned.transform.position}");
-                }
+
                 _nextSpawnTime += SPAWN_INTERVAL;
             }
             if (_spawnMaterials != null)
