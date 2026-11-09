@@ -115,7 +115,9 @@ namespace RestoreCastle3D
                 Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
                 GameObject instance = Managers.Resource.Instantiate(
                     "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
-                    position: position, rotation: Quaternion.identity);
+                    position: position, rotation: material.id == "vine" ||
+                        material.id == "growing_vine" || material.id == "sunflower"
+                        ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity);
                 instance.name = material.name;
                 instance.GetComponent<CastlePiece3D>().EnableContinuousDrop();
                 _nextSpawnTime += SPAWN_INTERVAL;
@@ -676,7 +678,9 @@ namespace RestoreCastle3D
         {
             GameObject instance = Managers.Resource.Instantiate(
                 "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
-                position: position, rotation: Quaternion.Euler(0f, _objectYaw, 0f));
+                position: position, rotation: Quaternion.Euler(0f, _objectYaw, 0f) *
+                    (material.id == "vine" || material.id == "growing_vine" || material.id == "sunflower"
+                        ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity));
             if (instance == null) throw new InvalidOperationException("Missing 3D prefab: " + material.id);
             instance.name = material.name;
             CastlePiece3D piece = instance.GetComponent<CastlePiece3D>();

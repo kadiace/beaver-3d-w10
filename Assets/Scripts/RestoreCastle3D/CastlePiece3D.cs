@@ -8,15 +8,17 @@ namespace RestoreCastle3D
     public sealed class CastlePiece3D : MonoBehaviour
     {
         private const float CREEK_SPEED = 3f;
-        private const float SPRING_BREAK_FORCE = 1200f;
-        private const float SPRING_BREAK_TORQUE = 600f;
+        private const float SPRING_STRENGTH = 10000f;
+        private const float SPRING_DAMPER = 500f;
+        private const float SPRING_DISTANCE = 0f;
+        private const float SPRING_TOLERANCE = 0f;
+        private const float SPRING_BREAK_FORCE = 10000f;
+        private const float SPRING_BREAK_TORQUE = 10000f;
+        private const float SPRING_BREAK_DISTANCE = 0.08f;
         private const float DESPAWN_Z = -15f;
         private const float DESPAWN_Y = -10f;
 
         [SerializeField] private string materialId;
-
-        [Header("Spring attachment")]
-        [SerializeField, Min(0f)] private float springBreakDistance = 3f;
 
         private readonly HashSet<CastlePiece3D> _contacts = new HashSet<CastlePiece3D>();
         private readonly HashSet<CastlePiece3D> _attachedPieces = new HashSet<CastlePiece3D>();
@@ -354,15 +356,17 @@ namespace RestoreCastle3D
             joint.autoConfigureConnectedAnchor = false;
             joint.anchor = other.transform.InverseTransformPoint(collision.GetContact(0).point);
             joint.connectedAnchor = transform.InverseTransformPoint(collision.GetContact(0).point);
-            joint.spring = 300f;
-            joint.damper = 25f;
-            joint.minDistance = 0f;
-            joint.maxDistance = 0f;
+            joint.spring = SPRING_STRENGTH;
+            joint.damper = SPRING_DAMPER;
+            joint.minDistance = SPRING_DISTANCE;
+            joint.maxDistance = SPRING_DISTANCE;
+            joint.tolerance = SPRING_TOLERANCE;
             joint.breakForce = SPRING_BREAK_FORCE;
             joint.breakTorque = SPRING_BREAK_TORQUE;
+            joint.enableCollision = true;
             other._springTarget = this;
             other._springJoint = joint;
-            other._springDistanceLimit = springBreakDistance;
+            other._springDistanceLimit = SPRING_BREAK_DISTANCE;
             _attachedPieces.Add(other);
             other._attachedPieces.Add(this);
             other.MarkAttachmentGroupThrown();
