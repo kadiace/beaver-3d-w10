@@ -25,8 +25,7 @@ namespace RestoreCastle3D
         private Text _target;
         private Text _rerollStat;
         private Text _rerollAction;
-        private Text _detail;
-        private Text _effects;
+       private Text _effects;
         private Text _stageTitle;
         private Text _stageBody;
         private Text _completeBody;
@@ -65,8 +64,7 @@ namespace RestoreCastle3D
             _durability = FindText("TopBar/DurabilityStat/Value");
             _target = FindText("TopBar/TargetStat/Value");
             _rerollStat = FindText("TopBar/RerollStat/Label");
-            _detail = FindText("PlacementDetailPanel/DetailText");
-            _effects = FindText("ActiveEffectsPanel/Hint");
+           _effects = FindText("ActiveEffectsPanel/Hint");
             _stagePopup = transform.Find("StageResultPopup").gameObject;
             _stageTitle = FindText("StageResultPopup/Heading/TitleText");
             _stageBody = FindText("StageResultPopup/Contents/BodyText");
@@ -252,8 +250,7 @@ Esc 또는 짧은 우클릭: 선택 취소 후 후보 목록 열기
             }
             _rerollButton.interactable = _game.CanReroll && _game.RerollCount > 0;
             _topRerollButton.interactable = _rerollButton.interactable;
-            _detail.text = _game.StatusMessage ?? "";
-            if (_hoveredPiece != null && !_game.IsPlacedPiece(_hoveredPiece))
+           if (_hoveredPiece != null && !_game.IsPlacedPiece(_hoveredPiece))
             {
                 _hoveredPiece = null;
                 if (_hoveredCard < 0) _tooltip.SetActive(false);
