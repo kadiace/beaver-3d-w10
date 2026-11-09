@@ -15,9 +15,11 @@ public class SceneManagerEx
         Load(CurrentScene);
     }
 
+    /// <summary>기존 매니저 상태와 풀 오브젝트를 정리한 뒤 지정한 씬을 로드한다.</summary>
     public void Load(Scene scene)
     {
         PendingScene = scene;
+        Managers.Clear();
         SceneManager.LoadScene(ToSceneName(scene));
     }
 
