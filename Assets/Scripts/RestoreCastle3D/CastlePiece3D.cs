@@ -69,7 +69,7 @@ namespace RestoreCastle3D
                 Time.time < _attachBlockedUntil || Time.time < other._attachBlockedUntil ||
                 _attachedPieces.Count != 0) return false;
             return (!other._thrown && other._attachedPieces.Count == 0) ||
-                (materialId == "barrel" && other._thrown && other._attachedPieces.Count != 0);
+                (other._thrown && other._attachedPieces.Count != 0 && _springTarget == null);
         }
         public bool IsSettling => _settling;
         /// <summary>Finalize scoring, but keep physics and joints intact for the cliff fall.</summary>
@@ -428,11 +428,11 @@ namespace RestoreCastle3D
             if (other == null || other == this || other._settling ||
                 Time.time < other._attachBlockedUntil || _attachedPieces.Contains(other)) return;
 
-            // A thrown barrel can also join an already attached group, then split the whole group.
-            bool barrelJoinsGroup = materialId == "barrel" && other._thrown &&
-                other._attachedPieces.Count != 0 && _springTarget == null &&
-                _attachedPieces.Count == 0;
-            if (barrelJoinsGroup)
+            // A newly thrown piece can join any existing attached chunk, not only a barrel.
+            // Add one Joint to the collided member: the entire connected graph becomes one chunk.
+            bool joinsExistingChunk = other._thrown && other._attachedPieces.Count != 0 &&
+                _springTarget == null && _attachedPieces.Count == 0;
+            if (joinsExistingChunk)
             {
                 SpringJoint link = gameObject.AddComponent<SpringJoint>();
                 link.connectedBody = other.Body;
@@ -447,6 +447,7 @@ namespace RestoreCastle3D
                 other._attachedPieces.Add(this);
                 CastleCreekScore3D.Active?.Refresh(this, other);
                 TryArmBarrel();
+                other.TryArmBarrel();
                 return;
             }
             if (other._thrown || other._attachedPieces.Count != 0) return;

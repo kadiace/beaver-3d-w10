@@ -13,6 +13,8 @@ internal static class CreekSynergySmokeTests
             "materialId", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo NeighborsField = typeof(CastlePiece3D).GetField(
             "_attachedPieces", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo ThrownField = typeof(CastlePiece3D).GetField(
+            "_thrown", BindingFlags.Instance | BindingFlags.NonPublic);
         private readonly List<GameObject> _created = new List<GameObject>();
         private readonly CastleCatalog3D _catalog = new CastleCatalog3D();
 
@@ -31,6 +33,8 @@ internal static class CreekSynergySmokeTests
             ((HashSet<CastlePiece3D>)NeighborsField.GetValue(a)).Add(b);
             ((HashSet<CastlePiece3D>)NeighborsField.GetValue(b)).Add(a);
         }
+
+        public void MarkThrown(CastlePiece3D piece) => ThrownField.SetValue(piece, true);
 
         public int Score(CastlePiece3D any)
         {
@@ -145,7 +149,33 @@ internal static class CreekSynergySmokeTests
             piece.gameObject.SetActive(false);
             return locked && !piece.IsSettling ? 1 : 0;
         }, ref passed);
-        Debug.Log("Creek synergy smoke tests passed: " + passed + "/14");
+        Check("New dropped piece can target an already attached chunk root", 1, f =>
+        {
+            var root = f.Make("pebble");
+            var attached = f.Make("pebble");
+            var dropped = f.Make("pebble");
+            f.Link(root, attached);
+            f.MarkThrown(root);
+            f.MarkThrown(attached);
+            return dropped.CanAttachWhenThrownTo(root) ? 1 : 0;
+        }, ref passed);
+        Check("Dropping onto an existing chunk member merges the whole score group", 6, f =>
+        {
+            var root = f.Make("pebble");
+            var attached = f.Make("pebble");
+            var dropped = f.Make("pebble");
+            f.Link(root, attached);
+            f.MarkThrown(root);
+            f.MarkThrown(attached);
+            if (!dropped.CanAttachWhenThrownTo(attached))
+                throw new Exception("Existing chunk member rejected new dropped piece");
+            f.Link(dropped, attached);
+            if (CastleSynergy3D.Collect(root).Count != 3 ||
+                dropped.CanAttachWhenThrownTo(root))
+                throw new Exception("Joined graph has missing members or duplicate eligibility");
+            return f.Score(root);
+        }, ref passed);
+        Debug.Log("Creek synergy smoke tests passed: " + passed + "/16");
     }
 
     private static void Check(string name, int expected, Func<Fixture, int> scenario, ref int passed)
