@@ -7,6 +7,9 @@ namespace RestoreCastle3D
     [RequireComponent(typeof(Rigidbody))]
     public sealed class CastlePiece3D : MonoBehaviour
     {
+        private const float CREEK_SPEED = 10f;
+        private const float DESPAWN_Z = -15f;
+
         [SerializeField] private string materialId;
 
         private readonly HashSet<CastlePiece3D> _contacts = new HashSet<CastlePiece3D>();
@@ -18,6 +21,8 @@ namespace RestoreCastle3D
         private bool _fuseStarted;
         private bool _fusePending;
         private int _growthCount;
+        private bool _continuousDrop;
+        private bool _removalScheduled;
 
         public string MaterialId => materialId;
         public Rigidbody Body => _body;
@@ -65,8 +70,24 @@ namespace RestoreCastle3D
             if (id != null) materialId = id;
         }
 
+        /// <summary>자동 낙하 모드로 전환하여 기존 충돌 능력을 비활성화하고 중력을 켠다.</summary>
+        public void EnableContinuousDrop()
+        {
+            _continuousDrop = true;
+            _body.isKinematic = false;
+            _body.useGravity = true;
+        }
+
+        private void Update()
+        {
+            if (!_continuousDrop || _removalScheduled || transform.position.z > DESPAWN_Z) return;
+            _removalScheduled = true;
+            Destroy(gameObject, 1f);
+        }
+
         private void OnCollisionEnter(Collision collision)
         {
+            if (_continuousDrop) return;
             Register(collision);
             TryAnchorToRiver(collision);
             if (materialId == "barrel" && !_game.IsAbilityDisabled(this)
@@ -80,6 +101,16 @@ namespace RestoreCastle3D
 
         private void OnCollisionStay(Collision collision)
         {
+            if (_continuousDrop)
+            {
+                if (collision.gameObject.name == "Flat Muddy Creek Bed" ||
+                    collision.gameObject.name == "Upper Flat Muddy Creek Bed")
+                {
+                    Vector3 velocity = _body.linearVelocity;
+                    _body.linearVelocity = new Vector3(0f, velocity.y, -CREEK_SPEED);
+                }
+                return;
+            }
             Register(collision);
             TryAnchorToRiver(collision);
         }
@@ -101,6 +132,7 @@ namespace RestoreCastle3D
 
         private void OnCollisionExit(Collision collision)
         {
+            if (_continuousDrop) return;
             CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
             if (other == null || other == this) return;
             _contacts.Remove(other);

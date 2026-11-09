@@ -20,6 +20,7 @@ namespace RestoreCastle3D
         private const float CAMERA_EDGE_MARGIN = 3f;
         private const float CAMERA_MOVEMENT_RANGE_MULTIPLIER = 1.2f;
         private const float CAMERA_MOVEMENT_REFERENCE_SIZE = 7f;
+        private const float SPAWN_INTERVAL = 0.1f;
 
         private static readonly float _livingTreeScalePerGrowth =
             1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
@@ -83,22 +84,31 @@ namespace RestoreCastle3D
         private bool _finished;
         private bool _stagePassed;
         private string _status;
+        private CastleMaterial3D[] _spawnMaterials;
+        private float _nextSpawnTime;
 
         private void Start()
         {
-            _sceneContext = GetComponent<GameSceneContext>();
             _catalog = new CastleCatalog3D();
-            ConfigureScene();
-            CreateHud();
-            _dropPreview = new CastleDropPreview3D();
-            _floodEffect = new CastleFloodEffect3D();
-            _floodPreview = _camera.GetComponent<CastleFloodPreview3D>();
-            _floodPreview.Initialize(this, _floodEffect);
-            ResetGame();
+            _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly).ToArray();
+            _random = new System.Random(Environment.TickCount);
+            _nextSpawnTime = Time.time + SPAWN_INTERVAL;
         }
 
         private void Update()
         {
+            if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
+            {
+                CastleMaterial3D material = _spawnMaterials[_random.Next(_spawnMaterials.Length)];
+                Vector3 position = new Vector3(UnityEngine.Random.Range(-12f, 12f), 30f, 45f);
+                GameObject prefab = Resources.Load<GameObject>("Prefabs/" + CastleCatalog3D.PrefabId(material.id));
+                GameObject instance = Instantiate(prefab, position, Quaternion.identity);
+                instance.name = material.name;
+                instance.GetComponent<CastlePiece3D>().EnableContinuousDrop();
+                _nextSpawnTime += SPAWN_INTERVAL;
+            }
+            if (_spawnMaterials != null) return;
+
             if (_catalog == null) return;
             Mouse mouse = Mouse.current;
             // Track releases even while the fifth drop is finishing or a popup is open.
