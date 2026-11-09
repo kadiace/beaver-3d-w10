@@ -41,6 +41,8 @@ namespace RestoreCastle3D
         private bool _removalScheduled;
         private float _attachBlockedUntil;
         private bool _settling;
+        private bool _originalDetectCollisions;
+        private readonly Dictionary<Collider, bool> _settlementColliders = new Dictionary<Collider, bool>();
         private int _initialChildCount;
         private Vector3 _initialColliderCenter;
         private Vector3 _initialColliderSize;
@@ -58,16 +60,38 @@ namespace RestoreCastle3D
         public int PlacedTurn { get; private set; }
         public int PermanentBonus { get; set; }
         public int GrowthCount { get => _growthCount; set => _growthCount = value; }
-        public bool CanPickUp => !_thrown && !_body.isKinematic && _attachedPieces.Count == 0;
+        public bool CanPickUp => !_settling && !_thrown && !_body.isKinematic && _attachedPieces.Count == 0;
         public bool WasThrown => _thrown;
         public bool IsSettling => _settling;
-        public void MarkSettling() { _settling = true; _removalScheduled = true; }
+        /// <summary>Lock an awarded group in place until its delayed pool return.</summary>
+        public void MarkSettling()
+        {
+            if (_settling) return;
+            _settling = true;
+            _removalScheduled = true;
+            StopAllCoroutines();
+            _held = false;
+            _body.linearVelocity = Vector3.zero;
+            _body.angularVelocity = Vector3.zero;
+            _body.useGravity = false;
+            _body.isKinematic = true;
+            _body.detectCollisions = false;
+            _settlementColliders.Clear();
+            foreach (Collider collider in GetComponentsInChildren<Collider>(true))
+            {
+                _settlementColliders[collider] = collider.enabled;
+                collider.enabled = false;
+            }
+            SetOutlineLayer(0);
+            SetPenaltyOutline(false);
+        }
         public void BlockReattachment(float seconds) =>
             _attachBlockedUntil = Mathf.Max(_attachBlockedUntil, Time.time + seconds);
 
         private void Awake()
         {
             _body = GetComponent<Rigidbody>();
+            _originalDetectCollisions = _body.detectCollisions;
             _initialChildCount = transform.childCount;
             _initialScale = transform.localScale;
             if (TryGetComponent(out BoxCollider box))
@@ -85,7 +109,8 @@ namespace RestoreCastle3D
         {
             foreach (Renderer renderer in _renderers)
                 renderer.renderingLayerMask = (renderer.renderingLayerMask & ~30u) |
-                    (layer != 0 ? layer : _springTarget != null ? 16u : _throwOrigin ? 4u : 0u);
+                    (_settling ? 0u :
+                     layer != 0 ? layer : _springTarget != null ? 16u : _throwOrigin ? 4u : 0u);
         }
 
         /// <summary>드랍 가이드의 폐기물 디메리트 대상 여부에 따라 빨간 외곽선 레이어를 켜거나 끈다.</summary>
@@ -175,6 +200,7 @@ namespace RestoreCastle3D
 
         private void FixedUpdate()
         {
+            if (_settling) return;
             if (_springJoint == null || _springTarget == null || _springDistanceLimit <= 0f) return;
             Vector3 anchor = transform.TransformPoint(_springJoint.anchor);
             Vector3 connectedAnchor = _springTarget.transform.TransformPoint(_springJoint.connectedAnchor);
@@ -242,6 +268,10 @@ namespace RestoreCastle3D
                 box.size = _initialColliderSize;
             }
             CastleCreekScore3D.Active?.Unregister(this);
+            foreach (var pair in _settlementColliders)
+                if (pair.Key != null) pair.Key.enabled = pair.Value;
+            _settlementColliders.Clear();
+            _body.detectCollisions = _originalDetectCollisions;
             _game = null;
             _attachBlockedUntil = 0f;
             _settling = false;
@@ -271,7 +301,7 @@ namespace RestoreCastle3D
 
         private void OnCollisionEnter(Collision collision)
         {
-            if (_continuousDrop) return;
+            if (_settling || _continuousDrop) return;
             AttachThrownPiece(collision);
             Register(collision);
             if (CastleCreekScore3D.Active == null && materialId == "barrel" &&
@@ -285,6 +315,7 @@ namespace RestoreCastle3D
 
         private void OnCollisionStay(Collision collision)
         {
+            if (_settling) return;
             if ((_continuousDrop || _thrown) &&
                 (collision.gameObject.name == "Flat Muddy Creek Bed" ||
                  collision.gameObject.name == "Upper Flat Muddy Creek Bed") && !_body.isKinematic)
@@ -301,6 +332,7 @@ namespace RestoreCastle3D
         {
             CastlePiece3D origin = _springTarget != null ? _springTarget : this;
             Vector3 velocity = origin._body.linearVelocity;
+            if (origin._settling) return;
             if (!origin._body.isKinematic)
                 origin._body.linearVelocity = new Vector3(0f, velocity.y, -CREEK_SPEED);
 
@@ -315,7 +347,7 @@ namespace RestoreCastle3D
 
         private void OnCollisionExit(Collision collision)
         {
-            if (_continuousDrop) return;
+            if (_settling || _continuousDrop) return;
             CastlePiece3D other = collision.collider.GetComponentInParent<CastlePiece3D>();
             if (other == null || other == this) return;
             _contacts.Remove(other);
@@ -334,6 +366,7 @@ namespace RestoreCastle3D
 
         private void OnJointBreak(float breakForce)
         {
+            if (_settling) return;
             RemoveSpringAttachment();
         }
 
