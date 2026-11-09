@@ -18,7 +18,7 @@ namespace RestoreCastle3D
         private const float FLOOD_DEPTH_INCREASE_PER_STAGE = 0.5f;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
-        private const float CAMERA_MIN_TARGET_Z = -5f;
+        private const float CAMERA_MIN_TARGET_Z = -15f;
         private const float CAMERA_MAX_TARGET_Z = 15f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float BOUNDARY_DESTRUCTION_DELAY = 1f;
