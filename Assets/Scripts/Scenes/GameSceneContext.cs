@@ -12,6 +12,13 @@ public class GameSceneContext : MonoBehaviour
     [Header("Flood")]
     [SerializeField] private float _floodSurfaceY = -1.75f;
 
+    [Header("Creek campaign")]
+    [SerializeField, Min(1f)] private float _creekStageSeconds = 30f;
+    [SerializeField] private int[] _creekStageTargets = { 20, 40, 60, 80, 100 };
+
+    public float CreekStageSeconds => _creekStageSeconds;
+    public int[] CreekStageTargets => _creekStageTargets;
+
     /// <summary>Inspector에서 설정한 스테이지 공통 홍수 수면의 월드 Y 좌표를 반환한다.</summary>
     public float FloodSurfaceY => _floodSurfaceY;
 

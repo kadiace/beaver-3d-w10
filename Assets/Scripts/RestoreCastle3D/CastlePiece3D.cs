@@ -33,6 +33,9 @@ namespace RestoreCastle3D
         private CastleGame3D _game;
         private Rigidbody _body;
         private Renderer[] _renderers;
+        private bool _persistentTrashOutline;
+        private bool _penaltyOutline;
+        private uint _requestedOutlineLayer;
         private bool _fuseStarted;
         private bool _fusePending;
         private int _growthCount;
@@ -108,23 +111,28 @@ namespace RestoreCastle3D
             SetOutlineLayer(0);
         }
 
-        /// <summary>자식 렌더러의 외곽선 레이어만 교체하고 기본 렌더링 레이어는 보존한다.</summary>
-        public void SetOutlineLayer(uint layer)
+        /// <summary>Trash keeps a red outline even when hovered or dragged.</summary>
+        public void SetPersistentTrashOutline(bool enabled)
         {
-            foreach (Renderer renderer in _renderers)
-                renderer.renderingLayerMask = (renderer.renderingLayerMask & ~30u) |
-                    (_settling ? 0u :
-                     layer != 0 ? layer : _springTarget != null ? 16u : _throwOrigin ? 4u : 0u);
+            _persistentTrashOutline = enabled;
+            SetOutlineLayer(_requestedOutlineLayer);
         }
 
-        /// <summary>드랍 가이드의 폐기물 디메리트 대상 여부에 따라 빨간 외곽선 레이어를 켜거나 끈다.</summary>
+        /// <summary>Preserve base rendering layers and prioritize red trash outlines.</summary>
+        public void SetOutlineLayer(uint layer)
+        {
+            _requestedOutlineLayer = layer;
+            uint outline = _settling ? 0u :
+                _persistentTrashOutline || _penaltyOutline ? 8u :
+                layer != 0 ? layer : _springTarget != null ? 16u : _throwOrigin ? 4u : 0u;
+            foreach (Renderer renderer in _renderers)
+                renderer.renderingLayerMask = (renderer.renderingLayerMask & ~30u) | outline;
+        }
+
         public void SetPenaltyOutline(bool enabled)
         {
-            enabled &= !_settling;
-            foreach (Renderer renderer in _renderers)
-                renderer.renderingLayerMask = enabled
-                    ? renderer.renderingLayerMask | 8u
-                    : renderer.renderingLayerMask & ~8u;
+            _penaltyOutline = enabled && !_settling;
+            SetOutlineLayer(_requestedOutlineLayer);
         }
 
         /// <summary>생성된 기물에 게임 소유자 및 설치된 턴을 연결한다.</summary>
@@ -183,7 +191,8 @@ namespace RestoreCastle3D
 
         private void Update()
         {
-            if (_settling) return;
+            if (_settling || (CastleCreekScore3D.Active != null &&
+                CastleCreekScore3D.Active.IsRunPaused)) return;
             // The scoring boundary wins over the Y fallback if both are crossed this frame.
             if (transform.position.z <= DESPAWN_Z && !_removalScheduled && !_held)
             {
@@ -278,6 +287,9 @@ namespace RestoreCastle3D
                 box.size = _initialColliderSize;
             }
             CastleCreekScore3D.Active?.Unregister(this);
+            _persistentTrashOutline = false;
+            _penaltyOutline = false;
+            _requestedOutlineLayer = 0u;
             foreach (var pair in _settlementColliders)
                 if (pair.Key != null) pair.Key.enabled = pair.Value;
             _settlementColliders.Clear();
@@ -345,15 +357,16 @@ namespace RestoreCastle3D
             CastlePiece3D origin = _springTarget != null ? _springTarget : this;
             Vector3 velocity = origin._body.linearVelocity;
             if (origin._settling) return;
+            float creekSpeed = CastleCreekScore3D.Active?.CreekSpeed ?? CREEK_SPEED;
             if (!origin._body.isKinematic)
-                origin._body.linearVelocity = new Vector3(0f, velocity.y, -CREEK_SPEED);
+                origin._body.linearVelocity = new Vector3(0f, velocity.y, -creekSpeed);
 
             foreach (CastlePiece3D attached in origin._attachedPieces)
             {
                 if (attached == null || attached._springTarget != origin || attached._body.isKinematic)
                     continue;
                 velocity = attached._body.linearVelocity;
-                attached._body.linearVelocity = new Vector3(0f, velocity.y, -CREEK_SPEED);
+                attached._body.linearVelocity = new Vector3(0f, velocity.y, -creekSpeed);
             }
         }
 

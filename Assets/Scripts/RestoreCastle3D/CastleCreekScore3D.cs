@@ -21,6 +21,7 @@ namespace RestoreCastle3D
         private readonly Dictionary<CastlePiece3D, int> _previewCandidates =
             new Dictionary<CastlePiece3D, int>();
         private CastleCatalog3D _catalog;
+        private CastleCreekStageRun3D _run;
         private Camera _camera;
         private Canvas _canvas;
         private RectTransform _rect;
@@ -29,6 +30,10 @@ namespace RestoreCastle3D
         private TextMeshProUGUI _hoverText;
         private RectTransform _hoverPanel;
         private TextMeshProUGUI _edgeText;
+        private TextMeshProUGUI _pollutionIndicator;
+        private int _pollutionBurst;
+        private float _pollutionUntil;
+        private float _lastPollutionBurst;
         private TMP_FontAsset _font;
         private float _displayedScore;
         private int _score;
@@ -45,6 +50,9 @@ namespace RestoreCastle3D
         private float _nextPreviewRefresh;
 
         public int TotalScore => _score;
+        public bool IsRunPaused => _run != null && _run.IsPaused;
+        public float CreekSpeed => _run?.CreekSpeed ?? 1f;
+        public float CreekSpawnInterval => _run?.CreekSpawnInterval ?? 1f;
         public CastlePiece3D TrackedPiece =>
             _trackedPiece != null && _trackedPiece.isActiveAndEnabled && !_trackedPiece.IsSettling &&
             _registered.Contains(_trackedPiece) ? _trackedPiece : null;
@@ -98,8 +106,18 @@ namespace RestoreCastle3D
             _edgeText.outlineColor = new Color32(0, 0, 0, 255);
             _edgeText.rectTransform.sizeDelta = new Vector2(430f, 120f);
             _edgeText.gameObject.SetActive(false);
+            _pollutionIndicator = CreateLabel("Pollution Edge Indicator", 44, TextAlignmentOptions.Right);
+            _pollutionIndicator.rectTransform.anchorMin = new Vector2(1f, 0f);
+            _pollutionIndicator.rectTransform.anchorMax = new Vector2(1f, 0f);
+            _pollutionIndicator.rectTransform.pivot = new Vector2(1f, 0f);
+            _pollutionIndicator.rectTransform.anchoredPosition = new Vector2(-30f, 84f);
+            _pollutionIndicator.rectTransform.sizeDelta = new Vector2(420f, 86f);
+            _pollutionIndicator.fontStyle = FontStyles.Bold;
+            _pollutionIndicator.gameObject.SetActive(false);
             _floating = canvasObject.AddComponent<CastleFloatingText3D>();
             _floating.Initialize(_camera, _rect);
+            _run = canvasObject.AddComponent<CastleCreekStageRun3D>();
+            _run.Initialize(this, _canvas, _font);
         }
 
         private TextMeshProUGUI CreateLabel(string name, int size, TextAlignmentOptions align)
@@ -123,11 +141,13 @@ namespace RestoreCastle3D
             if (piece == null) return;
             _registered.Add(piece);
             _lastPoints[piece] = 0;
+            piece.SetPersistentTrashOutline(_catalog.Get(piece.MaterialId)?.category == "쓰레기");
         }
 
         public void Unregister(CastlePiece3D piece)
         {
             _registered.Remove(piece);
+            if (piece != null) piece.SetPersistentTrashOutline(false);
             _lastPoints.Remove(piece);
             if (_hovered == piece || _trackedPiece == piece)
             {
@@ -186,6 +206,29 @@ namespace RestoreCastle3D
             foreach (var member in group) center += member.transform.position;
             center /= group.Count;
             _score += earned;
+            // Count only trash objects physically at Z=-15, not other attached members.
+            // Y despawns and explosion debris never award pollution.
+            List<CastlePiece3D> boundaryTrash = group.Where(member =>
+                member != null && member.transform.position.z <= -15f &&
+                _catalog.Get(member.MaterialId)?.category == "쓰레기").ToList();
+            if (boundaryTrash.Count > 0 && _run != null)
+            {
+                int pollutionAdded = _run.OnTrashReachedBoundary(boundaryTrash.Count);
+                if (pollutionAdded > 0)
+                {
+                    Vector3 pollutionPosition = Vector3.zero;
+                    foreach (CastlePiece3D trash in boundaryTrash)
+                        pollutionPosition += trash.transform.position;
+                    pollutionPosition /= boundaryTrash.Count;
+                    Vector3 vp = _camera.WorldToViewportPoint(pollutionPosition);
+                    if (vp.z > 0f && vp.x >= 0.05f && vp.x <= 0.95f &&
+                        vp.y >= 0.05f && vp.y <= 0.95f)
+                        _floating.Show(new CastleChange3D(null, null,
+                            CastleChangeKind.Pollution, pollutionAdded, pollutionPosition,
+                            "+" + pollutionAdded + " 오염도!"));
+                    else ShowPollutionIndicator(pollutionAdded);
+                }
+            }
             _flashUntil = Time.unscaledTime + 0.65f;
             if (group.Count > 1 && earned != 0)
             {
@@ -305,7 +348,9 @@ namespace RestoreCastle3D
             {
                 if (pair.Key == null || !pair.Key.isActiveAndEnabled || pair.Key.IsSettling ||
                     !_registered.Contains(pair.Key)) continue;
-                pair.Key.SetOutlineLayer(pair.Value < 0 ? 8u : 4u);
+                // Show only positive synergy previews; trash already stays red.
+                if (pair.Value <= 0) continue;
+                pair.Key.SetOutlineLayer(4u);
                 _outlined.Add(pair.Key);
             }
             _heldPiece.SetOutlineLayer(2u);
@@ -323,6 +368,17 @@ namespace RestoreCastle3D
             barrel.MarkSettling();
             Unregister(barrel);
             Managers.Resource.Destroy(barrel.gameObject);
+        }
+
+        private void ShowPollutionIndicator(int amount)
+        {
+            if (Time.unscaledTime - _lastPollutionBurst > 0.35f)
+                _pollutionBurst = 0;
+            _pollutionBurst += amount;
+            _lastPollutionBurst = Time.unscaledTime;
+            _pollutionUntil = Time.unscaledTime + 1.5f;
+            _pollutionIndicator.text = "+" + _pollutionBurst + " 오염도!";
+            _pollutionIndicator.gameObject.SetActive(true);
         }
 
         private void ShowEdgeIndicator(Vector3 position, string text)
@@ -388,6 +444,24 @@ namespace RestoreCastle3D
             }
             else if (_edgeText.gameObject.activeSelf) _edgeText.gameObject.SetActive(false);
 
+            if (Time.unscaledTime < _pollutionUntil)
+            {
+                float age = Time.unscaledTime - _lastPollutionBurst;
+                _pollutionIndicator.rectTransform.localScale = Vector3.one *
+                    Mathf.Lerp(1.2f, 1f, Mathf.Clamp01(age / 0.3f));
+                Color pollutionColor = new Color(1f, 0.27f, 0.30f);
+                pollutionColor.a = Mathf.Clamp01((_pollutionUntil - Time.unscaledTime) * 2f);
+                _pollutionIndicator.color = pollutionColor;
+            }
+            else if (_pollutionIndicator.gameObject.activeSelf)
+                _pollutionIndicator.gameObject.SetActive(false);
+
+            if (IsRunPaused)
+            {
+                ClearOutlines();
+                _hoverPanel.gameObject.SetActive(false);
+                return;
+            }
             UpdateHover();
         }
 
