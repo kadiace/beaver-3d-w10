@@ -128,7 +128,11 @@ namespace RestoreCastle3D
             _registered.Remove(piece);
             _lastPoints.Remove(piece);
             _outlined.Remove(piece);
-            if (_hovered == piece) _hovered = null;
+            if (_hovered == piece || _trackedPiece == piece)
+            {
+                _hovered = null;
+                if (_hoverPanel != null) _hoverPanel.gameObject.SetActive(false);
+            }
             if (_trackedPiece == piece) _trackedPiece = null;
             if (_heldPiece == piece) _heldPiece = null;
             _previewCandidates.Remove(piece);
@@ -140,7 +144,8 @@ namespace RestoreCastle3D
         public void Refresh(CastlePiece3D a, CastlePiece3D b = null)
         {
             if (_catalog == null || _batching) return;
-            if (a != null && a.IsSettling || b != null && b.IsSettling) return;
+            if ((a != null && a.IsSettling) || (b != null && b.IsSettling)) return;
+            _nextPreviewRefresh = 0f;
             var visited = new HashSet<CastlePiece3D>();
             foreach (var start in new[] { a, b })
             {
