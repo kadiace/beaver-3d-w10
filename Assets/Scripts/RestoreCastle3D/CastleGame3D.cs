@@ -149,7 +149,7 @@ namespace RestoreCastle3D
                 new Vector3(placement.x, dropHeight, placement.z)));
         }
 
-        /// <summary>Esc 또는 우클릭으로 현재 라운드의 고정 후보를 다시 연다.</summary>
+        /// <summary>Esc 또는 우클릭으로 선택을 취소하고 현재 라운드의 후보를 다시 연다.</summary>
         private void OpenCandidatePalette()
         {
             if (_resolving || _awaitingStage || _finished || _rulesOpen) return;
@@ -158,7 +158,7 @@ namespace RestoreCastle3D
             HideDropPreview();
             if (_placementsInRound > 0)
                 _status = "후보를 다시 선택하세요. 남은 배치 "
-                    + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회 (리롤 불가)";
+                    + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회";
         }
 
         /// <summary>화면 커서가 배치 가능한 월드 XZ에 있으면 그 위치를 반환한다.</summary>
@@ -350,7 +350,8 @@ namespace RestoreCastle3D
         public int RerollCount => _rerolls + _extraRerolls;
         public bool CanSelect => !_resolving && !_awaitingStage && !_finished && !_rulesOpen
             && _paletteOpen && _placementsInRound < PLACEMENTS_PER_ROUND;
-        public bool CanReroll => CanSelect && _placementsInRound == 0;
+        public bool CanReroll => !_resolving && !_awaitingStage && !_finished && !_rulesOpen
+            && _placementsInRound < PLACEMENTS_PER_ROUND && RerollCount > 0;
         public bool CanShowItemInfo => !_awaitingStage && !_finished && !_rulesOpen;
         public event Action<CastleChange3D> ChangeCommitted;
 
@@ -567,8 +568,11 @@ namespace RestoreCastle3D
             return piece;
         }
 
-        /// <summary>서로 다른 자재 3개를 뽑되 살아있는 나무의 등장 확률을 절반으로 낮춘다.</summary>
-        private void DealOffers()
+        /// <summary>
+        /// 서로 다른 자재 3개를 뽑고 살아있는 나무의 등장 확률을 절반으로 낮춘다.
+        /// resetPlacements가 참이면 라운드 배치 횟수를 초기화하며, 리롤에서는 기존 횟수를 유지한다.
+        /// </summary>
+        private void DealOffers(bool resetPlacements = true)
         {
             List<CastleMaterial3D> available = _catalog.All.Where(CastleCatalog3D.CanAppearAsOffer).ToList();
             for (int i = 0; i < _offers.Length; i++)
@@ -584,7 +588,7 @@ namespace RestoreCastle3D
                 }
             }
             _selected = -1;
-            _placementsInRound = 0;
+            if (resetPlacements) _placementsInRound = 0;
             _paletteOpen = true;
             HideDropPreview();
         }
@@ -596,7 +600,9 @@ namespace RestoreCastle3D
             if (_rerolls > 0) _rerolls--;
             else if (_extraRerolls > 0) _extraRerolls--;
             else return;
-            DealOffers();
+            DealOffers(false);
+            _status = "후보를 다시 뽑았습니다. 남은 배치 "
+                + (PLACEMENTS_PER_ROUND - _placementsInRound) + "회";
         }
 
         /// <summary>각 기물의 낙하는 병렬 진행하고 5개가 모두 안정화되면 라운드를 정산한다.</summary>
