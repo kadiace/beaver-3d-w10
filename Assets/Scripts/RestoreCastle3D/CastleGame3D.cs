@@ -17,9 +17,10 @@ namespace RestoreCastle3D
         private const int LIVING_TREE_MAX_GROWTH = 8;
         private const float BARREL_EXPLOSION_RADIUS = 2.5f;
         private const float WASTE_EFFECT_RADIUS = 2.5f;
-        private const float CAMERA_EDGE_MARGIN = 3f;
-        private const float CAMERA_MOVEMENT_RANGE_MULTIPLIER = 1.2f;
-        private const float CAMERA_MOVEMENT_REFERENCE_SIZE = 7f;
+        private const float CAMERA_DRAG_THRESHOLD_PIXELS = 6f;
+        private const float CAMERA_MIN_TARGET_Z = -15f;
+        private const float CAMERA_MAX_TARGET_Z = 30f;
+        private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float SPAWN_INTERVAL = 0.1f;
 
         private static readonly float _livingTreeScalePerGrowth =
@@ -86,6 +87,9 @@ namespace RestoreCastle3D
         private string _status;
         private CastleMaterial3D[] _spawnMaterials;
         private float _nextSpawnTime;
+        private Vector2 _rightDragDisplacement;
+        private bool _rightGestureActive;
+        private bool _rightGestureMoved;
 
         private void Start()
         {
@@ -93,10 +97,12 @@ namespace RestoreCastle3D
             _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly).ToArray();
             _random = new System.Random(Environment.TickCount);
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
+            ConfigureScene();
         }
 
         private void Update()
         {
+            UpdateCameraInput();
             if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
             {
                 CastleMaterial3D material = _spawnMaterials[_random.Next(_spawnMaterials.Length)];
@@ -115,7 +121,6 @@ namespace RestoreCastle3D
             if (mouse != null && mouse.leftButton.wasReleasedThisFrame)
                 _dropMouseReleased = true;
 
-            UpdateCameraInput();
             if (CanPreviewFlood && Managers.Input.FloodPreviewPressed)
                 _floodPreview.Toggle();
             if (!_stageTransitioning)
@@ -145,12 +150,10 @@ namespace RestoreCastle3D
                     _objectYaw += RotationSpeed * Time.deltaTime;
             }
 
-            if (mouse != null && mouse.rightButton.wasPressedThisFrame)
-                OpenCandidatePalette();
-
             UpdateDropPreview();
 
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame ||
+                mouse.rightButton.isPressed || mouse.rightButton.wasReleasedThisFrame ||
                 !_dropMouseReleased || _selected < 0 ||
                 _placementsInRound >= PLACEMENTS_PER_ROUND ||
                 Time.unscaledTime - _lastDropTime < dropClickCooldown)
@@ -377,7 +380,7 @@ namespace RestoreCastle3D
             if (_camera == null) throw new InvalidOperationException("Game scene needs a Main Camera.");
             _camera.orthographic = true;
             _camera.orthographicSize = 10.5f;
-            _camera.transform.rotation = Quaternion.Euler(60f, 45f, 0f);
+            _camera.transform.rotation = Quaternion.Euler(45f, 45f, 0f);
             _cameraTarget = Vector3.zero;
             UpdateCameraPosition();
             _placementBounds = GameObject.Find("Flat Muddy Creek Bed")
@@ -472,52 +475,74 @@ namespace RestoreCastle3D
             ResetGame();
         }
 
-        /// <summary>카메라 회전은 변경하지 않고 XZ 평행이동과 정사영 크기만 변경한다.</summary>
+        /// <summary>우클릭 드래그로 주시점을 Z축으로 이동하고 일반 휠로 줌을 조절한다.</summary>
         private void UpdateCameraInput()
         {
             Mouse mouse = Mouse.current;
-            if (mouse == null) return;
-            if (mouse.rightButton.isPressed)
+            if (mouse == null)
             {
-                Vector2 delta = mouse.delta.ReadValue();
-                float unit = 2f * _camera.orthographicSize / Mathf.Max(Screen.height, 1);
-                Vector3 right = Vector3.ProjectOnPlane(_camera.transform.right, Vector3.up).normalized;
-                Vector3 up = Vector3.ProjectOnPlane(_camera.transform.up, Vector3.up).normalized;
-                _cameraTarget -= unit * (right * delta.x + up * delta.y);
+                _rightGestureActive = false;
+                return;
             }
-            float scroll = mouse.scroll.ReadValue().y;
-            if (Mathf.Abs(scroll) > 0.01f)
-                _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize *
-                    Mathf.Exp(-scroll * 0.03f), 6f, 13.5f);
-            ClampCameraTarget();
-            UpdateCameraPosition();
-        }
 
-        /// <summary>기존 강바닥 이동 범위를 유지하면서 카메라 주시점을 배치 반경 안으로 제한한다.</summary>
-        private void ClampCameraTarget()
-        {
-            float movementSize = Mathf.Min(_camera.orthographicSize, CAMERA_MOVEMENT_REFERENCE_SIZE);
-            float horizontalReach = movementSize * _camera.aspect;
-            float verticalReach = movementSize / Mathf.Sin(60f * Mathf.Deg2Rad);
-            Vector3 right = _camera.transform.right;
-            Vector3 forward = Vector3.ProjectOnPlane(_camera.transform.up, Vector3.up).normalized;
-            float halfVisibleX = Mathf.Abs(right.x) * horizontalReach +
-                Mathf.Abs(forward.x) * verticalReach;
-            float halfVisibleZ = Mathf.Abs(right.z) * horizontalReach +
-                Mathf.Abs(forward.z) * verticalReach;
-            float limitX = Mathf.Max(0f, _placementBounds.extents.x +
-                CAMERA_EDGE_MARGIN - halfVisibleX) * CAMERA_MOVEMENT_RANGE_MULTIPLIER;
-            float limitZ = Mathf.Max(0f, _placementBounds.extents.z -
-                CAMERA_EDGE_MARGIN - halfVisibleZ) * CAMERA_MOVEMENT_RANGE_MULTIPLIER;
-            _cameraTarget.x = Mathf.Clamp(_cameraTarget.x, -limitX, limitX);
-            _cameraTarget.z = Mathf.Clamp(_cameraTarget.z, -limitZ, limitZ);
+            var rightButton = mouse.rightButton;
+            bool pointerOverUi = EventSystem.current != null &&
+                EventSystem.current.IsPointerOverGameObject();
+            if (rightButton.wasPressedThisFrame)
+            {
+                _rightGestureActive = !pointerOverUi;
+                _rightGestureMoved = false;
+                _rightDragDisplacement = Vector2.zero;
+            }
 
-            Vector2 center = new Vector2(_placementBounds.center.x, _placementBounds.center.z)
-                + PlacementCenterOffset;
-            Vector2 offset = new Vector2(_cameraTarget.x, _cameraTarget.z) - center;
-            Vector2 clamped = center + Vector2.ClampMagnitude(offset, PlacementRadius);
-            _cameraTarget.x = clamped.x;
-            _cameraTarget.z = clamped.y;
+            bool gestureInProgress = _rightGestureActive &&
+                (rightButton.isPressed || rightButton.wasReleasedThisFrame);
+            if (gestureInProgress)
+            {
+                Vector2 delta = rightButton.wasPressedThisFrame
+                    ? Vector2.zero : mouse.delta.ReadValue();
+                if (!_rightGestureMoved)
+                {
+                    _rightDragDisplacement += delta;
+                    if (_rightDragDisplacement.sqrMagnitude >=
+                        CAMERA_DRAG_THRESHOLD_PIXELS * CAMERA_DRAG_THRESHOLD_PIXELS)
+                    {
+                        _rightGestureMoved = true;
+                        delta = _rightDragDisplacement;
+                    }
+                    else
+                        delta = Vector2.zero;
+                }
+
+                if (_rightGestureMoved && delta.sqrMagnitude > 0f)
+                {
+                    _cameraTarget.z = Mathf.Clamp(
+                        _cameraTarget.z - delta.y * 0.025f,
+                        CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z);
+                    UpdateCameraPosition();
+                }
+
+            }
+
+            if (rightButton.wasReleasedThisFrame && _rightGestureActive)
+            {
+                if (!_rightGestureMoved && !pointerOverUi)
+                    OpenCandidatePalette();
+                _rightGestureActive = false;
+            }
+
+            if (!_rightGestureActive && !rightButton.isPressed)
+            {
+                float scroll = mouse.scroll.ReadValue().y;
+                if (Mathf.Abs(scroll) > 0.01f)
+                {
+                    float steps = scroll / WINDOWS_SCROLL_UNITS_PER_TICK;
+                    _camera.orthographicSize = Mathf.Clamp(
+                        _camera.orthographicSize * Mathf.Exp(-steps * 0.12f),
+                        6f, 13.5f);
+                    UpdateCameraPosition();
+                }
+            }
         }
 
         /// <summary>고정 각도를 유지한 채 평면상의 주시 위치를 변경한다.</summary>
