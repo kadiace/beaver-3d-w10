@@ -284,7 +284,7 @@ namespace RestoreCastle3D
                     _catalog.Get(p.MaterialId).name + " " +
                     (result.Points.TryGetValue(p, out int n) && n >= 0 ? "+" : "") +
                     (result.Points.TryGetValue(p, out int value) ? value : 0))) +
-                "\\n" + string.Join("\\n", _catalog.Get(next.MaterialId).abilities ??
+                "\n" + string.Join("\n", _catalog.Get(next.MaterialId).abilities ??
                     new string[0]);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect,
                 new Vector2(Mathf.Clamp(cursor.x + 20, 0, Screen.width - 400),
