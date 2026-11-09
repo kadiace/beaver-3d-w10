@@ -1,5 +1,24 @@
 # 홍수 방어 설계
 
+## 실행과 조작
+
+- Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열어 실행한다. 프로젝트 설정의 에디터 버전은 `6000.3.28f1`이다.
+- 하단 후보 3종 중 자재를 선택하고 월드를 가리키면, 아래 방향 Raycast로 찾은 표면에 반투명 낙하 미리보기와 커서 연결 가이드를 표시한다. 미리보기는 충돌체 윗면을 기준으로 한 정적 예상 위치이며 낙하 후 회전이나 다른 기물의 이동은 예측하지 않는다. 클릭하면 기물이 기본 Y=7에서 물리 낙하한다. UI 위에서는 미리보기와 가이드를 숨긴다.
+- 우클릭 드래그는 카메라 평행 이동, 휠은 줌, 우클릭을 누른 채 휠은 주시점을 중심으로 Y축 회전이다. 단순 우클릭은 후보 목록을 연다. Q/E는 배치 회전, Esc는 선택 취소 및 후보 목록 재개방에 사용한다. 카메라 회전량은 `GameSceneContext`의 `Camera Yaw Per Scroll Step`에서 조절한다.
+
+## 배치와 방어 판정
+
+- 5스테이지이며 스테이지마다 5라운드, 라운드마다 5개 기물을 배치한다. 한 라운드에서 첫 기물을 배치한 뒤에는 후보 리롤을 할 수 없다. 후보 선택은 다음 배치 전에 바꿀 수 있다.
+- 이전 기물이 낙하하는 동안 다음 기물을 배치할 수 있다. 클릭 사이에는 마우스 버튼을 놓았다 다시 눌러야 하며 기본 `dropClickCooldown`은 0.1초다. 다섯 번째 배치 후에는 해당 라운드의 낙하가 모두 끝나고 오크통 점화가 처리된 다음 주기 효과와 라운드 전환을 진행한다.
+- 다섯 라운드가 끝나면 스테이지 완료 팝업을 표시한다. 팝업을 닫으면 홍수가 시작된다. 깃발이 `GameSceneContext.DestructionBoundaryZ`(기본 Z=-28.2)를 넘으면 방어 실패다. 기물도 같은 경계를 넘으면 제거되며 기반은 제외한다. 현재 구현에는 기물 내구도 합계와 목표 수치에 따른 스테이지 성공 판정이 없다.
+- 홍수의 공급 시간은 `floodFillDuration`, 물 이동 시간은 `floodTravelDuration`, 공급 곡선은 `floodFillCurve`로 조절한다. 물리 흐름은 `CastleFloodFlow3D`, 수면 표시는 `CastleFloodEffect3D`가 담당한다.
+
+## 기물과 주요 파일
+
+- `growing_vine`과 `vine`은 첫 접촉 기물에 `FixedJoint`로 부착한다. 오크통은 첫 충돌 뒤 약 3초에 한 번 폭발하여 반경 2.5 안의 주변 기물에 물리 충격을 주며, 폭발 자체로 기물을 삭제하지 않는다.
+- `Assets/Scripts/RestoreCastle3D/CastleGame3D.cs`는 입력·배치·라운드·스테이지를, `CastlePiece3D.cs`는 기물 접촉과 결합을, `CastleHud3D.cs`는 UI를 담당한다. 자재 정의는 `Assets/Resources/Data/materials.json`, 기물 프리팹은 `Assets/Resources/Prefabs/`, HUD 프리팹은 `Assets/Resources/Prefabs/UIs/RestoreCastleHud.prefab`에 있다.
+- 현재 공유 물리 재질은 `Assets/Resources/Materials/Friction.physicMaterial`이며 정지 마찰은 1, 동마찰은 0.6, 반발은 0이다.
+
 ## 목표
 
 플레이어는 기물로 물길을 막아 월드 원점의 깃발을 보호한다. 한 번의 홍수에서 방어선이 완전히 사라지지 않고 위치와 각도가 흐트러져, 다음 스테이지의 더 강한 물살에 맞춰 보강하고 재배치할 이유가 생겨야 한다. 기물 내구도 수치 대신 물길, 틈, 기물의 이동으로 방어 결과를 보여준다.
