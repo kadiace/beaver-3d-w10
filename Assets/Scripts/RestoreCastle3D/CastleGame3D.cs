@@ -165,7 +165,9 @@ namespace RestoreCastle3D
                 }
             }
 
-            // Visibility investigatioial3D ChooseCreekMaterial()
+        }
+
+        private CastleMaterial3D ChooseCreekMaterial()
         {
             double roll = _random.NextDouble() * _creekSpawnWeights.Sum();
             for (int i = 0; i < _creekSpawnWeights.Length; i++)
