@@ -62,3 +62,57 @@ velocities, and resets/restores interpolation around the teleport.
    freshly spawned pieces no longer move back to (0,0,0).
 
 The editor tool is provided but was not executed in the remote environment.
+
+## Two-second settled-group state and focused inspection
+
+When any member of a spring-attached group crosses **Z = -15**:
+
+1. Snapshot the whole connected component and its score before modifying physics.
+2. Award the score exactly once and immediately unregister all of its members from
+   hover/pickup/synergy-preview and camera targeting.
+3. Freeze every Rigidbody in place, disable its collisions/colliders, hide its
+   outline and prevent any gameplay action or new Joint.
+4. Keep the entire group visible for **2 seconds**, then return all members to
+   the resource pool in the same removal pass. Pool resets colliders and rigidbody
+   settings for later spawns.
+5. Independently fallen objects beyond Y = -10 still use the existing discard
+   path and do not award points.
+
+**Controls:** Hold left click on a pickup-eligible piece to highlight all
+camera-visible pieces with a nonzero hypothetical attachment score change
+(cyan for positive synergy, red for negative effect). The hypothetical link
+does not change physics or real scores. Right click **without dragging** a
+piece to make the camera smoothly follow it and pin a readable inspection
+panel in the upper-left corner. Right-drag still manually pans the camera and
+cancels tracking. Right-click empty space also cancels tracking. The panel
+disappears immediately when the followed piece settles/is removed; it must
+not reappear on a pooled instance.
+
+**Editor regression checks:** Select
+`Tools > Beaver > Run Creek Synergy Smoke Tests`. The 14 scenarios now
+also cover virtual direct-edge point previews, trash penalties, preview
+non-mutation, and collider/interaction locking with state restoration after
+pooling.
+
+**Play Mode checklist:**
+
+- Attach 2–5 pieces, let **one** cross Z=-15 and confirm all become inert
+  simultaneously; they should remain visible for about 2 seconds and then
+  disappear together.
+- During the two seconds, try left-click pickup, hover, outline, right-click
+  follow, SpringJoint reattachment and explosion. None should reactivate.
+- Confirm score increases once on first crossing and does not change on the
+  later pool return or on a different member crossing the threshold.
+- Check subsequent reuse from the pool has normal collider, Rigidbody,
+  hover and pickup behavior again.
+- Hold the mouse on a pebble/large stone/wood piece and inspect candidate
+  outlines. Confirm the highlighted pieces actually alter the score on a
+  hypothetical Joint and the displayed score remains unchanged until real
+  attachment.
+- Right-click a moving item without dragging: camera pans/follows and the
+  tooltip remains readable as the item moves away from the cursor.
+- Right-drag manually to cancel follow; zoom should keep following until
+  the piece is gone or another target is chosen.
+
+> The smoke tests and Play Mode checks are provided for Unity validation but
+> have not been run inside this remote GitHub editing session.

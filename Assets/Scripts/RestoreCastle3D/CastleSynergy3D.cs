@@ -32,7 +32,77 @@ namespace RestoreCastle3D
             return group;
         }
 
-        public static Result Evaluate(List<CastlePiece3D> group, CastleCatalog3D catalog)
+        /// <summary>
+        /// A pair can satisfy part of a multi-piece condition even if this first link
+        /// would award zero points. Use this for selection outlines, not real scoring.
+        /// </summary>
+        public static bool HasPotentialTagSynergy(CastlePiece3D a, CastlePiece3D b,
+            CastleCatalog3D catalog)
+        {
+            if (a == null || b == null || catalog == null) return false;
+            string aTag = catalog.Get(a.MaterialId)?.category;
+            string bTag = catalog.Get(b.MaterialId)?.category;
+            if (aTag == null || bTag == null) return false;
+
+            bool Helps(CastlePiece3D source, CastlePiece3D other, string tag)
+            {
+                string id = source.MaterialId;
+                string otherId = other.MaterialId;
+                switch (id)
+                {
+                    case "pebble":
+                    case "large_stone": return tag == "석재";
+                    case "fossil": return otherId == "fossil";
+                    case "gem": return otherId == "pebble" || otherId == "large_stone" ||
+                            otherId == "fossil";
+                    case "plank":
+                    case "branch": return tag == "목재";
+                    case "leafy_branch": return tag == "목재" && otherId != id;
+                    case "log": return tag == "목재" || otherId == "mud";
+                    case "sunflower": return tag == "식물";
+                    case "bamboo": return tag == "목재" || tag == "식물";
+                    case "growing_vine": return tag == "석재";
+                    case "living_tree": return tag == "목재" || tag == "식물";
+                    case "mud": return tag == "목재";
+                    case "shoe":
+                    case "life_jacket": return tag == "잡동사니";
+                    case "bucket": return tag == "석재";
+                    case "watering_can": return tag == "식물";
+                    case "loose_work_glove": return tag == "목재";
+                    case "broken_game_controller": return tag == "잡동사니" &&
+                            otherId != "broken_game_controller";
+                    case "empty_bottle": return tag != "잡동사니";
+                    case "waste_bag_small":
+                    case "foul_smelling_lump": return true;
+                    default: return false;
+                }
+            }
+            return Helps(a, b, bTag) || Helps(b, a, aTag);
+        }
+
+        /// <summary>Delta of attaching a held single piece to a target and its existing component.</summary>
+        public static int PreviewAttachmentDelta(CastlePiece3D held,
+            CastlePiece3D target, CastleCatalog3D catalog)
+        {
+            if (held == null || target == null || held == target || catalog == null ||
+                held.IsSettling || target.IsSettling ||
+                !held.isActiveAndEnabled || !target.isActiveAndEnabled) return 0;
+
+            List<CastlePiece3D> component = Collect(target);
+            if (component.Contains(held) || component.Exists(p => p.IsSettling)) return 0;
+            int before = Evaluate(component, catalog).Total;
+            // Picked-up pieces are singletons in the current game mode.
+            List<CastlePiece3D> heldGroup = Collect(held);
+            before += Evaluate(heldGroup, catalog).Total;
+            var combined = new List<CastlePiece3D>(component);
+            foreach (CastlePiece3D p in heldGroup)
+                if (!combined.Contains(p)) combined.Add(p);
+            return Evaluate(combined, catalog, held, target).Total - before;
+        }
+
+        /// <summary>Score live connections with optional virtual direct edge for previews.</summary>
+        public static Result Evaluate(List<CastlePiece3D> group, CastleCatalog3D catalog,
+            CastlePiece3D virtualA = null, CastlePiece3D virtualB = null)
         {
             var result = new Result();
             if (group == null || group.Count < 2) return result;
@@ -46,6 +116,10 @@ namespace RestoreCastle3D
             {
                 var others = group.Where(p => p != piece).ToList();
                 var direct = piece.AttachedPieces.Where(p => p != null && others.Contains(p)).ToList();
+                CastlePiece3D virtualNeighbor = piece == virtualA ? virtualB :
+                    piece == virtualB ? virtualA : null;
+                if (virtualNeighbor != null && others.Contains(virtualNeighbor) &&
+                    !direct.Contains(virtualNeighbor)) direct.Add(virtualNeighbor);
                 int Other(string tag) => others.Count(p => Cat(p) == tag);
                 int Direct(string tag) => direct.Count(p => Cat(p) == tag);
                 bool OtherHas(string id) => others.Any(p => Id(p) == id);

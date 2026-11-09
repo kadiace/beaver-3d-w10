@@ -402,6 +402,8 @@ namespace RestoreCastle3D
                 else
                     _holdOffset = Vector3.zero;
                 piece.PickUp();
+                if (_spawnMaterials != null)
+                    CastleCreekScore3D.Active?.SetHeldPiece(piece);
                 if (_dropPreview == null) _dropPreview = new CastleDropPreview3D();
                 if (_spawnMaterials == null) SetOutlineTargets(piece);
             }
@@ -416,6 +418,8 @@ namespace RestoreCastle3D
             {
                 _heldPiece.Throw();
                 _heldPiece = null;
+                if (_spawnMaterials != null)
+                    CastleCreekScore3D.Active?.SetHeldPiece(null);
                 _dropPreview.Hide();
                 if (_heldGuide != null) _heldGuide.gameObject.SetActive(false);
                 return;
@@ -633,6 +637,8 @@ namespace RestoreCastle3D
 
                 if (_rightGestureMoved && delta.sqrMagnitude > 0f)
                 {
+                    if (_spawnMaterials != null)
+                        CastleCreekScore3D.Active?.StopTracking();
                     _cameraTarget.z = Mathf.Clamp(
                         _cameraTarget.z - delta.y * 0.025f,
                         CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z);
@@ -644,7 +650,16 @@ namespace RestoreCastle3D
             if (rightButton.wasReleasedThisFrame && _rightGestureActive)
             {
                 if (!_rightGestureMoved && !pointerOverUi)
-                    OpenCandidatePalette();
+                {
+                    if (_spawnMaterials != null)
+                    {
+                        // A short right click focuses the piece; a drag keeps panning.
+                        if (_heldPiece == null)
+                            CastleCreekScore3D.Active?.TrackUnderCursor(
+                                mouse.position.ReadValue());
+                    }
+                    else OpenCandidatePalette();
+                }
                 _rightGestureActive = false;
             }
 
@@ -657,6 +672,22 @@ namespace RestoreCastle3D
                     _camera.orthographicSize = Mathf.Clamp(
                         _camera.orthographicSize * Mathf.Exp(-steps * 0.12f),
                         6f, 13.5f);
+                    UpdateCameraPosition();
+                }
+            }
+
+            // Keep the chosen moving piece centered until it settles, is discarded,
+            // is picked up, or the player starts a right-button camera drag.
+            if (_spawnMaterials != null && !_rightGestureMoved && !rightButton.isPressed)
+            {
+                CastlePiece3D tracked = CastleCreekScore3D.Active?.TrackedPiece;
+                if (tracked != null)
+                {
+                    Vector3 target = tracked.transform.position;
+                    target.y = 0f;
+                    target.z = Mathf.Clamp(target.z, CAMERA_MIN_TARGET_Z, 50f);
+                    _cameraTarget = Vector3.Lerp(_cameraTarget, target,
+                        1f - Mathf.Exp(-8f * Time.unscaledDeltaTime));
                     UpdateCameraPosition();
                 }
             }
