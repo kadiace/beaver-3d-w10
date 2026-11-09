@@ -263,9 +263,13 @@ namespace RestoreCastle3D
             foreach (CastlePiece3D p in _outlined)
                 if (p != null && p.isActiveAndEnabled) p.SetOutlineLayer(0);
             _outlined.Clear();
-            _hoverText.gameObject.SetActive(next != null);
-            if (next == null) return;
+            if (next == null)
+            {
+                _hoverText.gameObject.SetActive(false);
+                return;
+            }
             var group = CastleSynergy3D.Collect(next);
+            _hoverText.gameObject.SetActive(group.Count > 1);
             var result = CastleSynergy3D.Evaluate(group, _catalog);
             foreach (var p in result.Contributors)
             {
@@ -279,7 +283,9 @@ namespace RestoreCastle3D
                 "\n" + string.Join("\n", group.Take(6).Select(p =>
                     _catalog.Get(p.MaterialId).name + " " +
                     (result.Points.TryGetValue(p, out int n) && n >= 0 ? "+" : "") +
-                    (result.Points.TryGetValue(p, out int value) ? value : 0)));
+                    (result.Points.TryGetValue(p, out int value) ? value : 0))) +
+                "\\n" + string.Join("\\n", _catalog.Get(next.MaterialId).abilities ??
+                    new string[0]);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect,
                 new Vector2(Mathf.Clamp(cursor.x + 20, 0, Screen.width - 400),
                     Mathf.Clamp(cursor.y - 16, 260, Screen.height)), null, out Vector2 local);
