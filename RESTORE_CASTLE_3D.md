@@ -29,6 +29,11 @@ Unity 6.3 LTS에서 `Assets/Scenes/Game.unity`를 열고 Play를 실행합니다
 - 만능 접착제는 자재 선택지에서 제외합니다. 자재 정의와 기존 능력은 유지합니다.
 - 각 기물의 최대 낙하 대기는 `Game` 씬의 `@SceneContext > GameSceneContext > Settlement > Max Drop Wait`에서 조절합니다. 기본값은 7초이며, 1.2초 이후 Rigidbody가 잠들면 먼저 종료합니다. 라운드에서는 모든 낙하 대기가 끝날 때까지 기다립니다. 폭발 후 최대 안정화 대기는 같은 그룹의 `Max Explosion Settle Wait`에서 조절하며 기본값은 7초입니다. 두 값은 0 이상이고, Play Mode에서 변경하면 진행 중인 대기에도 반영됩니다.
 
+## 가이드 안내
+
+- 가이드 팝업에는 라운드·스테이지 구성, 내구도와 통과 조건, 좌클릭 배치, 후보 재선택과 리롤 제한, 카메라·자재 조작, 공통 결합과 경계 파괴, 오크통의 폭발 시점과 상태 색상을 함께 표시합니다.
+- 문구는 `CastleHud3D.Initialize`의 `_rulesBody.text`와 `RestoreCastleHud` 프리팹의 `RulesPopup/Contents/BodyText`에 동일하게 반영합니다. 전체 설명을 읽을 수 있도록 가이드 팝업 크기는 980×900으로 둡니다.
+
 ## 스테이지 홍수와 기물 제거
 
 - 스테이지 통과 팝업을 닫으면 파란 홍수 큐브가 +Z에서 -Z로 확장되며 물 표면은 월드 Y=-1.95로 고정됩니다. 홍수에 닿은 기물에는 -Z 방향으로 한 번 충격량을 적용합니다.

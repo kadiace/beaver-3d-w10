@@ -232,14 +232,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uB9E4 \uC2A4\uD14C\uC774\uC9C0 5\uB77C\uC6B4\uB4DC \xB7 \uBAA9\uD45C
-    \uB0B4\uAD6C\uB3C4\uB294 \uC774\uC804 \uBAA9\uD45C\uC758 2\uBC30\n\uC0C8 \uC790\uC7AC\uB294
-    \uB9E8 \uC704\uC5D0 \uB193\uC785\uB2C8\uB2E4. \uC544\uB798 \uC790\uC7AC\uC758
-    \uB0A8\uC740 \uC601\uC5ED\uC774 70% \uC774\uD558\uC774\uBA74 \uD30C\uAD34\uB429\uB2C8\uB2E4.\n\uC2A4\uD14C\uC774\uC9C0
-    \uB9AC\uB864 3\uD68C\uB294 \uC774\uC6D4\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.
-    \uD68D\uB4DD\uD55C \uB9AC\uB864\uAD8C\uC740 \uC720\uC9C0\uB429\uB2C8\uB2E4.\n\uAC01
-    \uC790\uC7AC\uC758 \uB2A5\uB825\uC740 \uD6C4\uBCF4 \uCE74\uB4DC\uC640 \uD638\uBC84
-    \uC815\uBCF4\uC5D0\uC11C \uD655\uC778\uD558\uC138\uC694."
+  m_Text: "<b>목표와 진행</b>\n라운드당 5개 배치 · 스테이지당 5라운드 · 총 5스테이지\n현재 내구도는 살아 있는 자재와 능력 효과의 합입니다.\n스테이지 끝에 목표 내구도 이상이면 통과하며, 부족하면 처음부터 다시 시작합니다.\n통과 후 홍수가 발생합니다. 살아남은 자재는 다음 스테이지에도 남습니다.\n\n<b>배치와 리롤</b>\n후보 선택 후 좌클릭으로 낙하합니다. 같은 라운드의 후보 3종은 반복 선택할 수 있습니다.\nEsc 또는 짧은 우클릭: 선택 취소 후 후보 목록 열기\n기본 리롤은 스테이지마다 3회이며, 첫 배치 이후에는 사용할 수 없습니다.\n자재에 마우스를 올리면 내구도와 고유 능력을 확인할 수 있습니다.\n\n<b>조작</b>\n우클릭 드래그: 카메라 이동 / 스크롤: 확대·축소\n우클릭 중 스크롤: 카메라 회전 / Q·E: 자재 회전\n\n<b>결합과 파괴</b>\n자재끼리 닿으면 결합합니다. 강한 충격으로 끊어질 수 있으며 재충돌하면 다시 붙습니다.\n홍수나 폭발 등에 밀려 절벽 뒤 경계를 넘은 자재는 파괴됩니다.\n\n<b>오크통</b>\n다른 자재와 처음 충돌하면 폭발을 예약합니다.\n라운드 낙하 정산이 끝나면 1초 후 한 번 폭발해 주변을 밀어냅니다.\n빨강·노랑 깜빡임: 폭발 대기 / 진회색: 폭발 완료"
 --- !u!1 &224108683
 GameObject:
   m_ObjectHideFlags: 0
@@ -2827,7 +2820,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 650, y: 500}
+  m_SizeDelta: {x: 980, y: 900}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1470635700
 CanvasRenderer:
