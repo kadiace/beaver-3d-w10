@@ -37,6 +37,11 @@ internal static class CreekSynergySmokeTests
             return CastleSynergy3D.Evaluate(CastleSynergy3D.Collect(any), _catalog).Total;
         }
 
+        public int Preview(CastlePiece3D held, CastlePiece3D target)
+        {
+            return CastleSynergy3D.PreviewAttachmentDelta(held, target, _catalog);
+        }
+
         public void Dispose()
         {
             foreach (GameObject go in _created)
@@ -103,7 +108,42 @@ internal static class CreekSynergySmokeTests
             f.Link(stone, mud); f.Link(mud, a); f.Link(a, b);
             return f.Score(stone);
         }, ref passed);
-        Debug.Log("Creek synergy smoke tests passed: " + passed + "/10");
+        Check("Held pebble previews +2 without physically attaching", 2, f =>
+        {
+            var a = f.Make("pebble"); var b = f.Make("pebble");
+            int delta = f.Preview(a, b);
+            if (f.Score(a) != 0 || f.Score(b) != 0)
+                throw new Exception("Preview mutated live graph");
+            return delta;
+        }, ref passed);
+        Check("Virtual direct attachment activates large stone", 8, f =>
+        {
+            var stone = f.Make("large_stone");
+            var first = f.Make("pebble");
+            var held = f.Make("pebble");
+            f.Link(stone, first);
+            return f.Preview(held, stone);
+        }, ref passed);
+        Check("Held foul lump previews a negative penalty", -3, f =>
+        {
+            var trash = f.Make("foul_smelling_lump");
+            var shoe = f.Make("shoe");
+            return f.Preview(trash, shoe);
+        }, ref passed);
+        Check("Awarded piece locks colliders and restores pooled state", 1, f =>
+        {
+            var piece = f.Make("pebble");
+            var collider = piece.gameObject.AddComponent<BoxCollider>();
+            piece.MarkSettling();
+            bool locked = piece.IsSettling && !piece.CanPickUp &&
+                !collider.enabled && !piece.Body.detectCollisions &&
+                piece.Body.isKinematic;
+            piece.gameObject.SetActive(false);
+            bool restored = !piece.IsSettling && collider.enabled &&
+                piece.Body.detectCollisions && !piece.Body.isKinematic;
+            return locked && restored ? 1 : 0;
+        }, ref passed);
+        Debug.Log("Creek synergy smoke tests passed: " + passed + "/14");
     }
 
     private static void Check(string name, int expected, Func<Fixture, int> scenario, ref int passed)
