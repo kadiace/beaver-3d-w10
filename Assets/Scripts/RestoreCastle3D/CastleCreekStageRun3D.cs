@@ -183,8 +183,7 @@ namespace RestoreCastle3D
         private void RestartRun()
         {
             ResumeWorld();
-            Scene scene = SceneManager.GetActiveScene();
-            SceneManager.LoadScene(scene.name);
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
         private void PauseWorld()
