@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace RestoreCastle3D
@@ -245,8 +245,7 @@ namespace RestoreCastle3D
                 string description = BuildPlacedDetails(_hoveredPiece);
                 if (_tooltipText.text != description)
                 {
-                    Mouse mouse = Mouse.current;
-                    ShowDescription(description, mouse == null ? Vector2.zero : mouse.position.ReadValue());
+                    ShowDescription(description, Managers.Input.HasPointer ? Managers.Input.PointerPosition : Vector2.zero);
                 }
             }
 

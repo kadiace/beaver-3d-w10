@@ -2,6 +2,12 @@
 
 This mode is enabled by `CastleGame3D.Start()` for the continuous-spawn scene.
 
+## Input actions
+
+- `Assets/InputSystem_Actions.inputactions` is the shared project-wide asset for gameplay and UI. `Managers.Input` reads its actions without adding or overriding bindings at runtime; the EventSystem prefab uses its UI map.
+- The Player map defines `PointerPosition`, `PointerDelta`, `PrimaryClick` (left mouse), `SecondaryClick` (right mouse), `CameraZoom` (wheel), `Cancel` (Escape), `RotateLeft` (Q), `RotateRight` (E), and `ToggleFloodPreview` (Tab). The rotation and flood-preview actions also cover the retained stage-placement mode.
+- Left click picks up and releases a piece. Right drag pans the camera; a short right click tracks a piece, and the wheel changes zoom. Escape closes the effects panel. Existing UI actions remain enabled while gameplay actions are active so buttons and popups continue to work during pauses.
+
 ## Runtime responsibilities
 
 - `CastleSynergy3D`: traverses actual attachment edges, evaluates direct vs connected-group abilities, assigns each member an integer score contribution, and applies trash penalties without clamping negative totals.

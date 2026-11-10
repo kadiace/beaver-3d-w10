@@ -2,9 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.EventSystems;
 
 namespace RestoreCastle3D
@@ -221,9 +220,8 @@ namespace RestoreCastle3D
             }
 
             if (_catalog == null) return;
-            Mouse mouse = Mouse.current;
             // Track releases even while the fifth drop is finishing or a popup is open.
-            if (mouse != null && mouse.leftButton.wasReleasedThisFrame)
+            if (Managers.Input.PrimaryReleased)
                 _dropMouseReleased = true;
 
             if (CanPreviewFlood && Managers.Input.FloodPreviewPressed)
@@ -234,7 +232,7 @@ namespace RestoreCastle3D
                 UpdateHoveredPiece();
             }
             if (_heldPiece != null || (_outlinedPiece != null && _outlinedPiece.CanPickUp &&
-                mouse != null && mouse.leftButton.wasPressedThisFrame && CanShowItemInfo))
+                Managers.Input.PrimaryPressed && CanShowItemInfo))
                 return;
             if (_resolving || _awaitingStage || _finished || _rulesOpen)
             {
@@ -242,32 +240,28 @@ namespace RestoreCastle3D
                 return;
             }
 
-            Keyboard keyboard = Keyboard.current;
-            if (keyboard != null)
-            {
-                if (keyboard.escapeKey.wasPressedThisFrame)
-                    OpenCandidatePalette();
-                if (keyboard.qKey.wasPressedThisFrame)
-                    _objectYaw -= 1f;
-                else if (keyboard.qKey.isPressed)
-                    _objectYaw -= RotationSpeed * Time.deltaTime;
+            if (Managers.Input.CancelPressed)
+                OpenCandidatePalette();
+            if (Managers.Input.RotateLeftPressed)
+                _objectYaw -= 1f;
+            else if (Managers.Input.RotateLeftHeld)
+                _objectYaw -= RotationSpeed * Time.deltaTime;
 
-                if (keyboard.eKey.wasPressedThisFrame)
-                    _objectYaw += 1f;
-                else if (keyboard.eKey.isPressed)
-                    _objectYaw += RotationSpeed * Time.deltaTime;
-            }
+            if (Managers.Input.RotateRightPressed)
+                _objectYaw += 1f;
+            else if (Managers.Input.RotateRightHeld)
+                _objectYaw += RotationSpeed * Time.deltaTime;
 
             UpdateDropPreview();
 
-            if (mouse == null || !mouse.leftButton.wasPressedThisFrame ||
-                mouse.rightButton.isPressed || mouse.rightButton.wasReleasedThisFrame ||
+            if (!Managers.Input.HasPointer || !Managers.Input.PrimaryPressed ||
+                Managers.Input.SecondaryHeld || Managers.Input.SecondaryReleased ||
                 !_dropMouseReleased || _selected < 0 ||
                 _placementsInRound >= PLACEMENTS_PER_ROUND ||
                 Time.unscaledTime - _lastDropTime < dropClickCooldown)
                 return;
 
-            if (!TryGetPlacementXZ(mouse.position.ReadValue(), out Vector3 placement))
+            if (!TryGetPlacementXZ(Managers.Input.PointerPosition, out Vector3 placement))
                 return;
 
             // An actual placement requires a new mouse-down after release and
@@ -354,10 +348,9 @@ namespace RestoreCastle3D
         /// <summary>선택한 자재의 실제 프리팹으로 -Y 방향 Raycast 낙하 예상 위치를 표시한다.</summary>
         private void UpdateDropPreview()
         {
-            Mouse mouse = Mouse.current;
-            if (mouse == null || _selected < 0 || mouse.rightButton.isPressed ||
+            if (!Managers.Input.HasPointer || _selected < 0 || Managers.Input.SecondaryHeld ||
                 _offers[_selected] == null ||
-                !TryGetCursorXZ(mouse.position.ReadValue(), out Vector3 placement))
+                !TryGetCursorXZ(Managers.Input.PointerPosition, out Vector3 placement))
             {
                 HideDropPreview();
                 return;
@@ -442,11 +435,10 @@ namespace RestoreCastle3D
         private void UpdateHoveredPiece()
         {
             if (_heldPiece != null) return;
-            Mouse mouse = Mouse.current;
-            if (mouse == null) { SetOutlineTargets(null); _hud?.SetHoveredPiece(null, Vector2.zero); return; }
+            if (!Managers.Input.HasPointer) { SetOutlineTargets(null); _hud?.SetHoveredPiece(null, Vector2.zero); return; }
 
-            Vector2 position = mouse.position.ReadValue();
-            if ((_spawnMaterials == null && !CanShowItemInfo) || mouse.rightButton.isPressed ||
+            Vector2 position = Managers.Input.PointerPosition;
+            if ((_spawnMaterials == null && !CanShowItemInfo) || Managers.Input.SecondaryHeld ||
                 (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()))
             {
                 SetOutlineTargets(null);
@@ -470,7 +462,7 @@ namespace RestoreCastle3D
             }
             if (_spawnMaterials == null) SetOutlineTargets(piece);
             _hud?.SetHoveredPiece(piece, position);
-            if (piece != null && piece.CanPickUp && mouse.leftButton.wasPressedThisFrame)
+            if (piece != null && piece.CanPickUp && Managers.Input.PrimaryPressed)
             {
                 _heldPiece = piece;
                 _heldHeight = _spawnMaterials != null
@@ -494,9 +486,8 @@ namespace RestoreCastle3D
         private void UpdateHeldPiece()
         {
             if (_heldPiece == null) return;
-            Mouse mouse = Mouse.current;
-            if (mouse == null) return;
-            Vector2 screen = mouse.position.ReadValue();
+            if (!Managers.Input.HasPointer) return;
+            Vector2 screen = Managers.Input.PointerPosition;
             bool hasCursor = TryGetCursorXZ(screen, out Vector3 cursor);
             if (hasCursor)
                 _heldPiece.MoveHeld(new Vector3(cursor.x + _holdOffset.x, _heldHeight,
@@ -504,7 +495,7 @@ namespace RestoreCastle3D
             Vector3 heldPosition = _heldPiece.transform.position;
             bool canDrop = hasCursor && heldPosition.x >= HELD_MIN_X && heldPosition.x <= HELD_MAX_X &&
                 heldPosition.z >= HELD_MIN_Z && heldPosition.z <= HELD_MAX_Z;
-            if (mouse.leftButton.wasReleasedThisFrame && canDrop)
+            if (Managers.Input.PrimaryReleased && canDrop)
             {
                 _heldPiece.Throw();
                 _heldPiece = null;
@@ -605,13 +596,8 @@ namespace RestoreCastle3D
         /// <summary>원본 2D 게임의 상단 상태 UI와 하단 자재 카드 UI 프리팹을 연결한다.</summary>
         private void CreateHud()
         {
-            // The Game scene has no EventSystem; uGUI buttons and hover handlers need one.
             if (EventSystem.current == null)
-            {
-                GameObject events = new GameObject("RestoreCastle UI EventSystem");
-                events.AddComponent<EventSystem>();
-                events.AddComponent<InputSystemUIInputModule>();
-            }
+                Managers.Resource.Instantiate("Prefabs/UIs/EventSystem");
             GameObject instance = Managers.Resource.Instantiate("Prefabs/UIs/RestoreCastleHud");
             if (instance == null) throw new InvalidOperationException("Missing original RestoreCastle HUD prefab.");
             instance.name = "RestoreCastleHud";
@@ -689,20 +675,21 @@ namespace RestoreCastle3D
             ResetGame();
         }
 
-        /// <summary>우클릭 드래그를 ISO 카메라 화면 방향에 투영해 월드 XZ 평면을 이동한다.</summary>
+        /// <summary>포인터 액션을 읽어 카메라 이동, 기물 추적과 줌 상태를 갱신한다.</summary>
         private void UpdateCameraInput()
         {
-            Mouse mouse = Mouse.current;
-            if (mouse == null)
+            if (!Managers.Input.HasPointer)
             {
                 _rightGestureActive = false;
                 return;
             }
 
-            var rightButton = mouse.rightButton;
+            bool rightPressed = Managers.Input.SecondaryPressed;
+            bool rightReleased = Managers.Input.SecondaryReleased;
+            bool rightHeld = Managers.Input.SecondaryHeld;
             bool pointerOverUi = EventSystem.current != null &&
                 EventSystem.current.IsPointerOverGameObject();
-            if (rightButton.wasPressedThisFrame)
+            if (rightPressed)
             {
                 _rightGestureActive = !pointerOverUi;
                 _rightGestureMoved = false;
@@ -710,11 +697,10 @@ namespace RestoreCastle3D
             }
 
             bool gestureInProgress = _rightGestureActive &&
-                (rightButton.isPressed || rightButton.wasReleasedThisFrame);
+                (rightHeld || rightReleased);
             if (gestureInProgress)
             {
-                Vector2 delta = rightButton.wasPressedThisFrame
-                    ? Vector2.zero : mouse.delta.ReadValue();
+                Vector2 delta = rightPressed ? Vector2.zero : Managers.Input.PointerDelta;
                 if (!_rightGestureMoved)
                 {
                     _rightDragDisplacement += delta;
@@ -758,7 +744,7 @@ namespace RestoreCastle3D
 
             }
 
-            if (rightButton.wasReleasedThisFrame && _rightGestureActive)
+            if (rightReleased && _rightGestureActive)
             {
                 if (!_rightGestureMoved && !pointerOverUi)
                 {
@@ -767,16 +753,16 @@ namespace RestoreCastle3D
                         // A short right click focuses the piece; a drag keeps panning.
                         if (_heldPiece == null)
                             CastleCreekScore3D.Active?.TrackUnderCursor(
-                                mouse.position.ReadValue());
+                                Managers.Input.PointerPosition);
                     }
                     else OpenCandidatePalette();
                 }
                 _rightGestureActive = false;
             }
 
-            if (!_rightGestureActive && !rightButton.isPressed)
+            if (!_rightGestureActive && !rightHeld)
             {
-                float scroll = mouse.scroll.ReadValue().y;
+                float scroll = Managers.Input.CameraZoom;
                 if (Mathf.Abs(scroll) > 0.01f)
                 {
                     float steps = scroll / WINDOWS_SCROLL_UNITS_PER_TICK;
@@ -789,7 +775,7 @@ namespace RestoreCastle3D
 
             // Keep the chosen moving piece centered until it settles, is discarded,
             // is picked up, or the player starts a right-button camera drag.
-            if (_spawnMaterials != null && !_rightGestureMoved && !rightButton.isPressed)
+            if (_spawnMaterials != null && !_rightGestureMoved && !rightHeld)
             {
                 CastlePiece3D tracked = CastleCreekScore3D.Active?.TrackedPiece;
                 if (tracked != null)

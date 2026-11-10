@@ -1,10 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using TMPro;
+
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
+
+using TMPro;
 
 namespace RestoreCastle3D
 {
@@ -463,13 +464,14 @@ namespace RestoreCastle3D
             UpdateHover();
         }
 
+        /// <summary>포인터와 추적 상태를 읽어 기물의 시너지 강조와 설명 패널을 갱신한다.</summary>
         private void UpdateHover()
         {
             if (_heldPiece != null)
             {
                 UpdateHeldPreview();
                 if (_heldPiece != null)
-                    ShowDescription(_heldPiece, Mouse.current == null ? Vector2.zero : Mouse.current.position.ReadValue(), true);
+                    ShowDescription(_heldPiece, Managers.Input.HasPointer ? Managers.Input.PointerPosition : Vector2.zero, true);
                 return;
             }
 
@@ -477,9 +479,8 @@ namespace RestoreCastle3D
             // object moves and the camera follows it. A pooled/settled piece cannot
             // remain tracked because Unregister() clears the reference.
             CastlePiece3D next = TrackedPiece;
-            Mouse mouse = Mouse.current;
-            if (next == null && mouse != null && !mouse.rightButton.isPressed)
-                next = PickAt(mouse.position.ReadValue());
+            if (next == null && Managers.Input.HasPointer && !Managers.Input.SecondaryHeld)
+                next = PickAt(Managers.Input.PointerPosition);
 
             _hovered = next;
             ClearOutlines();
@@ -503,7 +504,7 @@ namespace RestoreCastle3D
 
             Vector3 anchor = TrackedPiece == next
                 ? _camera.WorldToScreenPoint(next.transform.position)
-                : new Vector3(mouse.position.ReadValue().x, mouse.position.ReadValue().y, 1f);
+                : new Vector3(Managers.Input.PointerPosition.x, Managers.Input.PointerPosition.y, 1f);
             ShowDescription(next, anchor, false);
         }
 

@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
-using TMPro;
+
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+
+using TMPro;
 
 namespace RestoreCastle3D
 {
@@ -103,7 +103,7 @@ namespace RestoreCastle3D
         private void Update()
         {
             if (_score == null) return;
-            if (_effectsOverlay.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (_effectsOverlay.activeSelf && Managers.Input.CancelPressed)
                 HideEffects();
             if (!IsPaused)
             {
@@ -296,14 +296,11 @@ namespace RestoreCastle3D
             fill.offsetMax = Vector2.zero;
         }
 
+        /// <summary>공용 EventSystem을 연결하고 캠페인 상태와 결과를 표시할 UI를 생성한다.</summary>
         private void CreateUi()
         {
             if (EventSystem.current == null)
-            {
-                GameObject events = new GameObject("Creek UI EventSystem");
-                events.AddComponent<EventSystem>();
-                events.AddComponent<InputSystemUIInputModule>();
-            }
+                Managers.Resource.Instantiate("Prefabs/UIs/EventSystem");
             if (_canvas.GetComponent<GraphicRaycaster>() == null)
                 _canvas.gameObject.AddComponent<GraphicRaycaster>();
 
