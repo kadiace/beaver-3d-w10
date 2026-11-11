@@ -262,24 +262,17 @@ namespace BeaverRecycling
             foreach (RecyclingItem member in _held) member.SetHeld(true);
         }
 
-        /// <summary>운반 중 기물의 충돌 범위를 조회해 접촉한 상대 묶음을 한도 안에서 합친다.</summary>
+        /// <summary>운반 중인 기물의 XZ 투영 범위를 조회해 접촉한 상대 묶음을 한도 안에서 합친다.</summary>
         private void CollectContacts()
         {
             for (int i = 0; i < _held.Count; i++)
             {
                 RecyclingItem held = _held[i];
-                Bounds bounds = held.Collider.bounds;
-                int count;
-                while ((count = Physics.OverlapBoxNonAlloc(bounds.center, bounds.extents + Vector3.one * 0.04f,
-                    _overlapBuffer, Quaternion.identity, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) == _overlapBuffer.Length)
-                    Array.Resize(ref _overlapBuffer, _overlapBuffer.Length * 2);
-                for (int j = 0; j < count; j++)
+                Bounds heldBounds = held.Collider.bounds;
+                foreach (RecyclingItem other in _items)
                 {
-                    Collider collider = _overlapBuffer[j];
-                    RecyclingItem other = collider.GetComponentInParent<RecyclingItem>();
-                    if (other == null || other.IsHeld || !other.CanJoin || !_items.Contains(other)) continue;
-                    if (!Physics.ComputePenetration(held.Collider, held.transform.position, held.transform.rotation,
-                        other.Collider, other.transform.position, other.transform.rotation, out _, out _)) continue;
+                    if (other == held || other.IsHeld || !other.CanJoin) continue;
+                    if (!TryGetProjectedContactPoint(heldBounds, other.Collider.bounds, out Vector3 contactPoint)) continue;
                     List<RecyclingItem> incoming = RecyclingItem.Collect(other);
                     if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
                     if (_held.Count + incoming.Count > Capacity)
@@ -287,10 +280,43 @@ namespace BeaverRecycling
                         if (Time.time > _capacityNoticeAt) { _hud.Message("운반 한도가 가득 찼어요"); _capacityNoticeAt = Time.time + 1.5f; }
                         continue;
                     }
-                    held.Attach(other, other.Collider.ClosestPoint(held.Body.position));
+                    contactPoint = RaiseJoiningItemToContact(held, other, contactPoint);
+                    held.Attach(other, contactPoint);
                     foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
                 }
             }
+        }
+
+        /// <summary>두 월드 바운드의 XZ 투영이 닿거나 겹치는지 판정하고 투영 겹침 중심을 반환한다.</summary>
+        private static bool TryGetProjectedContactPoint(Bounds first, Bounds second, out Vector3 contactPoint)
+        {
+            float minX = Mathf.Max(first.min.x, second.min.x);
+            float maxX = Mathf.Min(first.max.x, second.max.x);
+            float minZ = Mathf.Max(first.min.z, second.min.z);
+            float maxZ = Mathf.Min(first.max.z, second.max.z);
+            if (minX > maxX || minZ > maxZ)
+            {
+                contactPoint = default;
+                return false;
+            }
+
+            contactPoint = new Vector3((minX + maxX) * 0.5f, (first.center.y + second.center.y) * 0.5f, (minZ + maxZ) * 0.5f);
+            return true;
+        }
+
+        /// <summary>기존 묶음보다 아래에 있는 새 기물을 올려 충돌체 바운드가 맞닿게 하고 조인트 지점을 조정한다.</summary>
+        private static Vector3 RaiseJoiningItemToContact(RecyclingItem held, RecyclingItem joining, Vector3 contactPoint)
+        {
+            Bounds heldBounds = held.Collider.bounds;
+            Bounds joiningBounds = joining.Collider.bounds;
+            float lift = heldBounds.min.y - joiningBounds.max.y;
+            if (lift <= 0f) return contactPoint;
+
+            Vector3 raisedPosition = joining.Body.position + Vector3.up * lift;
+            joining.Body.position = raisedPosition;
+            joining.transform.SetPositionAndRotation(raisedPosition, joining.Body.rotation);
+            contactPoint.y = heldBounds.min.y;
+            return contactPoint;
         }
 
         /// <summary>분리 여부를 받아 운반 묶음을 내려놓고 필요하면 모든 결합과 재접착을 잠시 해제한다.</summary>
