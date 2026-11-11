@@ -24,6 +24,7 @@ public class GameSceneContext : MonoBehaviour
 
     private void Start()
     {
+        Managers.Input.UseRecyclingControls(false);
         Managers.Input.SetInputMode(InputMode.Player);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;

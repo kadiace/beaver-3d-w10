@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc1ff9591337b0ff16bb688615053ccc, type: 3}
+  m_Name: RecyclingCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::BeaverRecycling.RecyclingCatalog
+  _items:
+  - _id: plastic_bottle
+    _name: "\uD50C\uB77C\uC2A4\uD2F1 \uBCD1"
+    _category: 0
+    _prefab: {fileID: 1005, guid: 48a99799f674ef674127d88dd03bf0b6, type: 3}
+    _firstDay: 1
+    _woodYield: 0
+    _weight: 1
+  - _id: plastic_box
+    _name: "\uD50C\uB77C\uC2A4\uD2F1 \uC6A9\uAE30"
+    _category: 0
+    _prefab: {fileID: 1005, guid: dcd2e56800f20557e1d6ca2604ddb463, type: 3}
+    _firstDay: 1
+    _woodYield: 0
+    _weight: 1
+  - _id: glass_bottle
+    _name: "\uC720\uB9AC\uBCD1"
+    _category: 1
+    _prefab: {fileID: 1005, guid: 16dbd2736ed3c77bc9f6c924b74a0065, type: 3}
+    _firstDay: 2
+    _woodYield: 0
+    _weight: 1
+  - _id: glass_jar
+    _name: "\uC720\uB9AC \uB2E8\uC9C0"
+    _category: 1
+    _prefab: {fileID: 1005, guid: 14f3b8c54f1802352acc4edf208d6dfe, type: 3}
+    _firstDay: 2
+    _woodYield: 0
+    _weight: 1
+  - _id: film_bag
+    _name: "\uBE44\uB2D0\uBD09\uD22C"
+    _category: 2
+    _prefab: {fileID: 1005, guid: 0eeeb09d86ecb16e776e5bb67258d591, type: 3}
+    _firstDay: 3
+    _woodYield: 0
+    _weight: 1
+  - _id: film_wrapper
+    _name: "\uD3EC\uC7A5 \uBE44\uB2D0"
+    _category: 2
+    _prefab: {fileID: 1005, guid: 17da66d2f94502bb2be2a98946566d69, type: 3}
+    _firstDay: 3
+    _woodYield: 0
+    _weight: 1
+  - _id: metal_can
+    _name: "\uCC0C\uADF8\uB7EC\uC9C4 \uCE94"
+    _category: 3
+    _prefab: {fileID: 1005, guid: aa49886f7a780b99f557c7060f6c340d, type: 3}
+    _firstDay: 1
+    _woodYield: 0
+    _weight: 1
+  - _id: metal_bucket
+    _name: "\uAE08\uC18D \uD1B5"
+    _category: 3
+    _prefab: {fileID: 1005, guid: 2267dcb3e15a420096da9cf866eeb246, type: 3}
+    _firstDay: 1
+    _woodYield: 0
+    _weight: 1
+  - _id: wood_branch
+    _name: "\uB098\uBB47\uAC00\uC9C0"
+    _category: 4
+    _prefab: {fileID: 1005, guid: bb62ca1f22087f4769c50cf2fdbbb6d7, type: 3}
+    _firstDay: 1
+    _woodYield: 1
+    _weight: 3
+  - _id: wood_log
+    _name: "\uD1B5\uB098\uBB34"
+    _category: 4
+    _prefab: {fileID: 1005, guid: 4e5276eefcd29006195dc39f85b39163, type: 3}
+    _firstDay: 2
+    _woodYield: 3
+    _weight: 1

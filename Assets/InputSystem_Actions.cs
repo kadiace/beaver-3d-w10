@@ -191,6 +191,86 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""initialStateCheck"": false,
                     ""priority"": 0
+                },
+                {
+                    ""name"": ""PointerPosition"",
+                    ""type"": ""Value"",
+                    ""id"": ""89d4878e-0e48-4151-b6dc-e8044b969f36"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""PointerDelta"",
+                    ""type"": ""Value"",
+                    ""id"": ""4d63b619-84d5-40d1-af7f-9f4612a23cac"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""PrimaryClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""d2c444c4-0908-47fc-ae03-12c4e2e6cedc"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""SecondaryClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""2ab9f3bd-290e-476a-8863-1488b3d5992f"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""CameraZoom"",
+                    ""type"": ""Value"",
+                    ""id"": ""f5f7ad7f-94e4-439a-912f-c06bd986c148"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""Cancel"",
+                    ""type"": ""Button"",
+                    ""id"": ""c10a0f84-0a3d-4436-a05b-4a5b6c410b6d"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""RotateLeft"",
+                    ""type"": ""Button"",
+                    ""id"": ""f22eebba-eb2c-4f82-af6c-c650ef64cb48"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""RotateRight"",
+                    ""type"": ""Button"",
+                    ""id"": ""ef239cc2-36a4-4644-ae08-2640cdf578b1"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
                 }
             ],
             ""bindings"": [
@@ -587,6 +667,94 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": ""Keyboard&Mouse"",
                     ""action"": ""ToggleFloodPreview"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""4007ac71-1f4f-4957-92c7-49cc4c00a391"",
+                    ""path"": ""<Mouse>/position"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""PointerPosition"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5147e298-dd3f-4a27-9ed7-1e5e44977c89"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""PointerDelta"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""efe2471d-85f6-412f-a0f0-aa89f6ee2121"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""PrimaryClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8784b1f6-4907-4000-8297-64c927393a40"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""SecondaryClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c7ebbacb-a7eb-4d2e-9852-caaf84a1e874"",
+                    ""path"": ""<Mouse>/scroll"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""CameraZoom"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d55df4d2-b1a7-4de6-bcee-87404ebdc1ea"",
+                    ""path"": ""<Keyboard>/escape"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""Cancel"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""dbf5f7b0-8b49-4727-84e2-b2752cddd5e1"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""RotateLeft"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""fe7a3251-7cff-465b-8913-c2e0f5d670cf"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""RotateRight"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1117,6 +1285,324 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""isPartOfComposite"": false
                 }
             ]
+        },
+        {
+            ""name"": ""Recycling"",
+            ""id"": ""3996f7d2-7212-ac66-dc29-81c8eb68c2a0"",
+            ""actions"": [
+                {
+                    ""name"": ""Move"",
+                    ""type"": ""Value"",
+                    ""id"": ""8784c9ec-febc-8c04-e64c-44fecdf63d42"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""PointerPosition"",
+                    ""type"": ""Value"",
+                    ""id"": ""e83f29b5-e4e5-83aa-8d96-4680191f4a7c"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""PointerDelta"",
+                    ""type"": ""Value"",
+                    ""id"": ""b012abbb-e19f-f690-c191-e5e7feaade3d"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""PrimaryClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""66cc0740-c505-4a32-ff89-f358d9554c82"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""SecondaryClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""f635f7b3-0707-1b2e-df4f-fa179998e067"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""CameraZoom"",
+                    ""type"": ""Value"",
+                    ""id"": ""d16aa413-bc92-56ca-afd5-0883cda66ad1"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""Cancel"",
+                    ""type"": ""Button"",
+                    ""id"": ""6baa6d03-9334-ef73-8832-28cf4ea6cc63"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""Submit"",
+                    ""type"": ""Button"",
+                    ""id"": ""262c318e-12be-f020-5b63-339bc6e2e102"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
+                    ""name"": ""SplitBundle"",
+                    ""type"": ""Button"",
+                    ""id"": ""98542636-b0ac-f6b0-12c7-8f77674c9017"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""e7a98f9d-ab96-5568-6dc6-f0f13cb529e0"",
+                    ""path"": ""<Gamepad>/leftStick"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""WASD"",
+                    ""id"": ""a9b8e50f-cdbb-444c-50fa-400e845a5717"",
+                    ""path"": ""Dpad"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Move"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""dac57117-dbca-e15e-7fd1-552e3cf571a2"",
+                    ""path"": ""<Keyboard>/w"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""f07d7738-1f9e-1ec7-e936-736a01403c55"",
+                    ""path"": ""<Keyboard>/upArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""68df4d48-8ce3-8dbb-f066-5b297b4565fb"",
+                    ""path"": ""<Keyboard>/s"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""94578558-3074-dc48-9758-5bb24da472fe"",
+                    ""path"": ""<Keyboard>/downArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""ff3bfa34-3555-a54e-31ed-53791cc3e192"",
+                    ""path"": ""<Keyboard>/a"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""08dadab9-5c73-1b57-034e-55ac970a9906"",
+                    ""path"": ""<Keyboard>/leftArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""4f6bfe49-f0e1-eb06-cb8e-81014a9dc1a6"",
+                    ""path"": ""<Keyboard>/d"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""ebd482b5-f6a2-f475-c60b-ef6a5c678760"",
+                    ""path"": ""<Keyboard>/rightArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""4b9297ec-2b10-bc1a-f57d-81594763e7e5"",
+                    ""path"": ""<XRController>/{Primary2DAxis}"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""XR"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5457ecd9-b654-3e57-a5fe-d2e5762258a8"",
+                    ""path"": ""<Joystick>/stick"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Joystick"",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""6befd7cf-11e3-c854-c48a-bf123d84e287"",
+                    ""path"": ""<Mouse>/position"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""PointerPosition"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d5bef88d-2a2f-a42f-9133-b3caacfcbbb8"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""PointerDelta"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2c496dd9-692c-d8f1-4d45-caf5d4abaa33"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""PrimaryClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""83bf430c-f120-18c8-893e-9787a2d548cd"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""SecondaryClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""28df4bf4-6f9b-4022-3979-d3eb63f67905"",
+                    ""path"": ""<Mouse>/scroll"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""CameraZoom"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""906ed40f-70bb-93a6-028e-8c5d5344d9f2"",
+                    ""path"": ""<Keyboard>/escape"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""Cancel"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""de8dda64-c3a9-9948-0e72-b3fcdd9e815f"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""Submit"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f99064be-1cf2-ac89-cbf2-6b0db2810845"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""SplitBundle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                }
+            ]
         }
     ],
     ""controlSchemes"": [
@@ -1194,6 +1680,14 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         m_Player_Next = m_Player.FindAction("Next", throwIfNotFound: true);
         m_Player_Sprint = m_Player.FindAction("Sprint", throwIfNotFound: true);
         m_Player_ToggleFloodPreview = m_Player.FindAction("ToggleFloodPreview", throwIfNotFound: true);
+        m_Player_PointerPosition = m_Player.FindAction("PointerPosition", throwIfNotFound: true);
+        m_Player_PointerDelta = m_Player.FindAction("PointerDelta", throwIfNotFound: true);
+        m_Player_PrimaryClick = m_Player.FindAction("PrimaryClick", throwIfNotFound: true);
+        m_Player_SecondaryClick = m_Player.FindAction("SecondaryClick", throwIfNotFound: true);
+        m_Player_CameraZoom = m_Player.FindAction("CameraZoom", throwIfNotFound: true);
+        m_Player_Cancel = m_Player.FindAction("Cancel", throwIfNotFound: true);
+        m_Player_RotateLeft = m_Player.FindAction("RotateLeft", throwIfNotFound: true);
+        m_Player_RotateRight = m_Player.FindAction("RotateRight", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1206,12 +1700,24 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         m_UI_ScrollWheel = m_UI.FindAction("ScrollWheel", throwIfNotFound: true);
         m_UI_TrackedDevicePosition = m_UI.FindAction("TrackedDevicePosition", throwIfNotFound: true);
         m_UI_TrackedDeviceOrientation = m_UI.FindAction("TrackedDeviceOrientation", throwIfNotFound: true);
+        // Recycling
+        m_Recycling = asset.FindActionMap("Recycling", throwIfNotFound: true);
+        m_Recycling_Move = m_Recycling.FindAction("Move", throwIfNotFound: true);
+        m_Recycling_PointerPosition = m_Recycling.FindAction("PointerPosition", throwIfNotFound: true);
+        m_Recycling_PointerDelta = m_Recycling.FindAction("PointerDelta", throwIfNotFound: true);
+        m_Recycling_PrimaryClick = m_Recycling.FindAction("PrimaryClick", throwIfNotFound: true);
+        m_Recycling_SecondaryClick = m_Recycling.FindAction("SecondaryClick", throwIfNotFound: true);
+        m_Recycling_CameraZoom = m_Recycling.FindAction("CameraZoom", throwIfNotFound: true);
+        m_Recycling_Cancel = m_Recycling.FindAction("Cancel", throwIfNotFound: true);
+        m_Recycling_Submit = m_Recycling.FindAction("Submit", throwIfNotFound: true);
+        m_Recycling_SplitBundle = m_Recycling.FindAction("SplitBundle", throwIfNotFound: true);
     }
 
     ~@InputSystem_Actions()
     {
         UnityEngine.Debug.Assert(!m_Player.enabled, "This will cause a leak and performance issues, InputSystem_Actions.Player.Disable() has not been called.");
         UnityEngine.Debug.Assert(!m_UI.enabled, "This will cause a leak and performance issues, InputSystem_Actions.UI.Disable() has not been called.");
+        UnityEngine.Debug.Assert(!m_Recycling.enabled, "This will cause a leak and performance issues, InputSystem_Actions.Recycling.Disable() has not been called.");
     }
 
     /// <summary>
@@ -1297,6 +1803,14 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Next;
     private readonly InputAction m_Player_Sprint;
     private readonly InputAction m_Player_ToggleFloodPreview;
+    private readonly InputAction m_Player_PointerPosition;
+    private readonly InputAction m_Player_PointerDelta;
+    private readonly InputAction m_Player_PrimaryClick;
+    private readonly InputAction m_Player_SecondaryClick;
+    private readonly InputAction m_Player_CameraZoom;
+    private readonly InputAction m_Player_Cancel;
+    private readonly InputAction m_Player_RotateLeft;
+    private readonly InputAction m_Player_RotateRight;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1348,6 +1862,38 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/ToggleFloodPreview".
         /// </summary>
         public InputAction @ToggleFloodPreview => m_Wrapper.m_Player_ToggleFloodPreview;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/PointerPosition".
+        /// </summary>
+        public InputAction @PointerPosition => m_Wrapper.m_Player_PointerPosition;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/PointerDelta".
+        /// </summary>
+        public InputAction @PointerDelta => m_Wrapper.m_Player_PointerDelta;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/PrimaryClick".
+        /// </summary>
+        public InputAction @PrimaryClick => m_Wrapper.m_Player_PrimaryClick;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/SecondaryClick".
+        /// </summary>
+        public InputAction @SecondaryClick => m_Wrapper.m_Player_SecondaryClick;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/CameraZoom".
+        /// </summary>
+        public InputAction @CameraZoom => m_Wrapper.m_Player_CameraZoom;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Cancel".
+        /// </summary>
+        public InputAction @Cancel => m_Wrapper.m_Player_Cancel;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/RotateLeft".
+        /// </summary>
+        public InputAction @RotateLeft => m_Wrapper.m_Player_RotateLeft;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/RotateRight".
+        /// </summary>
+        public InputAction @RotateRight => m_Wrapper.m_Player_RotateRight;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1404,6 +1950,30 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @ToggleFloodPreview.started += instance.OnToggleFloodPreview;
             @ToggleFloodPreview.performed += instance.OnToggleFloodPreview;
             @ToggleFloodPreview.canceled += instance.OnToggleFloodPreview;
+            @PointerPosition.started += instance.OnPointerPosition;
+            @PointerPosition.performed += instance.OnPointerPosition;
+            @PointerPosition.canceled += instance.OnPointerPosition;
+            @PointerDelta.started += instance.OnPointerDelta;
+            @PointerDelta.performed += instance.OnPointerDelta;
+            @PointerDelta.canceled += instance.OnPointerDelta;
+            @PrimaryClick.started += instance.OnPrimaryClick;
+            @PrimaryClick.performed += instance.OnPrimaryClick;
+            @PrimaryClick.canceled += instance.OnPrimaryClick;
+            @SecondaryClick.started += instance.OnSecondaryClick;
+            @SecondaryClick.performed += instance.OnSecondaryClick;
+            @SecondaryClick.canceled += instance.OnSecondaryClick;
+            @CameraZoom.started += instance.OnCameraZoom;
+            @CameraZoom.performed += instance.OnCameraZoom;
+            @CameraZoom.canceled += instance.OnCameraZoom;
+            @Cancel.started += instance.OnCancel;
+            @Cancel.performed += instance.OnCancel;
+            @Cancel.canceled += instance.OnCancel;
+            @RotateLeft.started += instance.OnRotateLeft;
+            @RotateLeft.performed += instance.OnRotateLeft;
+            @RotateLeft.canceled += instance.OnRotateLeft;
+            @RotateRight.started += instance.OnRotateRight;
+            @RotateRight.performed += instance.OnRotateRight;
+            @RotateRight.canceled += instance.OnRotateRight;
         }
 
         /// <summary>
@@ -1445,6 +2015,30 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @ToggleFloodPreview.started -= instance.OnToggleFloodPreview;
             @ToggleFloodPreview.performed -= instance.OnToggleFloodPreview;
             @ToggleFloodPreview.canceled -= instance.OnToggleFloodPreview;
+            @PointerPosition.started -= instance.OnPointerPosition;
+            @PointerPosition.performed -= instance.OnPointerPosition;
+            @PointerPosition.canceled -= instance.OnPointerPosition;
+            @PointerDelta.started -= instance.OnPointerDelta;
+            @PointerDelta.performed -= instance.OnPointerDelta;
+            @PointerDelta.canceled -= instance.OnPointerDelta;
+            @PrimaryClick.started -= instance.OnPrimaryClick;
+            @PrimaryClick.performed -= instance.OnPrimaryClick;
+            @PrimaryClick.canceled -= instance.OnPrimaryClick;
+            @SecondaryClick.started -= instance.OnSecondaryClick;
+            @SecondaryClick.performed -= instance.OnSecondaryClick;
+            @SecondaryClick.canceled -= instance.OnSecondaryClick;
+            @CameraZoom.started -= instance.OnCameraZoom;
+            @CameraZoom.performed -= instance.OnCameraZoom;
+            @CameraZoom.canceled -= instance.OnCameraZoom;
+            @Cancel.started -= instance.OnCancel;
+            @Cancel.performed -= instance.OnCancel;
+            @Cancel.canceled -= instance.OnCancel;
+            @RotateLeft.started -= instance.OnRotateLeft;
+            @RotateLeft.performed -= instance.OnRotateLeft;
+            @RotateLeft.canceled -= instance.OnRotateLeft;
+            @RotateRight.started -= instance.OnRotateRight;
+            @RotateRight.performed -= instance.OnRotateRight;
+            @RotateRight.canceled -= instance.OnRotateRight;
         }
 
         /// <summary>
@@ -1673,6 +2267,190 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
     /// Provides a new <see cref="UIActions" /> instance referencing this action map.
     /// </summary>
     public UIActions @UI => new UIActions(this);
+
+    // Recycling
+    private readonly InputActionMap m_Recycling;
+    private List<IRecyclingActions> m_RecyclingActionsCallbackInterfaces = new List<IRecyclingActions>();
+    private readonly InputAction m_Recycling_Move;
+    private readonly InputAction m_Recycling_PointerPosition;
+    private readonly InputAction m_Recycling_PointerDelta;
+    private readonly InputAction m_Recycling_PrimaryClick;
+    private readonly InputAction m_Recycling_SecondaryClick;
+    private readonly InputAction m_Recycling_CameraZoom;
+    private readonly InputAction m_Recycling_Cancel;
+    private readonly InputAction m_Recycling_Submit;
+    private readonly InputAction m_Recycling_SplitBundle;
+    /// <summary>
+    /// Provides access to input actions defined in input action map "Recycling".
+    /// </summary>
+    public struct RecyclingActions
+    {
+        private @InputSystem_Actions m_Wrapper;
+
+        /// <summary>
+        /// Construct a new instance of the input action map wrapper class.
+        /// </summary>
+        public RecyclingActions(@InputSystem_Actions wrapper) { m_Wrapper = wrapper; }
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/Move".
+        /// </summary>
+        public InputAction @Move => m_Wrapper.m_Recycling_Move;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/PointerPosition".
+        /// </summary>
+        public InputAction @PointerPosition => m_Wrapper.m_Recycling_PointerPosition;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/PointerDelta".
+        /// </summary>
+        public InputAction @PointerDelta => m_Wrapper.m_Recycling_PointerDelta;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/PrimaryClick".
+        /// </summary>
+        public InputAction @PrimaryClick => m_Wrapper.m_Recycling_PrimaryClick;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/SecondaryClick".
+        /// </summary>
+        public InputAction @SecondaryClick => m_Wrapper.m_Recycling_SecondaryClick;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/CameraZoom".
+        /// </summary>
+        public InputAction @CameraZoom => m_Wrapper.m_Recycling_CameraZoom;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/Cancel".
+        /// </summary>
+        public InputAction @Cancel => m_Wrapper.m_Recycling_Cancel;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/Submit".
+        /// </summary>
+        public InputAction @Submit => m_Wrapper.m_Recycling_Submit;
+        /// <summary>
+        /// Provides access to the underlying input action "Recycling/SplitBundle".
+        /// </summary>
+        public InputAction @SplitBundle => m_Wrapper.m_Recycling_SplitBundle;
+        /// <summary>
+        /// Provides access to the underlying input action map instance.
+        /// </summary>
+        public InputActionMap Get() { return m_Wrapper.m_Recycling; }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Enable()" />
+        public void Enable() { Get().Enable(); }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Disable()" />
+        public void Disable() { Get().Disable(); }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.enabled" />
+        public bool enabled => Get().enabled;
+        /// <summary>
+        /// Implicitly converts an <see ref="RecyclingActions" /> to an <see ref="InputActionMap" /> instance.
+        /// </summary>
+        public static implicit operator InputActionMap(RecyclingActions set) { return set.Get(); }
+        /// <summary>
+        /// Adds <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+        /// </summary>
+        /// <param name="instance">Callback instance.</param>
+        /// <remarks>
+        /// If <paramref name="instance" /> is <c>null</c> or <paramref name="instance"/> have already been added this method does nothing.
+        /// </remarks>
+        /// <seealso cref="RecyclingActions" />
+        public void AddCallbacks(IRecyclingActions instance)
+        {
+            if (instance == null || m_Wrapper.m_RecyclingActionsCallbackInterfaces.Contains(instance)) return;
+            m_Wrapper.m_RecyclingActionsCallbackInterfaces.Add(instance);
+            @Move.started += instance.OnMove;
+            @Move.performed += instance.OnMove;
+            @Move.canceled += instance.OnMove;
+            @PointerPosition.started += instance.OnPointerPosition;
+            @PointerPosition.performed += instance.OnPointerPosition;
+            @PointerPosition.canceled += instance.OnPointerPosition;
+            @PointerDelta.started += instance.OnPointerDelta;
+            @PointerDelta.performed += instance.OnPointerDelta;
+            @PointerDelta.canceled += instance.OnPointerDelta;
+            @PrimaryClick.started += instance.OnPrimaryClick;
+            @PrimaryClick.performed += instance.OnPrimaryClick;
+            @PrimaryClick.canceled += instance.OnPrimaryClick;
+            @SecondaryClick.started += instance.OnSecondaryClick;
+            @SecondaryClick.performed += instance.OnSecondaryClick;
+            @SecondaryClick.canceled += instance.OnSecondaryClick;
+            @CameraZoom.started += instance.OnCameraZoom;
+            @CameraZoom.performed += instance.OnCameraZoom;
+            @CameraZoom.canceled += instance.OnCameraZoom;
+            @Cancel.started += instance.OnCancel;
+            @Cancel.performed += instance.OnCancel;
+            @Cancel.canceled += instance.OnCancel;
+            @Submit.started += instance.OnSubmit;
+            @Submit.performed += instance.OnSubmit;
+            @Submit.canceled += instance.OnSubmit;
+            @SplitBundle.started += instance.OnSplitBundle;
+            @SplitBundle.performed += instance.OnSplitBundle;
+            @SplitBundle.canceled += instance.OnSplitBundle;
+        }
+
+        /// <summary>
+        /// Removes <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+        /// </summary>
+        /// <remarks>
+        /// Calling this method when <paramref name="instance" /> have not previously been registered has no side-effects.
+        /// </remarks>
+        /// <seealso cref="RecyclingActions" />
+        private void UnregisterCallbacks(IRecyclingActions instance)
+        {
+            @Move.started -= instance.OnMove;
+            @Move.performed -= instance.OnMove;
+            @Move.canceled -= instance.OnMove;
+            @PointerPosition.started -= instance.OnPointerPosition;
+            @PointerPosition.performed -= instance.OnPointerPosition;
+            @PointerPosition.canceled -= instance.OnPointerPosition;
+            @PointerDelta.started -= instance.OnPointerDelta;
+            @PointerDelta.performed -= instance.OnPointerDelta;
+            @PointerDelta.canceled -= instance.OnPointerDelta;
+            @PrimaryClick.started -= instance.OnPrimaryClick;
+            @PrimaryClick.performed -= instance.OnPrimaryClick;
+            @PrimaryClick.canceled -= instance.OnPrimaryClick;
+            @SecondaryClick.started -= instance.OnSecondaryClick;
+            @SecondaryClick.performed -= instance.OnSecondaryClick;
+            @SecondaryClick.canceled -= instance.OnSecondaryClick;
+            @CameraZoom.started -= instance.OnCameraZoom;
+            @CameraZoom.performed -= instance.OnCameraZoom;
+            @CameraZoom.canceled -= instance.OnCameraZoom;
+            @Cancel.started -= instance.OnCancel;
+            @Cancel.performed -= instance.OnCancel;
+            @Cancel.canceled -= instance.OnCancel;
+            @Submit.started -= instance.OnSubmit;
+            @Submit.performed -= instance.OnSubmit;
+            @Submit.canceled -= instance.OnSubmit;
+            @SplitBundle.started -= instance.OnSplitBundle;
+            @SplitBundle.performed -= instance.OnSplitBundle;
+            @SplitBundle.canceled -= instance.OnSplitBundle;
+        }
+
+        /// <summary>
+        /// Unregisters <param cref="instance" /> and unregisters all input action callbacks via <see cref="RecyclingActions.UnregisterCallbacks(IRecyclingActions)" />.
+        /// </summary>
+        /// <seealso cref="RecyclingActions.UnregisterCallbacks(IRecyclingActions)" />
+        public void RemoveCallbacks(IRecyclingActions instance)
+        {
+            if (m_Wrapper.m_RecyclingActionsCallbackInterfaces.Remove(instance))
+                UnregisterCallbacks(instance);
+        }
+
+        /// <summary>
+        /// Replaces all existing callback instances and previously registered input action callbacks associated with them with callbacks provided via <param cref="instance" />.
+        /// </summary>
+        /// <remarks>
+        /// If <paramref name="instance" /> is <c>null</c>, calling this method will only unregister all existing callbacks but not register any new callbacks.
+        /// </remarks>
+        /// <seealso cref="RecyclingActions.AddCallbacks(IRecyclingActions)" />
+        /// <seealso cref="RecyclingActions.RemoveCallbacks(IRecyclingActions)" />
+        /// <seealso cref="RecyclingActions.UnregisterCallbacks(IRecyclingActions)" />
+        public void SetCallbacks(IRecyclingActions instance)
+        {
+            foreach (var item in m_Wrapper.m_RecyclingActionsCallbackInterfaces)
+                UnregisterCallbacks(item);
+            m_Wrapper.m_RecyclingActionsCallbackInterfaces.Clear();
+            AddCallbacks(instance);
+        }
+    }
+    /// <summary>
+    /// Provides a new <see cref="RecyclingActions" /> instance referencing this action map.
+    /// </summary>
+    public RecyclingActions @Recycling => new RecyclingActions(this);
     private int m_KeyboardMouseSchemeIndex = -1;
     /// <summary>
     /// Provides access to the input control scheme.
@@ -1815,6 +2593,62 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnToggleFloodPreview(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PointerPosition" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPointerPosition(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PointerDelta" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPointerDelta(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PrimaryClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPrimaryClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SecondaryClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSecondaryClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraZoom" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraZoom(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Cancel" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCancel(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "RotateLeft" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnRotateLeft(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "RotateRight" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnRotateRight(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.
@@ -1893,5 +2727,76 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnTrackedDeviceOrientation(InputAction.CallbackContext context);
+    }
+    /// <summary>
+    /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "Recycling" which allows adding and removing callbacks.
+    /// </summary>
+    /// <seealso cref="RecyclingActions.AddCallbacks(IRecyclingActions)" />
+    /// <seealso cref="RecyclingActions.RemoveCallbacks(IRecyclingActions)" />
+    public interface IRecyclingActions
+    {
+        /// <summary>
+        /// Method invoked when associated input action "Move" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMove(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PointerPosition" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPointerPosition(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PointerDelta" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPointerDelta(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "PrimaryClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPrimaryClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SecondaryClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSecondaryClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CameraZoom" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCameraZoom(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Cancel" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCancel(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Submit" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSubmit(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SplitBundle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSplitBundle(InputAction.CallbackContext context);
     }
 }

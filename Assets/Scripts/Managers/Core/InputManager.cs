@@ -8,8 +8,10 @@ public class InputManager
     [Header("Input System")]
     private InputActionAsset _actions;
     private InputActionMap _playerMap;
+    private InputActionMap _recyclingMap;
     private InputActionMap _uiMap;
     private InputMode _inputMode = InputMode.Player;
+    private bool _useRecyclingControls;
 
     [Header("Player actions")]
     private InputAction _move;
@@ -22,6 +24,8 @@ public class InputManager
     private InputAction _rotateLeft;
     private InputAction _rotateRight;
     private InputAction _floodPreview;
+    private InputAction _submit;
+    private InputAction _splitBundle;
 
     [Header("UI actions")]
     private InputAction _uiClick;
@@ -37,6 +41,9 @@ public class InputManager
     public bool SecondaryReleased => _secondaryClick.WasReleasedThisFrame();
     public bool SecondaryHeld => _secondaryClick.IsPressed();
     public float CameraZoom => _cameraZoom.ReadValue<Vector2>().y;
+    public float CameraZoomSteps => NormalizeScroll(CameraZoom);
+    public bool SubmitPressed => _submit.WasPressedThisFrame();
+    public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame();
     public bool CancelPressed => _inputMode == InputMode.Player
         ? _cancel.WasPressedThisFrame() : _uiCancel.WasPressedThisFrame();
     public bool RotateLeftPressed => _rotateLeft.WasPressedThisFrame();
@@ -55,22 +62,47 @@ public class InputManager
         if (_actions == null) throw new InvalidOperationException("Project-wide Input Actions asset is not configured.");
 
         _playerMap = _actions.FindActionMap("Player", true);
+        _recyclingMap = _actions.FindActionMap("Recycling", true);
         _uiMap = _actions.FindActionMap("UI", true);
-        _move = _playerMap.FindAction("Move", true);
-        _pointerPosition = _playerMap.FindAction("PointerPosition", true);
-        _pointerDelta = _playerMap.FindAction("PointerDelta", true);
-        _primaryClick = _playerMap.FindAction("PrimaryClick", true);
-        _secondaryClick = _playerMap.FindAction("SecondaryClick", true);
-        _cameraZoom = _playerMap.FindAction("CameraZoom", true);
-        _cancel = _playerMap.FindAction("Cancel", true);
+        CacheGameplayActions(_playerMap);
         _rotateLeft = _playerMap.FindAction("RotateLeft", true);
         _rotateRight = _playerMap.FindAction("RotateRight", true);
         _floodPreview = _playerMap.FindAction("ToggleFloodPreview", true);
+        _submit = _recyclingMap.FindAction("Submit", true);
+        _splitBundle = _recyclingMap.FindAction("SplitBundle", true);
         _uiClick = _uiMap.FindAction("Click", true);
         _uiCancel = _uiMap.FindAction("Cancel", true);
 
         InputSystem.onActionChange += CheckDeviceType;
         SetInputMode(InputMode.Player);
+    }
+
+    /// <summary>분리수거 모드 여부를 받아 공용 조작의 참조와 활성 맵을 전환하고 기존 Player 맵을 보존한다.</summary>
+    public void UseRecyclingControls(bool enabled)
+    {
+        _useRecyclingControls = enabled;
+        CacheGameplayActions(enabled ? _recyclingMap : _playerMap);
+        SetInputMode(_inputMode);
+    }
+
+    /// <summary>선택된 게임 액션 맵을 받아 이동·포인터·버튼·취소 액션 참조를 갱신한다.</summary>
+    private void CacheGameplayActions(InputActionMap map)
+    {
+        _move = map.FindAction("Move", true);
+        _pointerPosition = map.FindAction("PointerPosition", true);
+        _pointerDelta = map.FindAction("PointerDelta", true);
+        _primaryClick = map.FindAction("PrimaryClick", true);
+        _secondaryClick = map.FindAction("SecondaryClick", true);
+        _cameraZoom = map.FindAction("CameraZoom", true);
+        _cancel = map.FindAction("Cancel", true);
+    }
+
+    /// <summary>공용 휠 값을 입력 설정과 플랫폼에 따라 실제 휠 칸 수로 환산해 반환한다.</summary>
+    private static float NormalizeScroll(float scroll)
+    {
+        bool windows = Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer;
+        return windows && InputSystem.settings.scrollDeltaBehavior == InputSettings.ScrollDeltaBehavior.KeepPlatformSpecificInputRange
+            ? scroll / 120f : scroll;
     }
 
     /// <summary>입력 모드에 따라 게임 액션을 켜거나 끄고 UI 액션과 커서·시간 상태를 갱신한다.</summary>
@@ -80,16 +112,17 @@ public class InputManager
         if (_actions == null) return;
 
         _uiMap.Enable();
+        _playerMap.Disable();
+        _recyclingMap.Disable();
         if (mode == InputMode.Player)
         {
-            _playerMap.Enable();
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            (_useRecyclingControls ? _recyclingMap : _playerMap).Enable();
+            Cursor.lockState = _useRecyclingControls ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = _useRecyclingControls;
             Time.timeScale = 1f;
         }
         else
         {
-            _playerMap.Disable();
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             Time.timeScale = 0f;

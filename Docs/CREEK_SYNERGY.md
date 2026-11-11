@@ -1,5 +1,7 @@
 # Endless creek: Joint synergy and settlement
 
+> 현재 분리수거 씬과 규칙은 [비버 분리수거 POC 상세 명세](BEAVER_RECYCLING_SPEC.md)를 따른다. 이 문서는 분리수거 버전 이전 하천 빌드의 점수·접착 구현 기록이다.
+
 This mode is enabled by `CastleGame3D.Start()` for the continuous-spawn scene.
 
 ## Input actions
