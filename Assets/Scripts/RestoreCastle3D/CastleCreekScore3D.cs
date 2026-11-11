@@ -97,7 +97,7 @@ namespace RestoreCastle3D
             _hoverText.rectTransform.anchorMax = Vector2.one;
             _hoverText.rectTransform.offsetMin = new Vector2(16f, 12f);
             _hoverText.rectTransform.offsetMax = new Vector2(-16f, -14f);
-            _hoverText.enableWordWrapping = true;
+            _hoverText.textWrappingMode = TextWrappingModes.Normal;
             _hoverText.overflowMode = TextOverflowModes.Ellipsis;
             _hoverPanel.gameObject.SetActive(false);
             _edgeText = CreateLabel("Offscreen Score Indicator", 54, TextAlignmentOptions.Center);
@@ -130,7 +130,7 @@ namespace RestoreCastle3D
             label.fontSize = size;
             label.alignment = align;
             label.raycastTarget = false;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.outlineWidth = 0.2f;
             label.outlineColor = Color.black;
             return label;

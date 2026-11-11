@@ -397,7 +397,7 @@ namespace RestoreCastle3D
                 row.rectTransform.pivot = new Vector2(0f, 1f);
                 row.rectTransform.sizeDelta = new Vector2(-24f, 0f);
                 row.rectTransform.anchoredPosition = new Vector2(12f, -rowTop);
-                row.enableWordWrapping = true;
+                row.textWrappingMode = TextWrappingModes.Normal;
                 row.text = "<b>" + material.name + "</b>  [" + material.category + "]  " + abilities;
                 row.ForceMeshUpdate();
                 float height = Mathf.Max(42f, row.preferredHeight + 12f);
@@ -436,7 +436,7 @@ namespace RestoreCastle3D
             _resultBody = Label("Result Description", card, 22,
                 TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f),
                 new Vector2(0f, -20f), new Vector2(525f, 102f));
-            _resultBody.enableWordWrapping = true;
+            _resultBody.textWrappingMode = TextWrappingModes.Normal;
 
             RectTransform buttonRect = NewImage("Result Action", card,
                 new Color(0.35f, 0.78f, 0.61f, 1f), true);
@@ -473,7 +473,7 @@ namespace RestoreCastle3D
             label.fontSize = fontSize;
             label.alignment = alignment;
             label.color = Color.white;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.raycastTarget = false;
             Place((RectTransform)obj.transform, anchor, anchor, position, size);
             return label;

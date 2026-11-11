@@ -89,7 +89,7 @@ namespace RestoreCastle3D
                 text.font = _font;
                 text.alignment = TextAlignmentOptions.Center;
                 text.raycastTarget = false;
-                text.enableWordWrapping = false;
+                text.textWrappingMode = TextWrappingModes.NoWrap;
                 text.outlineWidth = 0.22f;
                 text.outlineColor = Color.black;
                 RectTransform rect = (RectTransform)label.transform;
