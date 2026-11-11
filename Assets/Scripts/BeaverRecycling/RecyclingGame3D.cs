@@ -42,6 +42,9 @@ namespace BeaverRecycling
         [SerializeField, Min(0.1f)] private float _baseReach = 1.8f;
         [SerializeField, Min(1)] private int _baseCapacity = 6;
 
+        [Header("Bundle")]
+        [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
+
         [Header("Camera")]
         [SerializeField, Min(0.01f)] private float _zoomSensitivity = 0.12f;
         [SerializeField] private Vector2 _zoomRange = new Vector2(8f, 16f);
@@ -319,14 +322,45 @@ namespace BeaverRecycling
             return contactPoint;
         }
 
-        /// <summary>분리 여부를 받아 운반 묶음을 내려놓고 필요하면 모든 결합과 재접착을 잠시 해제한다.</summary>
+        /// <summary>분리 여부를 받아 묶음을 내려놓고 결합을 해제하며 분리 시 기물을 묶음 중심에서 바깥으로 흩뜨린다.</summary>
         private void ReleaseBundle(bool split)
         {
-            foreach (RecyclingItem item in _held)
+            bool scatter = split && _held.Count > 1;
+            Vector3 center = Vector3.zero;
+            if (scatter)
             {
-                item.SetHeld(false);
-                if (split) { item.DetachAll(); item.BlockAttachment(0.5f); }
+                foreach (RecyclingItem item in _held) center += item.Body.position;
+                center /= _held.Count;
             }
+
+            for (int i = 0; i < _held.Count; i++)
+            {
+                RecyclingItem item = _held[i];
+                item.SetHeld(false);
+                if (!split) continue;
+
+                item.DetachAll();
+                item.BlockAttachment(0.5f);
+                if (!scatter) continue;
+
+                Vector3 direction = item.Body.position - center;
+                direction.y = 0f;
+                if (direction.sqrMagnitude < 0.0001f)
+                {
+                    float angle = 2f * Mathf.PI * i / _held.Count;
+                    direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                }
+                else
+                {
+                    direction.Normalize();
+                }
+
+                Vector3 scatteredPosition = item.Body.position + direction * _splitScatterDistance;
+                item.Body.position = scatteredPosition;
+                item.transform.SetPositionAndRotation(scatteredPosition, item.Body.rotation);
+            }
+
+            if (scatter) Physics.SyncTransforms();
             _held.Clear();
         }
 
