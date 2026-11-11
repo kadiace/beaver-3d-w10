@@ -26,16 +26,20 @@ namespace BeaverRecycling
             return _available && delta.sqrMagnitude <= _reach * _reach;
         }
 
-        /// <summary>현재 일차·선택·예상 점수를 받아 월드 표지와 잠금 덮개를 갱신한다.</summary>
+        /// <summary>현재 일차와 제출 상태를 받아 투입구 활성 여부와 표지를 갱신한다.</summary>
         public void Refresh(int day, bool selected, bool hasBundle, RecyclingSubmission preview, Camera camera)
         {
-            CanUse(day, _interactionPoint.position);
-            _cover.SetActive(!_available);
-            string suffix = !_available ? "\n" + (_category == RecyclingCategory.Glass ? "2일차 개방" : "3일차 개방") :
-                selected && hasBundle ? "\nE 투입  " + (preview.Score >= 0 ? "+" : "") + preview.Score + "점" : "";
+            bool available = CanUse(day, _interactionPoint.position);
+            if (gameObject.activeSelf != available) gameObject.SetActive(available);
+            if (!available) return;
+
+            _cover.SetActive(false);
+            string suffix = selected && hasBundle
+                ? "\nE 투입  " + (preview.Score >= 0 ? "+" : "") + preview.Score + "점"
+                : "";
             _label.text = RecyclingRules.Name(_category) + suffix;
             _label.color = selected && hasBundle && preview.Wrong > 0
-                ? new Color(1f, 0.45f, 0.35f) : _available ? RecyclingRules.Color(_category) : Color.gray;
+                ? new Color(1f, 0.45f, 0.35f) : RecyclingRules.Color(_category);
             _label.canvas.transform.rotation = camera.transform.rotation;
         }
     }
