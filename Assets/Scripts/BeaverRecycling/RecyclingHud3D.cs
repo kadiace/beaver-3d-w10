@@ -14,7 +14,6 @@ namespace BeaverRecycling
         [SerializeField] private Text _message;
         [SerializeField] private Text _hover;
         [SerializeField] private Text _toast;
-        [SerializeField] private Button _homeButton;
         [SerializeField] private Button _pauseButton;
 
         [Header("Result and upgrades")]
@@ -34,7 +33,6 @@ namespace BeaverRecycling
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
         public void Initialize(RecyclingGame3D game)
         {
-            _homeButton.onClick.AddListener(game.CenterCamera);
             _pauseButton.onClick.AddListener(game.TogglePause);
             _primary.onClick.AddListener(game.PrimaryAction);
             _secondary.onClick.AddListener(game.SecondaryAction);
@@ -56,7 +54,6 @@ namespace BeaverRecycling
             _wood.text = "목재 " + wood;
             _carry.text = carry;
             _pauseButton.interactable = working;
-            _homeButton.interactable = working;
         }
 
         /// <summary>제목·결과 문구·버튼 이름과 상점 여부를 받아 정산 또는 준비 패널을 표시한다.</summary>

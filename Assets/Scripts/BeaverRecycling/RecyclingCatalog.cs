@@ -84,15 +84,29 @@ namespace BeaverRecycling
         public const int WRONG_PENALTY = 4;
         public const int ESCAPE_PENALTY = 2;
 
-        /// <summary>제출 묶음과 투입구 종류를 받아 정상 점수·묶음 보너스·감점을 계산해 반환한다.</summary>
+        /// <summary>제출 묶음과 투입구 종류를 받아 정상 점수·보너스·쓰레기 감점을 계산해 반환한다.</summary>
         public static RecyclingSubmission Evaluate(IReadOnlyList<RecyclingItem> items, RecyclingCategory chute)
         {
             int correct = 0;
+            int wrong = 0;
+            bool pureBundle = items.Count > 0;
             for (int i = 0; i < items.Count; i++)
-                if (items[i].Definition.Category == chute && !items[i].Definition.IsWood) correct++;
-            int wrong = items.Count - correct;
+            {
+                RecyclingDefinition definition = items[i].Definition;
+                if (definition.IsWood)
+                {
+                    pureBundle = false;
+                    continue;
+                }
+                if (definition.Category == chute) correct++;
+                else
+                {
+                    wrong++;
+                    pureBundle = false;
+                }
+            }
             float multiplier = correct >= 6 ? 0.75f : correct >= 4 ? 0.5f : correct >= 2 ? 0.25f : 0f;
-            int bonus = wrong == 0 ? Mathf.FloorToInt(correct * BASE_SCORE * multiplier) : 0;
+            int bonus = pureBundle ? Mathf.FloorToInt(correct * BASE_SCORE * multiplier) : 0;
             return new RecyclingSubmission(correct, wrong, bonus,
                 correct * BASE_SCORE + bonus - wrong * WRONG_PENALTY);
         }

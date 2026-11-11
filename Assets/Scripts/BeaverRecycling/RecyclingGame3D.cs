@@ -88,8 +88,7 @@ namespace BeaverRecycling
             _hud.Initialize(this);
             _camera.orthographic = true;
             _camera.orthographicSize = 13.5f;
-            _camera.transform.rotation = Quaternion.Euler(45f, 45f, 0f);
-            CenterCamera();
+            ResetCameraTarget();
             PrepareDay();
         }
 
@@ -132,7 +131,8 @@ namespace BeaverRecycling
                         _nextSpawn += _spawnIntervals[_day - 1];
                     }
                 }
-                if (_elapsed >= _supplySeconds + _closingSeconds) FinishDay();
+                if (_elapsed >= _supplySeconds + _closingSeconds ||
+                    (_phase == DayPhase.Closing && _items.Count == 0)) FinishDay();
                 if (IsWorking) RefreshHover(pointerOverUi);
             }
             RefreshHud();
@@ -143,8 +143,17 @@ namespace BeaverRecycling
         {
             if (!IsWorking) return;
             float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
+            Vector3 previousBeaverPosition = _beaver.transform.position;
+            Quaternion previousBeaverRotation = _beaver.transform.rotation;
             _beaver.Move(_movement, (_baseSpeed + 0.5f * _levels[1]) * slowdown, Time.fixedDeltaTime);
             if (_held.Count == 0) return;
+            Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
+            Vector3 beaverPosition = _beaver.transform.position;
+            foreach (RecyclingItem member in _held)
+            {
+                member.Body.position = beaverPosition + rotationDelta * (member.Body.position - previousBeaverPosition);
+                member.Body.rotation = rotationDelta * member.Body.rotation;
+            }
             Vector3 delta = _beaver.CarryPoint.position - _held[0].Body.position;
             foreach (RecyclingItem member in _held) member.Body.position += delta;
             Physics.SyncTransforms();
@@ -162,7 +171,7 @@ namespace BeaverRecycling
                 1f - Mathf.Exp(-6f * Time.unscaledDeltaTime));
             _cameraTarget.x = Mathf.Clamp(_cameraTarget.x, -9f, 9f);
             _cameraTarget.z = Mathf.Clamp(_cameraTarget.z, 19f, 41f);
-            _camera.transform.position = _cameraTarget - _camera.transform.forward * 28f;
+            _camera.transform.position = _cameraTarget - _camera.transform.forward * 32f;
         }
 
         void OnDestroy()
@@ -279,21 +288,21 @@ namespace BeaverRecycling
             _dayScore += submission.Score;
             _correct += submission.Correct;
             _wrong += submission.Wrong;
-            if (submission.Wrong == 0) _bestBundle = Mathf.Max(_bestBundle, submitted.Count);
+            if (submission.Correct == submitted.Count) _bestBundle = Mathf.Max(_bestBundle, submitted.Count);
             foreach (RecyclingItem item in submitted) item.Resolve(chute.IntakePosition, true);
             _hud.Event((submission.Score >= 0 ? "+" : "") + submission.Score + "점" +
                 (submission.Bonus > 0 ? " · 묶음 +" + submission.Bonus : ""), chute.IntakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }
 
-        /// <summary>이탈한 기물과 폭포 여부를 받아 한 번만 감점 또는 회수한 목재를 지급하고 제거한다.</summary>
+        /// <summary>이탈한 기물과 폭포 여부를 받아 쓰레기 감점 또는 폭포 목재 보상을 한 번 적용하고 제거한다.</summary>
         public void ResolveExit(RecyclingItem item, bool waterfall, bool animate)
         {
             if (item.IsResolved) return;
             Vector3 position = item.transform.position;
             if (item.Definition.IsWood)
             {
-                if (waterfall && item.WasCollected)
+                if (waterfall)
                 {
                     _wood += item.Definition.WoodYield;
                     _dayWood += item.Definition.WoodYield;
@@ -338,7 +347,7 @@ namespace BeaverRecycling
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
             _movement = Vector2.zero;
-            CenterCamera();
+            ResetCameraTarget();
             SetUiMode(true);
             UpdateModal();
             RefreshHud();
@@ -441,14 +450,14 @@ namespace BeaverRecycling
         {
             if (_phase == DayPhase.Preparation)
                 _hud.ShowModal(_day + "일차 · 출근 준비", "오늘의 목표 " + _targets[_day - 1] + "점\n" +
-                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · 좌클릭 집기/놓기\nE 제출 · Q 묶음 분리\n\n회수한 목재는 폭포로 보내세요", "출근", "", false);
+                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · 좌클릭 집기/놓기\nE 제출 · Q 묶음 분리\n\n나무는 폭포로 보내 목재를 얻으세요", "출근", "", false);
             else if (_phase == DayPhase.Paused)
                 _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
                     "정상 " + _correct + " · 오분류 " + _wrong + " · 놓침 " + _lost +
-                    "\n최대 묶음 " + _bestBundle + "개 · 회수 +" + _dayWood + " 목재";
+                    "\n최대 묶음 " + _bestBundle + "개 · 획득 +" + _dayWood + " 목재";
                 if (_phase == DayPhase.Clear)
                     _hud.ShowModal("5일 근무 완료!", body + "\n\n누적 " + _totalScore + "점 · 목재 " + _wood,
                         "처음부터", "", false);
@@ -508,21 +517,27 @@ namespace BeaverRecycling
             bool mixed = _held.Count > 0 && hovered.Definition.Category != _held[0].Definition.Category;
             hovered.SetOutline(mixed ? 8u : 2u);
             string hint = hovered.Definition.Name + " · " + RecyclingRules.Name(hovered.Definition.Category) +
-                (hovered.Definition.IsWood && hovered.WasCollected ? "\n회수됨 · 폭포로 보내세요" : mixed ? "\n다른 재질이 섞여요" : "");
+                (hovered.Definition.IsWood ? "\n폭포로 보내 목재를 얻으세요" : mixed ? "\n다른 재질이 섞여요" : "");
             Vector2 screen = _tracked == hovered ? (Vector2)_camera.WorldToScreenPoint(hovered.transform.position)
                 : Managers.Input.PointerPosition;
             _hud.Hint(hint, screen);
         }
 
-        /// <summary>비버 보기 입력에서 기물 추적과 수동 이동을 끝내고 비버를 카메라 중심으로 둔다.</summary>
-        public void CenterCamera()
+        /// <summary>
+        /// Resets camera tracking to follow the beaver at the start of a day.
+        /// Uses the beaver transform and updates the tracked item and camera target.
+        /// </summary>
+        private void ResetCameraTarget()
         {
             _tracked = null;
             _followBeaver = true;
             _cameraTarget = new Vector3(_beaver.transform.position.x, 0f, _beaver.transform.position.z + 2f);
         }
 
-        /// <summary>공용 액션의 우클릭과 휠을 받아 카메라 평행 이동·기물 추적·확대를 갱신한다.</summary>
+        /// <summary>
+        /// Reads right-click and wheel input for item tracking and camera zoom.
+        /// Uses pointer state and zoom steps, updating the tracked item and orthographic size.
+        /// </summary>
         private void ReadCameraInput()
         {
             bool overUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
@@ -538,19 +553,7 @@ namespace BeaverRecycling
                 if (!_cameraDragged)
                 {
                     _dragDistance += delta;
-                    if (_dragDistance.sqrMagnitude >= 36f) { _cameraDragged = true; delta = _dragDistance; }
-                    else delta = Vector2.zero;
-                }
-                if (_cameraDragged)
-                {
-                    _tracked = null;
-                    _followBeaver = false;
-                    Plane plane = new Plane(Vector3.up, Vector3.zero);
-                    Vector2 center = _camera.pixelRect.center;
-                    Ray a = _camera.ScreenPointToRay(center);
-                    Ray b = _camera.ScreenPointToRay(center + delta);
-                    if (plane.Raycast(a, out float da) && plane.Raycast(b, out float db))
-                        _cameraTarget += a.GetPoint(da) - b.GetPoint(db);
+                    _cameraDragged = _dragDistance.sqrMagnitude >= 36f;
                 }
             }
             if (Managers.Input.SecondaryReleased)

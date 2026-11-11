@@ -8,7 +8,7 @@ namespace BeaverRecycling
     [RequireComponent(typeof(Rigidbody))]
     public sealed class RecyclingItem : MonoBehaviour
     {
-        [Header("Recovery marker")]
+        [Header("Wood marker")]
         [SerializeField] private GameObject _woodBadge;
         private readonly Dictionary<RecyclingItem, FixedJoint> _links = new Dictionary<RecyclingItem, FixedJoint>();
         private Rigidbody _body;
@@ -19,7 +19,6 @@ namespace BeaverRecycling
         private Vector3 _originalScale;
         private bool _held;
         private bool _resolved;
-        private bool _collected;
         private float _attachAllowedAt;
         private float _lastFlowTime = float.NegativeInfinity;
 
@@ -28,7 +27,6 @@ namespace BeaverRecycling
         public RecyclingDefinition Definition => _definition;
         public bool IsHeld => _held;
         public bool IsResolved => _resolved;
-        public bool WasCollected => _collected;
         public bool CanJoin => !_resolved && !_held && Time.time >= _attachAllowedAt;
 
         void Awake()
@@ -43,7 +41,6 @@ namespace BeaverRecycling
         {
             _held = false;
             _resolved = false;
-            _collected = false;
             _attachAllowedAt = 0f;
             _lastFlowTime = float.NegativeInfinity;
             transform.localScale = _originalScale;
@@ -67,6 +64,7 @@ namespace BeaverRecycling
         {
             _game = game;
             _definition = definition;
+            _woodBadge.SetActive(definition.IsWood);
             _body.linearDamping = 0.4f;
             _body.angularDamping = 4f;
             _body.maxDepenetrationVelocity = 2f;
@@ -118,7 +116,7 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>운반 여부를 받아 Rigidbody 이동 방식을 바꾸고 회수된 목재 표시를 기록한다.</summary>
+        /// <summary>운반 여부를 받아 Rigidbody의 물리 이동 방식을 갱신한다.</summary>
         public void SetHeld(bool held)
         {
             if (!_body.isKinematic)
@@ -129,11 +127,6 @@ namespace BeaverRecycling
             _held = held;
             _body.isKinematic = held;
             _body.useGravity = !held;
-            if (held && _definition.IsWood)
-            {
-                _collected = true;
-                _woodBadge.SetActive(true);
-            }
         }
 
         /// <summary>분리 유예 시간을 받아 그 시각까지 재접착을 막는다.</summary>
