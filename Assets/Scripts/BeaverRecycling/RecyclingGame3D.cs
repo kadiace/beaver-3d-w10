@@ -561,7 +561,7 @@ namespace BeaverRecycling
                     _hud.ShowModal("5일 근무 완료!", body + "\n\n누적 " + _totalScore + "점 · 목재 " + _wood,
                         "처음부터", "", false);
                 else if (!_passed)
-                    _hud.ShowModal("오늘의 목표 미달", body + "\n\n오늘 다시: 출근 전 목재와 능력 복원", "오늘 다시", "처음부터", false);
+                    _hud.ShowModal("오늘의 목표 미달", body + "\n\n: 출근 전 목재와 능력 복원", "재도전", "처음부터", false);
                 else
                 {
                     _hud.ShowModal("퇴근 · 내일을 준비하세요", body + "\n보유 " + _wood + " 목재", "다음 날", "처음부터", true);
