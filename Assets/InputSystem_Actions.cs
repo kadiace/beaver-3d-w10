@@ -1361,7 +1361,7 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""priority"": 0
                 },
                 {
-                    ""name"": ""Submit"",
+                    ""name"": ""Interact"",
                     ""type"": ""Button"",
                     ""id"": ""262c318e-12be-f020-5b63-339bc6e2e102"",
                     ""expectedControlType"": ""Button"",
@@ -1538,17 +1538,6 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
-                    ""id"": ""2c496dd9-692c-d8f1-4d45-caf5d4abaa33"",
-                    ""path"": ""<Mouse>/leftButton"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": ""Keyboard&Mouse"",
-                    ""action"": ""PrimaryClick"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
                     ""id"": ""83bf430c-f120-18c8-893e-9787a2d548cd"",
                     ""path"": ""<Mouse>/rightButton"",
                     ""interactions"": """",
@@ -1587,7 +1576,7 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": ""Keyboard&Mouse"",
-                    ""action"": ""Submit"",
+                    ""action"": ""Interact"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -1709,7 +1698,7 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         m_Recycling_SecondaryClick = m_Recycling.FindAction("SecondaryClick", throwIfNotFound: true);
         m_Recycling_CameraZoom = m_Recycling.FindAction("CameraZoom", throwIfNotFound: true);
         m_Recycling_Cancel = m_Recycling.FindAction("Cancel", throwIfNotFound: true);
-        m_Recycling_Submit = m_Recycling.FindAction("Submit", throwIfNotFound: true);
+        m_Recycling_Interact = m_Recycling.FindAction("Interact", throwIfNotFound: true);
         m_Recycling_SplitBundle = m_Recycling.FindAction("SplitBundle", throwIfNotFound: true);
     }
 
@@ -2278,7 +2267,7 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Recycling_SecondaryClick;
     private readonly InputAction m_Recycling_CameraZoom;
     private readonly InputAction m_Recycling_Cancel;
-    private readonly InputAction m_Recycling_Submit;
+    private readonly InputAction m_Recycling_Interact;
     private readonly InputAction m_Recycling_SplitBundle;
     /// <summary>
     /// Provides access to input actions defined in input action map "Recycling".
@@ -2320,9 +2309,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Cancel => m_Wrapper.m_Recycling_Cancel;
         /// <summary>
-        /// Provides access to the underlying input action "Recycling/Submit".
+        /// Provides access to the underlying input action "Recycling/Interact".
         /// </summary>
-        public InputAction @Submit => m_Wrapper.m_Recycling_Submit;
+        public InputAction @Interact => m_Wrapper.m_Recycling_Interact;
         /// <summary>
         /// Provides access to the underlying input action "Recycling/SplitBundle".
         /// </summary>
@@ -2374,9 +2363,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @Cancel.started += instance.OnCancel;
             @Cancel.performed += instance.OnCancel;
             @Cancel.canceled += instance.OnCancel;
-            @Submit.started += instance.OnSubmit;
-            @Submit.performed += instance.OnSubmit;
-            @Submit.canceled += instance.OnSubmit;
+            @Interact.started += instance.OnInteract;
+            @Interact.performed += instance.OnInteract;
+            @Interact.canceled += instance.OnInteract;
             @SplitBundle.started += instance.OnSplitBundle;
             @SplitBundle.performed += instance.OnSplitBundle;
             @SplitBundle.canceled += instance.OnSplitBundle;
@@ -2412,9 +2401,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @Cancel.started -= instance.OnCancel;
             @Cancel.performed -= instance.OnCancel;
             @Cancel.canceled -= instance.OnCancel;
-            @Submit.started -= instance.OnSubmit;
-            @Submit.performed -= instance.OnSubmit;
-            @Submit.canceled -= instance.OnSubmit;
+            @Interact.started -= instance.OnInteract;
+            @Interact.performed -= instance.OnInteract;
+            @Interact.canceled -= instance.OnInteract;
             @SplitBundle.started -= instance.OnSplitBundle;
             @SplitBundle.performed -= instance.OnSplitBundle;
             @SplitBundle.canceled -= instance.OnSplitBundle;
@@ -2785,12 +2774,12 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnCancel(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "Submit" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "Interact" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnSubmit(InputAction.CallbackContext context);
+        void OnInteract(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "SplitBundle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>

@@ -15,6 +15,7 @@ namespace BeaverRecycling
         [Header("Scene objects")]
         [SerializeField] private RecyclingCatalog _catalog;
         [SerializeField] private RecyclingBeaver3D _beaver;
+        [SerializeField] private BoxCollider _pickupSensor;
         [SerializeField] private RecyclingChute3D[] _chutes;
         [SerializeField] private RecyclingHud3D _hud;
         [SerializeField] private Camera _camera;
@@ -82,6 +83,16 @@ namespace BeaverRecycling
         private int Capacity => _baseCapacity + 2 * _levels[0];
         private float Reach => _baseReach + 0.3f * _levels[2];
 
+        void Awake()
+        {
+            if (_pickupSensor != null) return;
+            _pickupSensor = _beaver.GetComponent<BoxCollider>();
+            if (_pickupSensor != null) return;
+            _pickupSensor = _beaver.gameObject.AddComponent<BoxCollider>();
+            _pickupSensor.isTrigger = true;
+            _pickupSensor.size = new Vector3(2.2f, 1.5f, 2.4f);
+            _pickupSensor.center = new Vector3(0f, 0.4f, 1f);
+        }
         void Start()
         {
             Managers.Input.UseRecyclingControls(true);
@@ -107,15 +118,8 @@ namespace BeaverRecycling
                     _tracked = null;
                     _followBeaver = true;
                 }
-                bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-                if (Managers.Input.PrimaryPressed && !pointerOverUi)
-                {
-                    if (_held.Count > 0) ReleaseBundle(false);
-                    else PickUp();
-                }
+                if (Managers.Input.InteractPressed) HandleInteract();
                 if (Managers.Input.SplitBundlePressed && _held.Count > 0) ReleaseBundle(true);
-                RecyclingChute3D chute = FindChute();
-                if (Managers.Input.SubmitPressed && chute != null && _held.Count > 0) Submit(chute);
                 _elapsed += Time.deltaTime;
                 if (_phase == DayPhase.Supply && _elapsed >= _supplySeconds)
                 {
@@ -133,7 +137,7 @@ namespace BeaverRecycling
                 }
                 if (_elapsed >= _supplySeconds + _closingSeconds ||
                     (_phase == DayPhase.Closing && _items.Count == 0)) FinishDay();
-                if (IsWorking) RefreshHover(pointerOverUi);
+                if (IsWorking) RefreshHover();
             }
             RefreshHud();
             RefreshChutes();
@@ -198,21 +202,56 @@ namespace BeaverRecycling
             _items.Add(item);
         }
 
-        /// <summary>커서의 물리 레이를 받아 활성 분리수거 기물 하나를 반환한다.</summary>
-        private RecyclingItem PickAtCursor()
+        /// <summary>센서 박스와 겹친 활성 기물 중 비버와 가장 가까운 대상을 반환한다.</summary>
+        private RecyclingItem FindPickupTarget()
         {
-            if (!Managers.Input.HasPointer) return null;
-            if (!Physics.Raycast(_camera.ScreenPointToRay(Managers.Input.PointerPosition), out RaycastHit hit,
-                200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return null;
-            RecyclingItem item = hit.collider.GetComponentInParent<RecyclingItem>();
-            return item != null && !item.IsResolved && _items.Contains(item) ? item : null;
+            Transform sensorTransform = _pickupSensor.transform;
+            Vector3 scale = sensorTransform.lossyScale;
+            Vector3 halfExtents = Vector3.Scale(_pickupSensor.size * 0.5f,
+                new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
+            Vector3 center = sensorTransform.TransformPoint(_pickupSensor.center);
+            int count;
+            while ((count = Physics.OverlapBoxNonAlloc(center, halfExtents, _overlapBuffer,
+                sensorTransform.rotation, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) == _overlapBuffer.Length)
+                Array.Resize(ref _overlapBuffer, _overlapBuffer.Length * 2);
+
+            RecyclingItem closest = null;
+            float closestDistance = float.PositiveInfinity;
+            Vector3 playerPosition = _beaver.transform.position;
+            for (int i = 0; i < count; i++)
+            {
+                RecyclingItem item = _overlapBuffer[i].GetComponentInParent<RecyclingItem>();
+                if (item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) continue;
+                Vector3 carryPosition = _beaver.CarryPoint.position;
+                Vector3 pickupPoint = item.Collider.ClosestPoint(carryPosition);
+                if ((pickupPoint - carryPosition).sqrMagnitude > Reach * Reach) continue;
+                Vector3 nearestPoint = item.Collider.ClosestPoint(playerPosition);
+                float distance = (nearestPoint - playerPosition).sqrMagnitude;
+                if (distance >= closestDistance) continue;
+                closest = item;
+                closestDistance = distance;
+            }
+            return closest;
         }
 
-        /// <summary>커서 아래 묶음의 거리와 크기를 검사하고 전체를 비버의 운반 상태로 바꾼다.</summary>
-        private void PickUp()
+        /// <summary>현재 운반 상태와 투입구 위치에 따라 E 입력을 집기·내려놓기·투입으로 처리한다.</summary>
+        private void HandleInteract()
         {
-            RecyclingItem item = PickAtCursor();
-            if (item == null) return;
+            if (_held.Count == 0)
+            {
+                PickUp(FindPickupTarget());
+                return;
+            }
+
+            RecyclingChute3D chute = FindChute();
+            if (chute != null) Submit(chute);
+            else ReleaseBundle(false);
+        }
+
+        /// <summary>선택된 기물 묶음의 거리와 크기를 검사하고 전체를 비버의 운반 상태로 바꾼다.</summary>
+        private void PickUp(RecyclingItem item)
+        {
+            if (item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) return;
             float distance = Vector3.Distance(item.Collider.ClosestPoint(_beaver.CarryPoint.position), _beaver.CarryPoint.position);
             if (distance > Reach) { _hud.Message("가까이 이동해서 집으세요"); return; }
             List<RecyclingItem> group = RecyclingItem.Collect(item);
@@ -450,7 +489,7 @@ namespace BeaverRecycling
         {
             if (_phase == DayPhase.Preparation)
                 _hud.ShowModal(_day + "일차 · 출근 준비", "오늘의 목표 " + _targets[_day - 1] + "점\n" +
-                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · 좌클릭 집기/놓기\nE 제출 · Q 묶음 분리\n\n나무는 폭포로 보내 목재를 얻으세요", "출근", "", false);
+                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · E 집기/놓기\n투입구에서 놓으면 분류 · Q 묶음 분리\n\n나무는 폭포로 보내 목재를 얻으세요", "출근", "", false);
             else if (_phase == DayPhase.Paused)
                 _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
             else
@@ -501,8 +540,8 @@ namespace BeaverRecycling
                     RecyclingRules.Evaluate(_held, chute.Category), _camera);
         }
 
-        /// <summary>포인터·운반·추적 상태를 받아 기물 강조와 분류 안내를 표시한다.</summary>
-        private void RefreshHover(bool pointerOverUi)
+        /// <summary>센서 대상·운반·추적 상태를 받아 기물 강조와 분류 안내를 표시한다.</summary>
+        private void RefreshHover()
         {
             foreach (RecyclingItem item in _items)
             {
@@ -512,14 +551,15 @@ namespace BeaverRecycling
                     (item.Body.position - _beaver.CarryPoint.position).sqrMagnitude < 9f) outline = 4u;
                 item.SetOutline(outline);
             }
-            RecyclingItem hovered = _tracked != null && !_tracked.IsResolved ? _tracked : pointerOverUi ? null : PickAtCursor();
+            RecyclingItem pickupTarget = _held.Count == 0 ? FindPickupTarget() : null;
+            if (pickupTarget != null) pickupTarget.SetOutline(2u);
+            RecyclingItem hovered = _tracked != null && !_tracked.IsResolved ? _tracked : pickupTarget;
             if (hovered == null) { _hud.Hint("", Vector2.zero); return; }
             bool mixed = _held.Count > 0 && hovered.Definition.Category != _held[0].Definition.Category;
-            hovered.SetOutline(mixed ? 8u : 2u);
+            if (hovered != pickupTarget) hovered.SetOutline(mixed ? 8u : 2u);
             string hint = hovered.Definition.Name + " · " + RecyclingRules.Name(hovered.Definition.Category) +
                 (hovered.Definition.IsWood ? "\n폭포로 보내 목재를 얻으세요" : mixed ? "\n다른 재질이 섞여요" : "");
-            Vector2 screen = _tracked == hovered ? (Vector2)_camera.WorldToScreenPoint(hovered.transform.position)
-                : Managers.Input.PointerPosition;
+            Vector2 screen = _camera.WorldToScreenPoint(hovered.transform.position);
             _hud.Hint(hint, screen);
         }
 
@@ -534,6 +574,19 @@ namespace BeaverRecycling
             _cameraTarget = new Vector3(_beaver.transform.position.x, 0f, _beaver.transform.position.z + 2f);
         }
 
+        /// <summary>
+        /// Casts through the current pointer and returns the registered recycling item under it.
+        /// Uses the camera and pointer position, and returns the hit item or null.
+        /// </summary>
+        private RecyclingItem PickAtCursor()
+        {
+            if (!Managers.Input.HasPointer) return null;
+            Ray ray = _camera.ScreenPointToRay(Managers.Input.PointerPosition);
+            if (!Physics.Raycast(ray, out RaycastHit hit, _camera.farClipPlane,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return null;
+            RecyclingItem item = hit.collider.GetComponentInParent<RecyclingItem>();
+            return item != null && !item.IsResolved && _items.Contains(item) ? item : null;
+        }
         /// <summary>
         /// Reads right-click and wheel input for item tracking and camera zoom.
         /// Uses pointer state and zoom steps, updating the tracked item and orthographic size.

@@ -32,7 +32,7 @@ namespace BeaverRecycling
             CanUse(day, _interactionPoint.position);
             _cover.SetActive(!_available);
             string suffix = !_available ? "\n" + (_category == RecyclingCategory.Glass ? "2일차 개방" : "3일차 개방") :
-                selected && hasBundle ? "\nE 제출  " + (preview.Score >= 0 ? "+" : "") + preview.Score + "점" : "";
+                selected && hasBundle ? "\nE 투입  " + (preview.Score >= 0 ? "+" : "") + preview.Score + "점" : "";
             _label.text = RecyclingRules.Name(_category) + suffix;
             _label.color = selected && hasBundle && preview.Wrong > 0
                 ? new Color(1f, 0.45f, 0.35f) : _available ? RecyclingRules.Color(_category) : Color.gray;

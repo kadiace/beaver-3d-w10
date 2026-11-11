@@ -24,7 +24,7 @@ public class InputManager
     private InputAction _rotateLeft;
     private InputAction _rotateRight;
     private InputAction _floodPreview;
-    private InputAction _submit;
+    private InputAction _interact;
     private InputAction _splitBundle;
 
     [Header("UI actions")]
@@ -42,7 +42,7 @@ public class InputManager
     public bool SecondaryHeld => _secondaryClick.IsPressed();
     public float CameraZoom => _cameraZoom.ReadValue<Vector2>().y;
     public float CameraZoomSteps => NormalizeScroll(CameraZoom);
-    public bool SubmitPressed => _submit.WasPressedThisFrame();
+    public bool InteractPressed => _interact.WasPressedThisFrame();
     public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame();
     public bool CancelPressed => _inputMode == InputMode.Player
         ? _cancel.WasPressedThisFrame() : _uiCancel.WasPressedThisFrame();
@@ -68,7 +68,7 @@ public class InputManager
         _rotateLeft = _playerMap.FindAction("RotateLeft", true);
         _rotateRight = _playerMap.FindAction("RotateRight", true);
         _floodPreview = _playerMap.FindAction("ToggleFloodPreview", true);
-        _submit = _recyclingMap.FindAction("Submit", true);
+        _interact = _recyclingMap.FindAction("Interact", true);
         _splitBundle = _recyclingMap.FindAction("SplitBundle", true);
         _uiClick = _uiMap.FindAction("Click", true);
         _uiCancel = _uiMap.FindAction("Cancel", true);

@@ -544,6 +544,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BeaverRecycling.RecyclingGame3D
   _catalog: {fileID: 11400000, guid: a7209ee42938989a0656ac559cf7bb4b, type: 2}
   _beaver: {fileID: 3100000091}
+  _pickupSensor: {fileID: 3100000998}
   _chutes:
   - {fileID: 3100000145}
   - {fileID: 3100000197}
@@ -588,6 +589,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3100000002}
+  - component: {fileID: 3100000998}
   - component: {fileID: 3100000091}
   m_Layer: 2
   m_Name: Beaver Worker
@@ -613,6 +615,19 @@ Transform:
   - {fileID: 3100000090}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &3100000998
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3100000001}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 1
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.2, y: 1.5, z: 2.4}
+  m_Center: {x: 0, y: 0.4, z: 1}
 --- !u!1 &3100000003
 GameObject:
   m_ObjectHideFlags: 0
@@ -7943,8 +7958,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1.1
-  m_Text: "WASD \uC774\uB3D9   \uC88C\uD074\uB9AD \uC9D1\uAE30/\uB193\uAE30   E \uC81C\uCD9C  
-    Q \uBD84\uB9AC   \uC6B0\uD074\uB9AD \uCE74\uBA54\uB77C   \uD720 \uD655\uB300"
+  m_Text: "WASD \uC774\uB3D9   E \uC9D1\uAE30/\uB193\uAE30 (\uD22C\uC785\uAD6C\uC5D0\uC11C \uD22C\uC785)   Q \uBD84\uB9AC   \uC6B0\uD074\uB9AD \uCD94\uC801   \uD720 \uD655\uB300"
 --- !u!1 &3100000353
 GameObject:
   m_ObjectHideFlags: 0
