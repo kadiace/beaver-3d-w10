@@ -371,6 +371,8 @@
 - 조인트와 기물 충돌 설정: 큰 묶음이 떨리거나 비버 이동을 끌어당겨 조작을 방해하지 않는지 확인한다.
 - 폭탄 추가 생성 확률은 Game 씬의 `RecyclingGame3D` Inspector에서 조정한다. 폭발 반경·밀쳐내기 속도·기절 시간은 `Assets/Resources/Prefabs/Recycling/bomb.prefab`의 `BombExplosion3D` Inspector에서 조정한다.
 
+- 에디터의 `Tools > Beaver > Spawn Objects` 창에서 Play Mode의 일과 진행 중 기물 목록 또는 폭탄을 골라 지정한 월드 위치에 생성할 수 있다. 비버 앞과 상류 공급 지점을 위치로 선택할 수 있으며, 생성된 오브젝트는 일반 공급물과 같은 초기화·게임 관리·정산을 따른다. 일차별 등장 제한은 이 도구에 적용하지 않는다.
+
 - 잔디 메시 재생성 메뉴: Tools > Beaver > Rebuild Terrain Grass. 환경 프리팹의 위쪽 지형 삼각형에 잔디 뿌리를 맞춘다.
 - Unity에서 에셋 임포트 후 Game 씬을 열어 입력, 기물 결합/분리, 제출 정산, 폭포 정산, 하루 결과와 재시도를 Play Mode로 확인한다.
 - 다음 조정 수치는 목표와 오분류/방치 감점, 공급 간격·유속·마감 시간, 운반 한도, 목재량과 업그레이드 비용, 충돌 안정성이다.

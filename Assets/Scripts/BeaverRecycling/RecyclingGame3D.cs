@@ -95,6 +95,12 @@ namespace BeaverRecycling
         public float FallbackY => _fallbackY;
         public float WaterY => _waterY;
         public float FlowSpeed => _flowSpeeds[_day - 1];
+#if UNITY_EDITOR
+        public IReadOnlyList<RecyclingDefinition> DebugItems => _catalog.DebugItems;
+        public Vector3 DebugSupplyPosition => _spawnPoint.position;
+        public Vector3 DebugBeaverPosition => new Vector3(_beaver.transform.position.x, _waterY + 1.5f,
+            _beaver.transform.position.z) + _beaver.transform.forward * 2f;
+#endif
         private int Capacity => _baseCapacity + 2 * _levels[0];
         private float Reach => _baseReach + 0.3f * _levels[2];
 
@@ -203,6 +209,35 @@ namespace BeaverRecycling
         /// <summary>기물 위치를 받아 하천의 수평 영역 안에 있는지 반환한다.</summary>
         public bool IsInsideRiver(Vector3 position) => position.x >= _riverMinimum.x && position.x <= _riverMaximum.x &&
             position.z >= _riverMinimum.y && position.z <= _riverMaximum.y;
+
+#if UNITY_EDITOR
+        /// <summary>기물 인덱스와 위치를 받아 작업 중에 해당 기물을 생성하고 관리 목록에 등록한 성공 여부를 반환한다.</summary>
+        public bool DebugSpawnItem(int index, Vector3 position)
+        {
+            if (!IsWorking || index < 0 || index >= _catalog.DebugItems.Count) return false;
+            RecyclingDefinition definition = _catalog.DebugItems[index];
+            GameObject instance = Managers.Resource.Instantiate("Prefabs/Recycling/" + definition.Prefab.name,
+                position: position, rotation: Quaternion.identity);
+            RecyclingItem item = instance.GetComponent<RecyclingItem>();
+            instance.name = definition.Name;
+            item.Initialize(this, definition);
+            _items.Add(item);
+            return true;
+        }
+
+        /// <summary>위치를 받아 작업 중에 폭탄을 생성하고 관리 목록에 등록한 성공 여부를 반환한다.</summary>
+        public bool DebugSpawnBomb(Vector3 position)
+        {
+            if (!IsWorking) return false;
+            GameObject instance = Managers.Resource.Instantiate(BOMB_PREFAB_PATH,
+                position: position, rotation: Quaternion.identity);
+            BombExplosion3D bomb = instance.GetComponent<BombExplosion3D>();
+            instance.name = "폭탄";
+            bomb.Initialize(this);
+            _bombs.Add(bomb);
+            return true;
+        }
+#endif
 
         /// <summary>활성 정의를 난수로 골라 풀에서 생성하고 새 기물의 상태를 초기화한다.</summary>
         private void SpawnItem()

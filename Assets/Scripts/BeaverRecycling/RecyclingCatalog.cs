@@ -33,6 +33,10 @@ namespace BeaverRecycling
     {
         [SerializeField] private RecyclingDefinition[] _items;
 
+#if UNITY_EDITOR
+        public IReadOnlyList<RecyclingDefinition> DebugItems => _items;
+#endif
+
         /// <summary>일차와 난수를 받아 목재 12%와 활성 분류의 균등 확률로 생성할 기물 정의를 반환한다.</summary>
         public RecyclingDefinition Draw(System.Random random, int day)
         {
