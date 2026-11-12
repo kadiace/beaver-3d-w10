@@ -14,6 +14,8 @@ namespace BeaverRecycling
         private const int NO_TRASH_LOSS_WOOD_BONUS = 3;
         private const int NO_MISCLASSIFICATION_SCORE_BONUS = 10;
         private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
+        private const int FIRST_BOMB_DAY = 4;
+        private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private static readonly int[] UPGRADE_COSTS = { 2, 4, 7 };
 
         [Header("Scene objects")]
@@ -32,6 +34,9 @@ namespace BeaverRecycling
         [SerializeField] private float[] _spawnIntervals = { 2f, 1.8f, 1.6f, 1.4f, 1.2f };
         [SerializeField] private float[] _flowSpeeds = { 1.2f, 1.35f, 1.5f, 1.65f, 1.8f };
         [SerializeField] private int _runSeed = 41357;
+
+        [Header("Bombs")]
+        [SerializeField, Range(0f, 1f)] private float _bombSpawnChance = 0.05f;
 
         [Header("River")]
         [SerializeField] private Vector2 _riverMinimum = new Vector2(-12f, 15f);
@@ -53,6 +58,7 @@ namespace BeaverRecycling
         [SerializeField, Min(0.01f)] private float _zoomSensitivity = 0.12f;
         [SerializeField] private Vector2 _zoomRange = new Vector2(8f, 16f);
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
+        private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
@@ -81,6 +87,7 @@ namespace BeaverRecycling
         private float _elapsed;
         private float _nextSpawn;
         private float _capacityNoticeAt;
+        private float _beaverStunnedUntil;
 
         public bool IsWorking => _phase == DayPhase.Supply || _phase == DayPhase.Closing;
         public float WaterfallZ => _waterfallZ;
@@ -119,14 +126,15 @@ namespace BeaverRecycling
             }
             if (IsWorking)
             {
-                _movement = Managers.Input.MoveInput;
-                if (_movement.sqrMagnitude > 0.001f)
+                bool stunned = Time.time < _beaverStunnedUntil;
+                _movement = stunned ? Vector2.zero : Managers.Input.MoveInput;
+                if (!stunned && _movement.sqrMagnitude > 0.001f)
                 {
                     _tracked = null;
                     _followBeaver = true;
                 }
-                if (Managers.Input.InteractPressed) HandleInteract();
-                if (Managers.Input.SplitBundlePressed && _held.Count > 0) ReleaseBundle(true);
+                if (!stunned && Managers.Input.InteractPressed) HandleInteract();
+                if (!stunned && Managers.Input.SplitBundlePressed && _held.Count > 0) ReleaseBundle(true);
                 _elapsed += Time.deltaTime;
                 if (_phase == DayPhase.Supply && _elapsed >= _supplySeconds)
                 {
@@ -143,7 +151,7 @@ namespace BeaverRecycling
                     }
                 }
                 if (_elapsed >= _supplySeconds + _closingSeconds ||
-                    (_phase == DayPhase.Closing && _items.Count == 0)) FinishDay();
+                    (_phase == DayPhase.Closing && _items.Count == 0 && _bombs.Count == 0)) FinishDay();
                 if (IsWorking) RefreshHover();
             }
             RefreshHud();
@@ -207,6 +215,22 @@ namespace BeaverRecycling
             instance.name = definition.Name;
             item.Initialize(this, definition);
             _items.Add(item);
+            if (_day >= FIRST_BOMB_DAY && _random.NextDouble() < _bombSpawnChance) SpawnBomb();
+        }
+
+        /// <summary>상류 공급 위치를 받아 폭탄을 별도로 생성하고 이동 흐름에 등록한다.</summary>
+        private void SpawnBomb()
+        {
+            Vector3 position = _spawnPoint.position;
+            position.x += ((float)_random.NextDouble() * 2f - 1f) * _spawnHalfWidth;
+            position.z += ((float)_random.NextDouble() * 2f - 1f) * 0.5f;
+            Quaternion rotation = Quaternion.Euler(0f, (float)_random.NextDouble() * 360f, 0f);
+            GameObject instance = Managers.Resource.Instantiate(BOMB_PREFAB_PATH,
+                position: position, rotation: rotation);
+            BombExplosion3D bomb = instance.GetComponent<BombExplosion3D>();
+            instance.name = "폭탄";
+            bomb.Initialize(this);
+            _bombs.Add(bomb);
         }
 
         /// <summary>센서 박스와 겹친 활성 기물 중 비버와 가장 가까운 대상을 반환한다.</summary>
@@ -425,6 +449,112 @@ namespace BeaverRecycling
             item.Resolve(position + Vector3.down * 3f, animate);
         }
 
+        /// <summary>접촉한 폭탄을 한 번 폭발시키고 넉백·기절·정리를 적용한다.</summary>
+        public void ExplodeBomb(BombExplosion3D bomb)
+        {
+            if (!IsWorking || !_bombs.Contains(bomb) || !bomb.TryBeginExplosion()) return;
+
+            Vector3 origin = bomb.transform.position;
+            ApplyBlastToItems(origin, bomb.ExplosionRadius, bomb.ItemKnockbackSpeed);
+            ApplyBlastToBombs(bomb, origin, bomb.ExplosionRadius, bomb.ItemKnockbackSpeed);
+
+            Vector3 beaverDirection = HorizontalDirection(origin, _beaver.transform.position);
+            _beaver.ApplyKnockback(beaverDirection * bomb.BeaverKnockbackSpeed);
+            _beaverStunnedUntil = Mathf.Max(_beaverStunnedUntil, Time.time + bomb.StunDuration);
+            _movement = Vector2.zero;
+            _hud.Message("폭발! 잠시 행동할 수 없어요");
+
+            _bombs.Remove(bomb);
+            bomb.ReturnNow();
+        }
+
+        /// <summary>폭발 반경 안의 묶음에 결합 상태를 보존한 수평 넉백을 적용한다.</summary>
+        private void ApplyBlastToItems(Vector3 origin, float radius, float knockbackSpeed)
+        {
+            float radiusSquared = radius * radius;
+            var processed = new HashSet<RecyclingItem>();
+
+            if (_held.Count > 0)
+            {
+                var carried = new List<RecyclingItem>(_held);
+                Vector3 carriedCenter = Vector3.zero;
+                foreach (RecyclingItem member in carried) carriedCenter += member.Body.position;
+                carriedCenter /= carried.Count;
+                if (HorizontalDistanceSquared(origin, carriedCenter) <= radiusSquared)
+                {
+                    foreach (RecyclingItem member in carried) processed.Add(member);
+                    Vector3 direction = HorizontalDirection(origin, carriedCenter);
+                    ReleaseBundle(true);
+                    foreach (RecyclingItem member in carried)
+                        member.ApplyKnockback(direction * knockbackSpeed);
+                }
+            }
+
+            foreach (RecyclingItem item in _items.ToArray())
+            {
+                if (item.IsResolved || item.IsHeld || processed.Contains(item)) continue;
+                List<RecyclingItem> group = RecyclingItem.Collect(item);
+                foreach (RecyclingItem member in group) processed.Add(member);
+
+                RecyclingItem closestMember = null;
+                float closestDistance = float.PositiveInfinity;
+                foreach (RecyclingItem member in group)
+                {
+                    if (member.IsResolved || member.IsHeld) continue;
+                    float distance = HorizontalDistanceSquared(origin, member.Body.position);
+                    if (distance > radiusSquared || distance >= closestDistance) continue;
+                    closestMember = member;
+                    closestDistance = distance;
+                }
+                if (closestMember == null) continue;
+
+                Vector3 velocityChange = HorizontalDirection(origin, closestMember.Body.position) * knockbackSpeed;
+                foreach (RecyclingItem member in group)
+                    if (!member.IsResolved && !member.IsHeld) member.ApplyKnockback(velocityChange);
+            }
+        }
+
+        /// <summary>폭발 반경 안의 다른 폭탄을 연쇄 폭발 없이 바깥 방향으로 밀어낸다.</summary>
+        private void ApplyBlastToBombs(BombExplosion3D source, Vector3 origin, float radius, float knockbackSpeed)
+        {
+            float radiusSquared = radius * radius;
+            foreach (BombExplosion3D bomb in _bombs.ToArray())
+            {
+                if (bomb == source || HorizontalDistanceSquared(origin, bomb.transform.position) > radiusSquared) continue;
+                Vector3 velocityChange = HorizontalDirection(origin, bomb.transform.position) * knockbackSpeed;
+                bomb.ApplyKnockback(velocityChange);
+            }
+        }
+
+        /// <summary>폭발 지점과 대상 위치를 받아 XZ 평면의 바깥 방향을 반환한다.</summary>
+        private static Vector3 HorizontalDirection(Vector3 origin, Vector3 target)
+        {
+            Vector3 direction = target - origin;
+            direction.y = 0f;
+            return direction.sqrMagnitude < 0.0001f ? Vector3.right : direction.normalized;
+        }
+
+        /// <summary>두 위치를 받아 높이를 제외한 수평 거리의 제곱을 반환한다.</summary>
+        private static float HorizontalDistanceSquared(Vector3 first, Vector3 second)
+        {
+            Vector3 difference = first - second;
+            difference.y = 0f;
+            return difference.sqrMagnitude;
+        }
+
+        /// <summary>강 경계를 벗어난 폭탄을 점수·자원 정산 없이 제거한다.</summary>
+        public void ResolveBombExit(BombExplosion3D bomb)
+        {
+            if (!_bombs.Remove(bomb)) return;
+            bomb.ReturnNow();
+        }
+
+        /// <summary>풀에 반환된 폭탄을 진행 중 장애물 목록에서 제거한다.</summary>
+        public void ForgetBomb(BombExplosion3D bomb)
+        {
+            _bombs.Remove(bomb);
+        }
+
         /// <summary>풀에 반환된 기물을 받아 생성 목록·운반·카메라 추적에서 제거한다.</summary>
         public void ForgetItem(RecyclingItem item)
         {
@@ -440,6 +570,8 @@ namespace BeaverRecycling
             _tracked = null;
             foreach (RecyclingItem item in _items.ToArray()) if (item != null) item.ReturnNow();
             _items.Clear();
+            foreach (BombExplosion3D bomb in _bombs.ToArray()) bomb.ReturnNow();
+            _bombs.Clear();
         }
 
         /// <summary>오늘 시작 시점의 재화와 업그레이드를 저장하고 출근 준비 화면으로 전환한다.</summary>
@@ -449,6 +581,7 @@ namespace BeaverRecycling
             _dayStartWood = _wood;
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
+            _beaverStunnedUntil = 0f;
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
             _movement = Vector2.zero;

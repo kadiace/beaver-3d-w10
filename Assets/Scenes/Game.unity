@@ -569,6 +569,7 @@ MonoBehaviour:
   - 1.65
   - 1.8
   _runSeed: 41357
+  _bombSpawnChance: 0.05
   _riverMinimum: {x: -12, y: 15}
   _riverMaximum: {x: 12, y: 45}
   _waterfallZ: 15
