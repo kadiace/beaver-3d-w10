@@ -10,6 +10,10 @@ namespace BeaverRecycling
     public sealed class RecyclingGame3D : MonoBehaviour
     {
         private enum DayPhase { Preparation, Supply, Closing, Result, Paused, Clear }
+        private const int NO_TRASH_LOSS_SCORE_BONUS = 10;
+        private const int NO_TRASH_LOSS_WOOD_BONUS = 3;
+        private const int NO_MISCLASSIFICATION_SCORE_BONUS = 10;
+        private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
         private static readonly int[] UPGRADE_COSTS = { 2, 4, 7 };
 
         [Header("Scene objects")]
@@ -394,7 +398,7 @@ namespace BeaverRecycling
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }
 
-        /// <summary>이탈한 기물과 폭포 여부를 받아 쓰레기 감점 또는 폭포 목재 보상을 한 번 적용하고 제거한다.</summary>
+        /// <summary>이탈한 기물과 폭포 여부를 받아 쓰레기 감점 또는 목재 점수·자원 보상을 한 번 적용하고 제거한다.</summary>
         public void ResolveExit(RecyclingItem item, bool waterfall, bool animate)
         {
             if (item.IsResolved) return;
@@ -403,9 +407,11 @@ namespace BeaverRecycling
             {
                 if (waterfall)
                 {
+                    _dayScore += RecyclingRules.BASE_SCORE;
                     _wood += item.Definition.WoodYield;
                     _dayWood += item.Definition.WoodYield;
-                    if (animate) _hud.Event("+" + item.Definition.WoodYield + " 목재", position, _camera,
+                    if (animate) _hud.Event("+" + RecyclingRules.BASE_SCORE + "점 · +" +
+                        item.Definition.WoodYield + " 목재", position, _camera,
                         new Color(1f, 0.8f, 0.4f));
                 }
             }
@@ -464,13 +470,25 @@ namespace BeaverRecycling
             _hud.HideModal();
         }
 
-        /// <summary>마감 때 남은 기물의 감점을 합산하고 목표 통과·실패·최종 클리어를 확정한다.</summary>
+        /// <summary>마감 때 남은 기물과 무실수 보너스를 정산해 목표 통과·실패·최종 클리어를 확정한다.</summary>
         private void FinishDay()
         {
             ReleaseBundle(false);
             foreach (RecyclingItem item in _items.ToArray())
                 if (!item.IsResolved) ResolveExit(item, false, false);
             ClearWorld();
+            if (_lost == 0)
+            {
+                _dayScore += NO_TRASH_LOSS_SCORE_BONUS;
+                _wood += NO_TRASH_LOSS_WOOD_BONUS;
+                _dayWood += NO_TRASH_LOSS_WOOD_BONUS;
+            }
+            if (_wrong == 0)
+            {
+                _dayScore += NO_MISCLASSIFICATION_SCORE_BONUS;
+                _wood += NO_MISCLASSIFICATION_WOOD_BONUS;
+                _dayWood += NO_MISCLASSIFICATION_WOOD_BONUS;
+            }
             _passed = _dayScore >= _targets[_day - 1];
             if (_passed) _totalScore += _dayScore;
             _phase = _passed && _day == _targets.Length ? DayPhase.Clear : DayPhase.Result;
@@ -549,14 +567,18 @@ namespace BeaverRecycling
         {
             if (_phase == DayPhase.Preparation)
                 _hud.ShowModal(_day + "일차 · 출근 준비", "오늘의 목표 " + _targets[_day - 1] + "점\n" +
-                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · E 집기/놓기\n투입구에서 놓으면 분류 · Q 묶음 분리\n\n나무는 폭포로 보내 목재를 얻으세요", "출근", "", false);
+                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · E 집기/놓기\n투입구에서 놓으면 분류 · Q 묶음 분리\n\n나무 폭포 통과 +3점·목재\n쓰레기 유실 0회 +10점·+3목재\n오분류 0회 +10점·+3목재", "출근", "", false);
             else if (_phase == DayPhase.Paused)
-                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
+                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
                     "정상 " + _correct + " · 오분류 " + _wrong + " · 놓침 " + _lost +
                     "\n최대 묶음 " + _bestBundle + "개 · 획득 +" + _dayWood + " 목재";
+                if (_lost == 0)
+                    body += "\n유실 없음 보너스 +" + NO_TRASH_LOSS_SCORE_BONUS + "점 · +" + NO_TRASH_LOSS_WOOD_BONUS + " 목재";
+                if (_wrong == 0)
+                    body += "\n오분류 없음 보너스 +" + NO_MISCLASSIFICATION_SCORE_BONUS + "점 · +" + NO_MISCLASSIFICATION_WOOD_BONUS + " 목재";
                 if (_phase == DayPhase.Clear)
                     _hud.ShowModal("5일 근무 완료!", body + "\n\n누적 " + _totalScore + "점 · 목재 " + _wood,
                         "처음부터", "", false);
