@@ -568,7 +568,6 @@ MonoBehaviour:
   - 1.5
   - 1.65
   - 1.8
-  _runSeed: 41357
   _bombSpawnChance: 0.05
   _riverMinimum: {x: -12, y: 15}
   _riverMaximum: {x: 12, y: 45}
@@ -580,8 +579,6 @@ MonoBehaviour:
   _baseReach: 1.8
   _baseCapacity: 6
   _splitScatterDistance: 0.35
-  _zoomSensitivity: 0.12
-  _zoomRange: {x: 8, y: 16}
 --- !u!1 &3100000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -7952,8 +7949,8 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1.1
-  m_Text: "WASD/\uBC29\uD5A5\uD0A4 \uC774\uB3D9   E \uC9D1\uAE30/\uB193\uAE30   Q
-    \uBD84\uB9AC"
+  m_Text: "\uBC29\uD5A5\uD0A4/WASD: \uC774\uB3D9   E: \uC9D1\uAE30/\uB193\uAE30  
+    Q: \uBD84\uB9AC"
 --- !u!1 &3100000353
 GameObject:
   m_ObjectHideFlags: 0

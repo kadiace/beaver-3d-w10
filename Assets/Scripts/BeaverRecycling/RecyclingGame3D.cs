@@ -34,7 +34,6 @@ namespace BeaverRecycling
         [SerializeField] private int[] _targets = { 30, 50, 70, 90, 110 };
         [SerializeField] private float[] _spawnIntervals = { 2f, 1.8f, 1.6f, 1.4f, 1.2f };
         [SerializeField] private float[] _flowSpeeds = { 1.2f, 1.35f, 1.5f, 1.65f, 1.8f };
-        [SerializeField] private int _runSeed = 41357;
 
         [Header("Bombs")]
         [SerializeField, Range(0f, 1f)] private float _bombSpawnChance = 0.05f;
@@ -61,7 +60,6 @@ namespace BeaverRecycling
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
-        private System.Random _random;
         private RecyclingItem _tracked;
         private DayPhase _phase;
         private DayPhase _beforePause;
@@ -239,26 +237,27 @@ namespace BeaverRecycling
         /// <summary>활성 정의를 난수로 골라 풀에서 생성하고 새 기물의 상태를 초기화한다.</summary>
         private void SpawnItem()
         {
-            RecyclingDefinition definition = _catalog.Draw(_random, _day);
+            RecyclingDefinition definition = _catalog.Draw(_day);
             Vector3 position = _spawnPoint.position;
-            position.x += ((float)_random.NextDouble() * 2f - 1f) * _spawnHalfWidth;
-            Quaternion rotation = Quaternion.Euler(0f, (float)_random.NextDouble() * 360f, 0f);
+            position.x += UnityEngine.Random.Range(-_spawnHalfWidth, _spawnHalfWidth);
+            Quaternion rotation = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
             GameObject instance = Managers.Resource.Instantiate("Prefabs/Recycling/" + definition.Prefab.name,
                 position: position, rotation: rotation);
             RecyclingItem item = instance.GetComponent<RecyclingItem>();
             instance.name = definition.Name;
             item.Initialize(this, definition);
             _items.Add(item);
-            if (_day >= FIRST_BOMB_DAY && _random.NextDouble() < _bombSpawnChance) SpawnBomb();
+            if (_day >= FIRST_BOMB_DAY && _bombSpawnChance > 0f &&
+                (_bombSpawnChance >= 1f || UnityEngine.Random.value < _bombSpawnChance)) SpawnBomb();
         }
 
         /// <summary>상류 공급 위치를 받아 폭탄을 별도로 생성하고 이동 흐름에 등록한다.</summary>
         private void SpawnBomb()
         {
             Vector3 position = _spawnPoint.position;
-            position.x += ((float)_random.NextDouble() * 2f - 1f) * _spawnHalfWidth;
-            position.z += ((float)_random.NextDouble() * 2f - 1f) * 0.5f;
-            Quaternion rotation = Quaternion.Euler(0f, (float)_random.NextDouble() * 360f, 0f);
+            position.x += UnityEngine.Random.Range(-_spawnHalfWidth, _spawnHalfWidth);
+            position.z += UnityEngine.Random.Range(-0.5f, 0.5f);
+            Quaternion rotation = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
             GameObject instance = Managers.Resource.Instantiate(BOMB_PREFAB_PATH,
                 position: position, rotation: rotation);
             BombExplosion3D bomb = instance.GetComponent<BombExplosion3D>();
@@ -627,10 +626,9 @@ namespace BeaverRecycling
             RefreshHud();
         }
 
-        /// <summary>출근 입력에서 일차별 동일 난수 시드와 공급 타이머를 초기화하고 작업을 시작한다.</summary>
+        /// <summary>출근 입력에서 공급 타이머를 초기화하고 작업을 시작한다.</summary>
         private void StartDay()
         {
-            _random = new System.Random(_runSeed + _day * 7919);
             _elapsed = 0f;
             _nextSpawn = 0.5f;
             _phase = DayPhase.Supply;

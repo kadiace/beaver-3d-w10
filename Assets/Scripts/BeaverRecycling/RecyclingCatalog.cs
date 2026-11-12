@@ -37,11 +37,11 @@ namespace BeaverRecycling
         public IReadOnlyList<RecyclingDefinition> DebugItems => _items;
 #endif
 
-        /// <summary>일차와 난수를 받아 목재 12%와 활성 분류의 균등 확률로 생성할 기물 정의를 반환한다.</summary>
-        public RecyclingDefinition Draw(System.Random random, int day)
+        /// <summary>일차를 받아 Unity 난수로 목재 12%와 활성 분류의 균등 확률에 따라 기물 정의를 반환한다.</summary>
+        public RecyclingDefinition Draw(int day)
         {
             RecyclingCategory category;
-            if (random.NextDouble() < 0.12) category = RecyclingCategory.Wood;
+            if (UnityEngine.Random.value < 0.12f) category = RecyclingCategory.Wood;
             else
             {
                 RecyclingCategory[] active = day == 1
@@ -49,12 +49,12 @@ namespace BeaverRecycling
                     : day == 2
                         ? new[] { RecyclingCategory.Plastic, RecyclingCategory.Metal, RecyclingCategory.Glass }
                         : new[] { RecyclingCategory.Plastic, RecyclingCategory.Glass, RecyclingCategory.Film, RecyclingCategory.Metal };
-                category = active[random.Next(active.Length)];
+                category = active[UnityEngine.Random.Range(0, active.Length)];
             }
             int total = 0;
             foreach (RecyclingDefinition item in _items)
                 if (item.Category == category && item.FirstDay <= day) total += item.Weight;
-            int roll = random.Next(total);
+            int roll = UnityEngine.Random.Range(0, total);
             foreach (RecyclingDefinition item in _items)
             {
                 if (item.Category != category || item.FirstDay > day) continue;
