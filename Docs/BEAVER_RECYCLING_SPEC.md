@@ -314,6 +314,7 @@
 - 화면 고정 UI에는 일차·시간·점수·목재·운반 현황·조작 안내·결과와 업그레이드만 둔다. 설명은 짧은 한글 문구로 표시한다.
 - 투입구 이름과 제출 안내는 투입구 위 World Space 표지로 표시한다. 게임 HUD와 결과 패널은 Screen Space UI로 구성한다.
 - 비버·투입구·HUD는 `Assets/Scenes/Game.unity`의 씬 오브젝트로 편집한다. 공급 자재는 `Assets/Resources/Prefabs/Recycling/`, 등장 규칙은 `Assets/Resources/Data/RecyclingCatalog.asset`에서 수정한다.
+- 강·폭포 재질은 유리 자재보다 먼저 렌더되도록 재질별 렌더 큐를 설정한다. 강 배경은 `2890`, 수면과 폭포는 `2900`, 유리 자재는 `3000`을 사용한다.
 
 ## 12. 기존 빌드에서의 변경 지점
 
