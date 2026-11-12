@@ -50,7 +50,7 @@ namespace BeaverRecycling
         public void Refresh(int day, string phase, float seconds, int score, int target, int wood, string carry, bool working)
         {
             _day.text = day + "일차  ·  " + phase + (working ? " " + Mathf.CeilToInt(seconds) + "초" : "");
-            _score.text = "오늘 " + score + " / " + target;
+            _score.text = "획득 점수 " + score + " / " + target;
             _wood.text = "목재 " + wood;
             _carry.text = carry;
             _pauseButton.interactable = working;

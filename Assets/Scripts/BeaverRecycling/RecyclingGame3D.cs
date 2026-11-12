@@ -454,8 +454,7 @@ namespace BeaverRecycling
             _wrong += submission.Wrong;
             if (submission.Correct == submitted.Count) _bestBundle = Mathf.Max(_bestBundle, submitted.Count);
             foreach (RecyclingItem item in submitted) item.Resolve(chute.IntakePosition, true);
-            _hud.Event((submission.Score >= 0 ? "+" : "") + submission.Score + "점" +
-                (submission.Bonus > 0 ? " · 묶음 +" + submission.Bonus : ""), chute.IntakePosition,
+            _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", chute.IntakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }
 
