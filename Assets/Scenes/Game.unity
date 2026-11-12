@@ -2609,6 +2609,8 @@ MonoBehaviour:
   _visual: {fileID: 3100000004}
   _knockbackSpinSpeed: 720
   _stunStar: {fileID: 3100000502}
+  _stunStarOrbitRadius: 0.55
+  _stunStarOrbitSpeed: 180
 --- !u!1 &3100000092
 GameObject:
   m_ObjectHideFlags: 0
@@ -9806,27 +9808,6 @@ MonoBehaviour:
   - {fileID: 3100000403}
   - {fileID: 3100000412}
   - {fileID: 3100000421}
---- !u!65 &3100000998
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3100000001}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 2.2, y: 1.5, z: 2.4}
-  m_Center: {x: 0, y: 0.4, z: 1}
 --- !u!1 &3100000501
 GameObject:
   m_ObjectHideFlags: 0
@@ -9861,6 +9842,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
 --- !u!212 &3100000503
 SpriteRenderer:
+  serializedVersion: 2
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -9907,8 +9889,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 10
   m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
-  m_Sprite: {fileID: -2082683393366224420, guid: d19b8e4031b94f429621cd58ac1137ae, type: 3}
+  m_Sprite: {fileID: 21300000, guid: d19b8e4031b94f429621cd58ac1137ae, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -9918,6 +9899,27 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!65 &3100000998
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3100000001}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.2, y: 1.5, z: 2.4}
+  m_Center: {x: 0, y: 0.4, z: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

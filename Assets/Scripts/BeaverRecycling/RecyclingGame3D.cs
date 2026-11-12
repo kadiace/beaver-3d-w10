@@ -492,11 +492,14 @@ namespace BeaverRecycling
             if (!IsWorking || !_bombs.Contains(bomb) || !bomb.TryBeginExplosion()) return;
 
             Vector3 origin = bomb.transform.position;
-            ApplyBlastToItems(origin, bomb.ExplosionRadius, bomb.ItemKnockbackSpeed);
-            ApplyBlastToBombs(bomb, origin, bomb.ExplosionRadius, bomb.ItemKnockbackSpeed);
+            float duration = bomb.KnockbackDuration;
+            float itemSpeed = duration > 0f ? 2f * bomb.ItemKnockbackDistance / duration : 0f;
+            float beaverSpeed = duration > 0f ? 2f * bomb.BeaverKnockbackDistance / duration : 0f;
+            ApplyBlastToItems(origin, bomb.ExplosionRadius, itemSpeed, duration);
+            ApplyBlastToBombs(bomb, origin, bomb.ExplosionRadius, itemSpeed, duration);
 
             Vector3 beaverDirection = HorizontalDirection(origin, _beaver.transform.position);
-            _beaver.ApplyKnockback(beaverDirection * bomb.BeaverKnockbackSpeed);
+            _beaver.ApplyKnockback(beaverDirection * beaverSpeed, duration);
             _beaverStunnedUntil = Mathf.Max(_beaverStunnedUntil, Time.time + bomb.StunDuration);
             _movement = Vector2.zero;
             _hud.Message("폭발! 잠시 행동할 수 없어요");
@@ -505,8 +508,8 @@ namespace BeaverRecycling
             bomb.ReturnNow();
         }
 
-        /// <summary>폭발 반경 안의 묶음에 결합 상태를 보존한 수평 넉백을 적용한다.</summary>
-        private void ApplyBlastToItems(Vector3 origin, float radius, float knockbackSpeed)
+        /// <summary>폭발 위치, 반경, 넉백 속도와 시간을 받아 범위 안의 기물 묶음에 넉백을 적용한다.</summary>
+        private void ApplyBlastToItems(Vector3 origin, float radius, float knockbackSpeed, float duration)
         {
             float radiusSquared = radius * radius;
             var processed = new HashSet<RecyclingItem>();
@@ -523,7 +526,7 @@ namespace BeaverRecycling
                     Vector3 direction = HorizontalDirection(origin, carriedCenter);
                     ReleaseBundle(true);
                     foreach (RecyclingItem member in carried)
-                        member.ApplyKnockback(direction * knockbackSpeed);
+                        member.ApplyKnockback(direction * knockbackSpeed, duration);
                 }
             }
 
@@ -547,19 +550,19 @@ namespace BeaverRecycling
 
                 Vector3 velocityChange = HorizontalDirection(origin, closestMember.Body.position) * knockbackSpeed;
                 foreach (RecyclingItem member in group)
-                    if (!member.IsResolved && !member.IsHeld) member.ApplyKnockback(velocityChange);
+                    if (!member.IsResolved && !member.IsHeld) member.ApplyKnockback(velocityChange, duration);
             }
         }
 
-        /// <summary>폭발 반경 안의 다른 폭탄을 연쇄 폭발 없이 바깥 방향으로 밀어낸다.</summary>
-        private void ApplyBlastToBombs(BombExplosion3D source, Vector3 origin, float radius, float knockbackSpeed)
+        /// <summary>원본 폭탄과 폭발 위치, 반경, 넉백 속도와 시간을 받아 범위 안의 다른 폭탄을 밀어낸다.</summary>
+        private void ApplyBlastToBombs(BombExplosion3D source, Vector3 origin, float radius, float knockbackSpeed, float duration)
         {
             float radiusSquared = radius * radius;
             foreach (BombExplosion3D bomb in _bombs.ToArray())
             {
                 if (bomb == source || HorizontalDistanceSquared(origin, bomb.transform.position) > radiusSquared) continue;
                 Vector3 velocityChange = HorizontalDirection(origin, bomb.transform.position) * knockbackSpeed;
-                bomb.ApplyKnockback(velocityChange);
+                bomb.ApplyKnockback(velocityChange, duration);
             }
         }
 

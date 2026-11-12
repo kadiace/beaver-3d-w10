@@ -7,19 +7,23 @@ namespace BeaverRecycling
     {
         [Header("Explosion")]
         [SerializeField, Min(0.1f)] private float _explosionRadius = 3f;
-        [SerializeField, Min(0f)] private float _itemKnockbackSpeed = 5f;
-        [SerializeField, Min(0f)] private float _beaverKnockbackSpeed = 6f;
+        [SerializeField, Min(0f)] private float _itemKnockbackDistance = 0.825f;
+        [SerializeField, Min(0f)] private float _beaverKnockbackDistance = 0.99f;
+        [SerializeField, Min(0f)] private float _knockbackDuration = 0.33f;
         [SerializeField, Min(0f)] private float _stunDuration = 1f;
 
         private Rigidbody _body;
         private BoxCollider _collider;
         private RecyclingGame3D _game;
         private Vector3 _knockbackVelocity;
+        private float _knockbackTimeRemaining;
+        private float _appliedKnockbackX;
         private bool _exploded;
 
         public float ExplosionRadius => _explosionRadius;
-        public float ItemKnockbackSpeed => _itemKnockbackSpeed;
-        public float BeaverKnockbackSpeed => _beaverKnockbackSpeed;
+        public float ItemKnockbackDistance => _itemKnockbackDistance;
+        public float BeaverKnockbackDistance => _beaverKnockbackDistance;
+        public float KnockbackDuration => _knockbackDuration;
         public float StunDuration => _stunDuration;
 
         void Awake()
@@ -32,6 +36,8 @@ namespace BeaverRecycling
         {
             _exploded = false;
             _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
         }
 
         void OnDisable()
@@ -46,6 +52,8 @@ namespace BeaverRecycling
             _game = game;
             _exploded = false;
             _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
             _collider.enabled = true;
             _body.isKinematic = false;
             _body.useGravity = true;
@@ -66,12 +74,13 @@ namespace BeaverRecycling
             return true;
         }
 
-        /// <summary>폭발 속도 변화를 받아 다른 폭발 없이 폭탄의 수평 이동에 반영한다.</summary>
-        public void ApplyKnockback(Vector3 velocityChange)
+        /// <summary>수평 속도 변화와 지속 시간을 받아 폭탄의 넉백 속도와 남은 시간을 갱신한다.</summary>
+        public void ApplyKnockback(Vector3 velocityChange, float duration)
         {
-            if (_exploded) return;
+            if (_exploded || duration <= 0f) return;
             velocityChange.y = 0f;
             _knockbackVelocity += velocityChange;
+            _knockbackTimeRemaining = duration;
         }
 
         /// <summary>폭발 또는 강 이탈 후 폭탄 오브젝트를 리소스 풀에 반환한다.</summary>
@@ -102,10 +111,13 @@ namespace BeaverRecycling
             bool touchesWater = _game.IsInsideRiver(_body.position) &&
                 _collider.bounds.min.y <= _game.WaterY + 0.2f;
             Vector3 velocity = _body.linearVelocity;
-            Vector3 knockbackVelocity = _knockbackVelocity;
-            _knockbackVelocity = Vector3.MoveTowards(_knockbackVelocity, Vector3.zero,
-                18f * Time.fixedDeltaTime);
-            velocity.x = velocity.x * 0.9f + knockbackVelocity.x;
+            float step = Mathf.Min(Time.fixedDeltaTime, _knockbackTimeRemaining);
+            float fraction = _knockbackTimeRemaining > 0f ? step / _knockbackTimeRemaining : 0f;
+            Vector3 knockbackVelocity = _knockbackVelocity * (step / Time.fixedDeltaTime) * (1f - 0.5f * fraction);
+            _knockbackVelocity *= 1f - fraction;
+            _knockbackTimeRemaining -= step;
+            velocity.x = (velocity.x - _appliedKnockbackX) * 0.9f + knockbackVelocity.x;
+            _appliedKnockbackX = knockbackVelocity.x;
             velocity.z = (touchesWater ? -_game.FlowSpeed : 0f) + knockbackVelocity.z;
             if (touchesWater)
             {

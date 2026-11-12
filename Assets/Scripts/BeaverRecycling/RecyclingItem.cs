@@ -8,8 +8,6 @@ namespace BeaverRecycling
     [RequireComponent(typeof(Rigidbody))]
     public sealed class RecyclingItem : MonoBehaviour
     {
-        private const float KNOCKBACK_DECELERATION = 18f;
-
         [Header("Wood marker")]
         [SerializeField] private GameObject _woodBadge;
         private readonly Dictionary<RecyclingItem, FixedJoint> _links = new Dictionary<RecyclingItem, FixedJoint>();
@@ -23,6 +21,8 @@ namespace BeaverRecycling
         private bool _resolved;
         private float _attachAllowedAt;
         private Vector3 _knockbackVelocity;
+        private float _knockbackTimeRemaining;
+        private float _appliedKnockbackX;
         private float _lastFlowTime = float.NegativeInfinity;
 
         public Rigidbody Body => _body;
@@ -46,6 +46,8 @@ namespace BeaverRecycling
             _resolved = false;
             _attachAllowedAt = 0f;
             _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
             _lastFlowTime = float.NegativeInfinity;
             transform.localScale = _originalScale;
             _collider.enabled = true;
@@ -69,6 +71,8 @@ namespace BeaverRecycling
             _game = game;
             _definition = definition;
             _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
             _woodBadge.SetActive(definition.IsWood);
             _body.linearDamping = 0.4f;
             _body.angularDamping = 4f;
@@ -131,6 +135,8 @@ namespace BeaverRecycling
             }
             _held = held;
             _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
             _body.isKinematic = held;
             _body.useGravity = !held;
         }
@@ -138,11 +144,13 @@ namespace BeaverRecycling
         /// <summary>분리 유예 시간을 받아 그 시각까지 재접착을 막는다.</summary>
         public void BlockAttachment(float seconds) => _attachAllowedAt = Time.time + seconds;
 
-        /// <summary>수평 속도 변화를 받아 다음 물리 이동에 넉백을 반영한다.</summary>
-        public void ApplyKnockback(Vector3 velocityChange)
+        /// <summary>수평 속도 변화와 지속 시간을 받아 기물의 넉백 속도와 남은 시간을 갱신한다.</summary>
+        public void ApplyKnockback(Vector3 velocityChange, float duration)
         {
+            if (duration <= 0f) return;
             velocityChange.y = 0f;
             _knockbackVelocity += velocityChange;
+            _knockbackTimeRemaining = duration;
         }
 
         /// <summary>외곽선 렌더링 레이어를 받아 기존 기본 렌더링을 유지하며 강조 색을 바꾼다.</summary>
@@ -208,10 +216,14 @@ namespace BeaverRecycling
                 member._lastFlowTime = Time.fixedTime;
                 if (member._held || member._body.isKinematic) continue;
                 Vector3 velocity = member._body.linearVelocity;
-                Vector3 knockbackVelocity = member._knockbackVelocity;
-                member._knockbackVelocity = Vector3.MoveTowards(member._knockbackVelocity,
-                    Vector3.zero, KNOCKBACK_DECELERATION * Time.fixedDeltaTime);
-                velocity.x = velocity.x * 0.9f + knockbackVelocity.x;
+                float step = Mathf.Min(Time.fixedDeltaTime, member._knockbackTimeRemaining);
+                float fraction = member._knockbackTimeRemaining > 0f ? step / member._knockbackTimeRemaining : 0f;
+                Vector3 knockbackVelocity = member._knockbackVelocity *
+                    (step / Time.fixedDeltaTime) * (1f - 0.5f * fraction);
+                member._knockbackVelocity *= 1f - fraction;
+                member._knockbackTimeRemaining -= step;
+                velocity.x = (velocity.x - member._appliedKnockbackX) * 0.9f + knockbackVelocity.x;
+                member._appliedKnockbackX = knockbackVelocity.x;
                 velocity.z = (touchesWater ? -_game.FlowSpeed : 0f) + knockbackVelocity.z;
                 if (_game.IsInsideRiver(member._body.position) && member._collider.bounds.min.y <= _game.WaterY + 0.2f)
                 {
