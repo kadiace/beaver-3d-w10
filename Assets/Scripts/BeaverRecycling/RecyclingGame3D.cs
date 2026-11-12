@@ -53,10 +53,14 @@ namespace BeaverRecycling
 
         [Header("Bundle")]
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
+        [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.3f;
 
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
+        private readonly List<Rect> _projectedOverlaps = new List<Rect>();
+        private readonly List<float> _projectedXEdges = new List<float>();
+        private readonly List<Vector2> _projectedZIntervals = new List<Vector2>();
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
@@ -326,46 +330,95 @@ namespace BeaverRecycling
             foreach (RecyclingItem member in _held) member.SetHeld(true);
         }
 
-        /// <summary>운반 중인 기물의 XZ 투영 범위를 조회해 접촉한 상대 묶음을 한도 안에서 합친다.</summary>
+        /// <summary>운반 묶음과 새 기물의 XZ 겹침 비율을 검사해 기준을 넘은 상대 묶음을 한도 안에서 합친다.</summary>
         private void CollectContacts()
         {
-            for (int i = 0; i < _held.Count; i++)
+            foreach (RecyclingItem other in _items)
             {
-                RecyclingItem held = _held[i];
-                Bounds heldBounds = held.Collider.bounds;
-                foreach (RecyclingItem other in _items)
+                if (other.IsHeld || !other.CanJoin) continue;
+                if (!TryGetProjectedContactPoint(other.Collider.bounds, out RecyclingItem held, out Vector3 contactPoint)) continue;
+                List<RecyclingItem> incoming = RecyclingItem.Collect(other);
+                if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
+                if (_held.Count + incoming.Count > Capacity)
                 {
-                    if (other == held || other.IsHeld || !other.CanJoin) continue;
-                    if (!TryGetProjectedContactPoint(heldBounds, other.Collider.bounds, out Vector3 contactPoint)) continue;
-                    List<RecyclingItem> incoming = RecyclingItem.Collect(other);
-                    if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
-                    if (_held.Count + incoming.Count > Capacity)
-                    {
-                        if (Time.time > _capacityNoticeAt) { _hud.Message("운반 한도가 가득 찼어요"); _capacityNoticeAt = Time.time + 1.5f; }
-                        continue;
-                    }
-                    contactPoint = RaiseJoiningItemToContact(held, other, contactPoint);
-                    held.Attach(other, contactPoint);
-                    foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
+                    if (Time.time > _capacityNoticeAt) { _hud.Message("운반 한도가 가득 찼어요"); _capacityNoticeAt = Time.time + 1.5f; }
+                    continue;
                 }
+                contactPoint = RaiseJoiningItemToContact(held, other, contactPoint);
+                held.Attach(other, contactPoint);
+                foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
             }
         }
 
-        /// <summary>두 월드 바운드의 XZ 투영이 닿거나 겹치는지 판정하고 투영 겹침 중심을 반환한다.</summary>
-        private static bool TryGetProjectedContactPoint(Bounds first, Bounds second, out Vector3 contactPoint)
+        /// <summary>새 기물의 바운드를 받아 운반 묶음과의 XZ 겹침 비율과 연결할 기물·접촉점을 반환한다.</summary>
+        private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactPoint)
         {
-            float minX = Mathf.Max(first.min.x, second.min.x);
-            float maxX = Mathf.Min(first.max.x, second.max.x);
-            float minZ = Mathf.Max(first.min.z, second.min.z);
-            float maxZ = Mathf.Min(first.max.z, second.max.z);
-            if (minX > maxX || minZ > maxZ)
-            {
-                contactPoint = default;
-                return false;
-            }
+            contact = null;
+            contactPoint = default;
+            float joiningArea = joiningBounds.size.x * joiningBounds.size.z;
+            if (joiningArea <= 0f) return false;
 
-            contactPoint = new Vector3((minX + maxX) * 0.5f, (first.center.y + second.center.y) * 0.5f, (minZ + maxZ) * 0.5f);
-            return true;
+            float requiredArea = joiningArea * _minimumProjectedOverlap;
+            float largestArea = 0f;
+            _projectedOverlaps.Clear();
+            _projectedXEdges.Clear();
+            foreach (RecyclingItem held in _held)
+            {
+                Bounds heldBounds = held.Collider.bounds;
+                float minX = Mathf.Max(heldBounds.min.x, joiningBounds.min.x);
+                float maxX = Mathf.Min(heldBounds.max.x, joiningBounds.max.x);
+                float minZ = Mathf.Max(heldBounds.min.z, joiningBounds.min.z);
+                float maxZ = Mathf.Min(heldBounds.max.z, joiningBounds.max.z);
+                if (minX >= maxX || minZ >= maxZ) continue;
+
+                float area = (maxX - minX) * (maxZ - minZ);
+                if (area > largestArea)
+                {
+                    largestArea = area;
+                    contact = held;
+                    contactPoint = new Vector3((minX + maxX) * 0.5f,
+                        (heldBounds.center.y + joiningBounds.center.y) * 0.5f, (minZ + maxZ) * 0.5f);
+                }
+                if (area >= requiredArea) return true;
+                _projectedOverlaps.Add(Rect.MinMaxRect(minX, minZ, maxX, maxZ));
+                _projectedXEdges.Add(minX);
+                _projectedXEdges.Add(maxX);
+            }
+            if (_projectedOverlaps.Count == 0) return false;
+
+            _projectedXEdges.Sort();
+            float totalArea = 0f;
+            for (int i = 0; i < _projectedXEdges.Count - 1; i++)
+            {
+                float left = _projectedXEdges[i];
+                float right = _projectedXEdges[i + 1];
+                if (left >= right) continue;
+
+                _projectedZIntervals.Clear();
+                foreach (Rect overlap in _projectedOverlaps)
+                    if (overlap.xMin < right && overlap.xMax > left)
+                        _projectedZIntervals.Add(new Vector2(overlap.yMin, overlap.yMax));
+                if (_projectedZIntervals.Count == 0) continue;
+
+                _projectedZIntervals.Sort((a, b) => a.x.CompareTo(b.x));
+                float start = _projectedZIntervals[0].x;
+                float end = _projectedZIntervals[0].y;
+                float length = 0f;
+                for (int j = 1; j < _projectedZIntervals.Count; j++)
+                {
+                    Vector2 interval = _projectedZIntervals[j];
+                    if (interval.x > end)
+                    {
+                        length += end - start;
+                        start = interval.x;
+                        end = interval.y;
+                    }
+                    else end = Mathf.Max(end, interval.y);
+                }
+                totalArea += (right - left) * (length + end - start);
+                if (totalArea >= requiredArea) return true;
+            }
+            return false;
         }
 
         /// <summary>기존 묶음보다 아래에 있는 새 기물을 올려 충돌체 바운드가 맞닿게 하고 조인트 지점을 조정한다.</summary>
