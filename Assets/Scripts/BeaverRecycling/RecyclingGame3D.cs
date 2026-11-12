@@ -128,6 +128,7 @@ namespace BeaverRecycling
             if (IsWorking)
             {
                 bool stunned = Time.time < _beaverStunnedUntil;
+                _beaver.SetStunned(stunned);
                 _movement = stunned ? Vector2.zero : Managers.Input.MoveInput;
                 if (!stunned && _movement.sqrMagnitude > 0.001f)
                 {
@@ -632,6 +633,7 @@ namespace BeaverRecycling
                 _totalScore += _dayScore;
             }
             _phase = _passed && _day == _targets.Length ? DayPhase.Clear : DayPhase.Result;
+            _beaver.SetStunned(false);
             _movement = Vector2.zero;
             SetUiMode(true);
             UpdateModal();
