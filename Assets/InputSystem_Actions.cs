@@ -1549,17 +1549,6 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
-                    ""id"": ""28df4bf4-6f9b-4022-3979-d3eb63f67905"",
-                    ""path"": ""<Mouse>/scroll"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": ""Keyboard&Mouse"",
-                    ""action"": ""CameraZoom"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
                     ""id"": ""906ed40f-70bb-93a6-028e-8c5d5344d9f2"",
                     ""path"": ""<Keyboard>/escape"",
                     ""interactions"": """",

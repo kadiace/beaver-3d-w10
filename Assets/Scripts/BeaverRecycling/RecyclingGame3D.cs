@@ -55,9 +55,6 @@ namespace BeaverRecycling
         [Header("Bundle")]
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
 
-        [Header("Camera")]
-        [SerializeField, Min(0.01f)] private float _zoomSensitivity = 0.12f;
-        [SerializeField] private Vector2 _zoomRange = new Vector2(8f, 16f);
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
@@ -772,13 +769,17 @@ namespace BeaverRecycling
                 {
                     _hud.ShowModal("퇴근 · 내일을 준비하세요", body + "\n보유 " + _wood + " 목재", "다음 날", "처음부터", true);
                     string[] names = { "튼튼한 앞발", "든든한 식사", "긴 집게" };
+                    string[] statNames = { "운반 한도", "이동 속도", "집기 거리" };
                     for (int i = 0; i < _levels.Length; i++)
                     {
                         int level = _levels[i];
-                        string value = i == 0 ? (Capacity + " → " + (Capacity + 2) + "개") : i == 1
-                            ? ((_baseSpeed + level * 0.5f).ToString("0.0") + " → " + (_baseSpeed + (level + 1) * 0.5f).ToString("0.0"))
-                            : (Reach.ToString("0.0") + " → " + (Reach + 0.3f).ToString("0.0"));
-                        string description = names[i] + " " + level + "/3\n" + (level == 3 ? "최대 단계" : value + "\n" + UPGRADE_COSTS[level] + " 목재");
+                        string current = i == 0 ? Capacity + "개" : i == 1
+                            ? (_baseSpeed + level * 0.5f).ToString("0.0") : Reach.ToString("0.0");
+                        string next = i == 0 ? (Capacity + 2) + "개" : i == 1
+                            ? (_baseSpeed + (level + 1) * 0.5f).ToString("0.0") : (Reach + 0.3f).ToString("0.0");
+                        string value = level == 3 ? current : current + " → " + next;
+                        string description = names[i] + " " + level + "/3\n" + statNames[i] + " " + value + "\n" +
+                            (level == 3 ? "최대 단계" : UPGRADE_COSTS[level] + " 목재");
                         _hud.SetUpgrade(i, description, level < 3 && _wood >= UPGRADE_COSTS[Mathf.Min(level, 2)]);
                     }
                 }
@@ -854,8 +855,7 @@ namespace BeaverRecycling
             return item != null && !item.IsResolved && _items.Contains(item) ? item : null;
         }
         /// <summary>
-        /// Reads right-click and wheel input for item tracking and camera zoom.
-        /// Uses pointer state and zoom steps, updating the tracked item and orthographic size.
+        /// Reads right-click and pointer input and updates the tracked item.
         /// </summary>
         private void ReadCameraInput()
         {
@@ -884,9 +884,6 @@ namespace BeaverRecycling
                 }
                 _cameraGesture = false;
             }
-            if (!overUi && !Managers.Input.SecondaryHeld)
-                _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize *
-                    Mathf.Exp(-Managers.Input.CameraZoomSteps * _zoomSensitivity), _zoomRange.x, _zoomRange.y);
         }
     }
 }

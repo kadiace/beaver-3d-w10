@@ -41,7 +41,6 @@ public class InputManager
     public bool SecondaryReleased => _secondaryClick.WasReleasedThisFrame();
     public bool SecondaryHeld => _secondaryClick.IsPressed();
     public float CameraZoom => _cameraZoom.ReadValue<Vector2>().y;
-    public float CameraZoomSteps => NormalizeScroll(CameraZoom);
     public bool InteractPressed => _interact.WasPressedThisFrame();
     public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame();
     public bool CancelPressed => _inputMode == InputMode.Player
@@ -95,14 +94,6 @@ public class InputManager
         _secondaryClick = map.FindAction("SecondaryClick", true);
         _cameraZoom = map.FindAction("CameraZoom", true);
         _cancel = map.FindAction("Cancel", true);
-    }
-
-    /// <summary>공용 휠 값을 입력 설정과 플랫폼에 따라 실제 휠 칸 수로 환산해 반환한다.</summary>
-    private static float NormalizeScroll(float scroll)
-    {
-        bool windows = Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer;
-        return windows && InputSystem.settings.scrollDeltaBehavior == InputSettings.ScrollDeltaBehavior.KeepPlatformSpecificInputRange
-            ? scroll / 120f : scroll;
     }
 
     /// <summary>입력 모드에 따라 게임 액션을 켜거나 끄고 UI 액션과 커서·시간 상태를 갱신한다.</summary>
