@@ -53,14 +53,11 @@ namespace BeaverRecycling
 
         [Header("Bundle")]
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
-        [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.3f;
+        [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.1f;
 
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
-        private readonly List<Rect> _projectedOverlaps = new List<Rect>();
-        private readonly List<float> _projectedXEdges = new List<float>();
-        private readonly List<Vector2> _projectedZIntervals = new List<Vector2>();
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
@@ -350,75 +347,158 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>새 기물의 바운드를 받아 운반 묶음과의 XZ 겹침 비율과 연결할 기물·접촉점을 반환한다.</summary>
+        /// <summary>메인 카메라의 투영 영역에서 새 기물의 면적 대비 운반 묶음의 겹침 비율을 판정한다.</summary>
         private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactPoint)
         {
             contact = null;
             contactPoint = default;
-            float joiningArea = joiningBounds.size.x * joiningBounds.size.z;
-            if (joiningArea <= 0f) return false;
+            if (_camera == null) return false;
+
+            // 월드 AABB의 8개 모서리를 카메라 화면에 투영한 볼록 외곽선으로 판정한다.
+            // Rect로 감싸면 아이소메트릭 시점에서 비어 있는 모서리까지 겹침으로 계산된다.
+            List<Vector2> joiningPolygon = ProjectBoundsToViewport(joiningBounds);
+            float joiningArea = PolygonArea(joiningPolygon);
+            if (joiningArea <= 0.00000001f) return false;
 
             float requiredArea = joiningArea * _minimumProjectedOverlap;
             float largestArea = 0f;
-            _projectedOverlaps.Clear();
-            _projectedXEdges.Clear();
+            var uncovered = new List<List<Vector2>> { joiningPolygon };
+
             foreach (RecyclingItem held in _held)
             {
                 Bounds heldBounds = held.Collider.bounds;
-                float minX = Mathf.Max(heldBounds.min.x, joiningBounds.min.x);
-                float maxX = Mathf.Min(heldBounds.max.x, joiningBounds.max.x);
-                float minZ = Mathf.Max(heldBounds.min.z, joiningBounds.min.z);
-                float maxZ = Mathf.Min(heldBounds.max.z, joiningBounds.max.z);
-                if (minX >= maxX || minZ >= maxZ) continue;
+                List<Vector2> heldPolygon = ProjectBoundsToViewport(heldBounds);
+                float individualArea = PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon));
+                if (individualArea <= 0.00000001f) continue;
 
-                float area = (maxX - minX) * (maxZ - minZ);
-                if (area > largestArea)
+                if (individualArea > largestArea)
                 {
-                    largestArea = area;
+                    largestArea = individualArea;
                     contact = held;
-                    contactPoint = new Vector3((minX + maxX) * 0.5f,
-                        (heldBounds.center.y + joiningBounds.center.y) * 0.5f, (minZ + maxZ) * 0.5f);
+                    contactPoint = (heldBounds.center + joiningBounds.center) * 0.5f;
                 }
-                if (area >= requiredArea) return true;
-                _projectedOverlaps.Add(Rect.MinMaxRect(minX, minZ, maxX, maxZ));
-                _projectedXEdges.Add(minX);
-                _projectedXEdges.Add(maxX);
-            }
-            if (_projectedOverlaps.Count == 0) return false;
+                if (individualArea >= requiredArea) return true;
 
-            _projectedXEdges.Sort();
-            float totalArea = 0f;
-            for (int i = 0; i < _projectedXEdges.Count - 1; i++)
-            {
-                float left = _projectedXEdges[i];
-                float right = _projectedXEdges[i + 1];
-                if (left >= right) continue;
+                // 여러 운반 기물이 동일한 화면 영역을 차지하더라도 중복 가산하지 않는다.
+                // joiningPolygon에서 각 heldPolygon을 차례로 빼고 남은 면적을 구한다.
+                var nextUncovered = new List<List<Vector2>>();
+                foreach (List<Vector2> piece in uncovered)
+                    SubtractConvexPolygon(piece, heldPolygon, nextUncovered);
+                uncovered = nextUncovered;
 
-                _projectedZIntervals.Clear();
-                foreach (Rect overlap in _projectedOverlaps)
-                    if (overlap.xMin < right && overlap.xMax > left)
-                        _projectedZIntervals.Add(new Vector2(overlap.yMin, overlap.yMax));
-                if (_projectedZIntervals.Count == 0) continue;
-
-                _projectedZIntervals.Sort((a, b) => a.x.CompareTo(b.x));
-                float start = _projectedZIntervals[0].x;
-                float end = _projectedZIntervals[0].y;
-                float length = 0f;
-                for (int j = 1; j < _projectedZIntervals.Count; j++)
-                {
-                    Vector2 interval = _projectedZIntervals[j];
-                    if (interval.x > end)
-                    {
-                        length += end - start;
-                        start = interval.x;
-                        end = interval.y;
-                    }
-                    else end = Mathf.Max(end, interval.y);
-                }
-                totalArea += (right - left) * (length + end - start);
-                if (totalArea >= requiredArea) return true;
+                float uncoveredArea = 0f;
+                foreach (List<Vector2> piece in uncovered) uncoveredArea += PolygonArea(piece);
+                if (joiningArea - uncoveredArea >= requiredArea) return true;
             }
             return false;
+        }
+
+        /// <summary>3D 월드 바운드 8개 꼭짓점을 카메라 뷰포트에 투영해 CCW 볼록 외곽선을 만든다.</summary>
+        private List<Vector2> ProjectBoundsToViewport(Bounds bounds)
+        {
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            var projected = new List<Vector2>(8);
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = new Vector3(
+                    (i & 1) == 0 ? min.x : max.x,
+                    (i & 2) == 0 ? min.y : max.y,
+                    (i & 4) == 0 ? min.z : max.z);
+                Vector3 viewport = _camera.WorldToViewportPoint(corner);
+                projected.Add(new Vector2(viewport.x, viewport.y));
+            }
+            projected.Sort((a, b) =>
+            {
+                int x = a.x.CompareTo(b.x);
+                return x != 0 ? x : a.y.CompareTo(b.y);
+            });
+
+            var hull = new List<Vector2>(16);
+            foreach (Vector2 point in projected)
+            {
+                while (hull.Count >= 2 && Cross(hull[hull.Count - 2], hull[hull.Count - 1], point) <= 0f)
+                    hull.RemoveAt(hull.Count - 1);
+                hull.Add(point);
+            }
+            int lowerCount = hull.Count;
+            for (int i = projected.Count - 2; i >= 0; i--)
+            {
+                Vector2 point = projected[i];
+                while (hull.Count > lowerCount &&
+                       Cross(hull[hull.Count - 2], hull[hull.Count - 1], point) <= 0f)
+                    hull.RemoveAt(hull.Count - 1);
+                hull.Add(point);
+            }
+            if (hull.Count > 1) hull.RemoveAt(hull.Count - 1);
+            return hull;
+        }
+
+        private static float Cross(Vector2 a, Vector2 b, Vector2 c) =>
+            (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+
+        private static float PolygonArea(List<Vector2> polygon)
+        {
+            if (polygon.Count < 3) return 0f;
+            float area = 0f;
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[(i + 1) % polygon.Count];
+                area += a.x * b.y - b.x * a.y;
+            }
+            return Mathf.Abs(area) * 0.5f;
+        }
+
+        /// <summary>CCW 볼록 다각형 두 개의 교집합을 반환한다.</summary>
+        private static List<Vector2> IntersectConvexPolygons(List<Vector2> subject, List<Vector2> clip)
+        {
+            List<Vector2> result = subject;
+            for (int i = 0; i < clip.Count && result.Count >= 3; i++)
+                result = ClipToHalfPlane(result, clip[i], clip[(i + 1) % clip.Count], true);
+            return result;
+        }
+
+        /// <summary>볼록 클리퍼의 각 변에 대해 외부 조각을 떼어내 중복 없는 차집합을 만든다.</summary>
+        private static void SubtractConvexPolygon(List<Vector2> subject, List<Vector2> clip,
+            List<List<Vector2>> uncovered)
+        {
+            List<Vector2> inside = subject;
+            for (int i = 0; i < clip.Count && inside.Count >= 3; i++)
+            {
+                Vector2 start = clip[i];
+                Vector2 end = clip[(i + 1) % clip.Count];
+                List<Vector2> outside = ClipToHalfPlane(inside, start, end, false);
+                if (PolygonArea(outside) > 0.00000001f) uncovered.Add(outside);
+                inside = ClipToHalfPlane(inside, start, end, true);
+            }
+        }
+
+        /// <summary>지정된 선의 왼쪽(CCW 내부) 또는 오른쪽에 있는 다각형을 잘라 반환한다.</summary>
+        private static List<Vector2> ClipToHalfPlane(List<Vector2> polygon, Vector2 edgeStart,
+            Vector2 edgeEnd, bool keepLeft)
+        {
+            var result = new List<Vector2>(polygon.Count + 2);
+            if (polygon.Count == 0) return result;
+
+            Vector2 previous = polygon[polygon.Count - 1];
+            float previousSide = Cross(edgeStart, edgeEnd, previous);
+            bool previousKept = keepLeft ? previousSide >= 0f : previousSide <= 0f;
+            foreach (Vector2 current in polygon)
+            {
+                float currentSide = Cross(edgeStart, edgeEnd, current);
+                bool currentKept = keepLeft ? currentSide >= 0f : currentSide <= 0f;
+                if (previousKept != currentKept)
+                {
+                    float t = previousSide / (previousSide - currentSide);
+                    result.Add(Vector2.LerpUnclamped(previous, current, t));
+                }
+                if (currentKept) result.Add(current);
+                previous = current;
+                previousSide = currentSide;
+                previousKept = currentKept;
+            }
+            return result;
         }
 
         /// <summary>기존 묶음보다 아래에 있는 새 기물을 올려 충돌체 바운드가 맞닿게 하고 조인트 지점을 조정한다.</summary>

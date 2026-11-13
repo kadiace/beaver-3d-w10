@@ -579,7 +579,7 @@ MonoBehaviour:
   _baseReach: 1.8
   _baseCapacity: 6
   _splitScatterDistance: 0.6
-  _minimumProjectedOverlap: 0.3
+  _minimumProjectedOverlap: 0.1
 --- !u!1 &3100000001
 GameObject:
   m_ObjectHideFlags: 0
