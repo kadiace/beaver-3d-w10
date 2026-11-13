@@ -480,26 +480,48 @@ namespace BeaverRecycling
             _held.Clear();
         }
 
-        /// <summary>현재 비버 위치에서 사용할 수 있는 가장 가까운 투입구를 반환한다.</summary>
-        private RecyclingChute3D FindChute()
+        /// <summary>비버 위치에서 사용 가능한 가장 가까운 투입구를 반환한다.</summary>
+        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position);
+
+        /// <summary>주어진 월드 위치와 수평거리 기준으로 사용 가능한 가장 가까운 투입구를 반환한다.</summary>
+        private RecyclingChute3D FindChute(Vector3 position)
         {
             RecyclingChute3D nearest = null;
             float distance = float.PositiveInfinity;
             foreach (RecyclingChute3D chute in _chutes)
             {
-                if (!chute.CanUse(_day, _beaver.transform.position)) continue;
-                float next = (chute.transform.position - _beaver.transform.position).sqrMagnitude;
+                if (!chute.CanUse(_day, position)) continue;
+                float next = (chute.transform.position - position).sqrMagnitude;
                 if (next < distance) { nearest = chute; distance = next; }
             }
             return nearest;
         }
 
-        /// <summary>선택된 투입구와 운반 묶음을 확정하고 같은 규칙의 점수·통계·제출 연출을 적용한다.</summary>
+        /// <summary>관성 이동을 마친 기물이 투입구 범위에 있으면 연결 묶음 전체를 일반 투입처럼 정산한다.</summary>
+        public bool TrySubmitThrownItem(RecyclingItem item)
+        {
+            if (!IsWorking || item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) return false;
+            RecyclingChute3D chute = FindChute(item.Body.position);
+            if (chute == null) return false;
+
+            List<RecyclingItem> bundle = RecyclingItem.Collect(item);
+            if (bundle.Any(member => member.IsHeld || member.IsResolved || !_items.Contains(member))) return false;
+            SubmitItems(chute, bundle);
+            return true;
+        }
+
+        /// <summary>선택된 투입구와 운반 묶음을 확정한다.</summary>
         private void Submit(RecyclingChute3D chute)
         {
-            RecyclingSubmission submission = RecyclingRules.Evaluate(_held, chute.Category);
             var submitted = new List<RecyclingItem>(_held);
             _held.Clear();
+            SubmitItems(chute, submitted);
+        }
+
+        /// <summary>수동 제출과 던져 넣기를 동일한 분류·점수·묶음 보너스·흡수 연출로 정산한다.</summary>
+        private void SubmitItems(RecyclingChute3D chute, List<RecyclingItem> submitted)
+        {
+            RecyclingSubmission submission = RecyclingRules.Evaluate(submitted, chute.Category);
             _dayScore += submission.Score;
             _correct += submission.Correct;
             _wrong += submission.Wrong;
