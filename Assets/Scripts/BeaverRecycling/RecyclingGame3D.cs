@@ -67,9 +67,6 @@ namespace BeaverRecycling
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
-        private readonly List<Rect> _projectedOverlaps = new List<Rect>();
-        private readonly List<float> _projectedXEdges = new List<float>();
-        private readonly List<Vector2> _projectedZIntervals = new List<Vector2>();
         private readonly List<Bounds> _splitPlacedBounds = new List<Bounds>();
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
@@ -345,13 +342,14 @@ namespace BeaverRecycling
             foreach (RecyclingItem member in _held) member.SetHeld(true);
         }
 
-        /// <summary>운반 묶음과 새 기물의 XZ 겹침 비율을 검사해 기준을 넘은 상대 묶음을 한도 안에서 합친다.</summary>
+        /// <summary>운반 묶음과 새 기물의 화면 겹침을 검사하고 시선 방향으로 맞닿게 정렬한 뒤 결합한다.</summary>
         private void CollectContacts()
         {
             foreach (RecyclingItem other in _items)
             {
                 if (other.IsHeld || !other.CanJoin) continue;
-                if (!TryGetProjectedContactPoint(other.Collider.bounds, out RecyclingItem held, out Vector3 contactPoint)) continue;
+                if (!TryGetProjectedContactPoint(other, out RecyclingItem held,
+                    out Vector3 contactOffset, out float overlapRatio)) continue;
                 List<RecyclingItem> incoming = RecyclingItem.Collect(other);
                 if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
                 if (_held.Count + incoming.Count > Capacity)
@@ -359,96 +357,316 @@ namespace BeaverRecycling
                     if (Time.time > _capacityNoticeAt) { _hud.Message("운반 한도가 가득 찼어요"); _capacityNoticeAt = Time.time + 1.5f; }
                     continue;
                 }
-                contactPoint = RaiseJoiningItemToContact(held, other, contactPoint);
+
+                Vector3 heldBefore = held.Body.position;
+                Vector3 joiningBefore = other.Body.position;
+                float distanceBefore = Vector3.Distance(heldBefore, joiningBefore);
+                float surfaceBefore = GetActualColliderGap(held, other, Vector3.zero);
+
+                // 기존 FixedJoint 상대 배치를 유지하면서 새 묶음 전체를 동일한 깊이 방향으로 이동한다.
+                foreach (RecyclingItem member in incoming)
+                {
+                    Vector3 position = member.Body.position + contactOffset;
+                    member.Body.position = position;
+                    member.transform.SetPositionAndRotation(position, member.Body.rotation);
+                }
+                Physics.SyncTransforms();
+
+                Vector3 joiningAfter = other.Body.position;
+                float distanceAfter = Vector3.Distance(held.Body.position, joiningAfter);
+                float surfaceAfter = GetActualColliderGap(held, other, Vector3.zero);
+
+                // 실제 Collider의 최단 표면점 사이에 Joint 앵커를 둔다.
+                Vector3 heldPoint, joiningPoint;
+                GetActualColliderGap(held, other, Vector3.zero, out heldPoint, out joiningPoint);
+                Vector3 contactPoint = (heldPoint + joiningPoint) * 0.5f;
                 held.Attach(other, contactPoint);
                 foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
+
+                Debug.Log(
+                    $"[RecyclingAttach] ISO overlap={overlapRatio * 100f:F2}% " +
+                    $"held={held.name}#{held.GetInstanceID()} pos={heldBefore.ToString("F3")} " +
+                    $"incoming={other.name}#{other.GetInstanceID()} " +
+                    $"before={joiningBefore.ToString("F3")} after={joiningAfter.ToString("F3")} " +
+                    $"centerDistance={distanceBefore:F3}m -> {distanceAfter:F3}m " +
+                    $"colliderGap={surfaceBefore:F3}m -> {surfaceAfter:F3}m " +
+                    $"offset={contactOffset.ToString("F3")} ({contactOffset.magnitude:F3}m) " +
+                    $"cameraForward={_camera.transform.forward.ToString("F3")} " +
+                    $"incomingBundleCount={incoming.Count} jointAnchor={contactPoint.ToString("F3")}",
+                    this);
             }
         }
 
-        /// <summary>새 기물의 바운드를 받아 운반 묶음과의 XZ 겹침 비율과 연결할 기물·접촉점을 반환한다.</summary>
-        private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactPoint)
+        // 실제 Collider 접촉까지 끌어오기 위한 검색값. 바운드의 접촉점은 실제 메시 접촉점이 아니다.
+        private const float ATTACH_SURFACE_TOLERANCE = 0.002f;
+        private const int ATTACH_DEPTH_SEARCH_STEPS = 24;
+        private const int ATTACH_CONTACT_REFINE_STEPS = 20;
+
+        /// <summary>새 기물의 ISO 투영 면적 중 단일 운반 기물과 30% 이상 겹치는 대상만 결합 후보로 고른다.</summary>
+        private bool TryGetProjectedContactPoint(RecyclingItem joining, out RecyclingItem contact,
+            out Vector3 contactOffset, out float overlapRatio)
         {
             contact = null;
-            contactPoint = default;
-            float joiningArea = joiningBounds.size.x * joiningBounds.size.z;
-            if (joiningArea <= 0f) return false;
+            contactOffset = Vector3.zero;
+            overlapRatio = 0f;
+            if (_camera == null) return false;
 
-            float requiredArea = joiningArea * _minimumProjectedOverlap;
-            float largestArea = 0f;
-            _projectedOverlaps.Clear();
-            _projectedXEdges.Clear();
+            List<Vector2> joiningPolygon = ProjectBoundsToViewport(joining.Collider.bounds);
+            float joiningArea = PolygonArea(joiningPolygon);
+            if (joiningArea <= 0.00000001f) return false;
+
+            // 분모는 항상 새로 붙는 일반 오브젝트의 투영 면적이다.
+            // 각 운반 기물과 개별 비교하며, 여러 운반 기물의 겹침을 합산하지 않는다.
+            float bestGap = float.PositiveInfinity;
+            float bestTravel = float.PositiveInfinity;
             foreach (RecyclingItem held in _held)
             {
-                Bounds heldBounds = held.Collider.bounds;
-                float minX = Mathf.Max(heldBounds.min.x, joiningBounds.min.x);
-                float maxX = Mathf.Min(heldBounds.max.x, joiningBounds.max.x);
-                float minZ = Mathf.Max(heldBounds.min.z, joiningBounds.min.z);
-                float maxZ = Mathf.Min(heldBounds.max.z, joiningBounds.max.z);
-                if (minX >= maxX || minZ >= maxZ) continue;
+                List<Vector2> heldPolygon = ProjectBoundsToViewport(held.Collider.bounds);
+                float overlapArea = PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon));
+                float candidateOverlap = Mathf.Clamp01(overlapArea / joiningArea);
+                if (candidateOverlap < _minimumProjectedOverlap) continue;
 
-                float area = (maxX - minX) * (maxZ - minZ);
-                if (area > largestArea)
+                // 30% 조건을 충족한 두 기물 사이에서만 카메라 깊이 방향 최단 거리를 구한다.
+                if (!TryGetClosestColliderOffset(held, joining, _camera.transform.forward,
+                    out Vector3 offset, out float gap)) continue;
+                float travel = offset.magnitude;
+                if (gap < bestGap - ATTACH_SURFACE_TOLERANCE ||
+                    (Mathf.Abs(gap - bestGap) <= ATTACH_SURFACE_TOLERANCE && travel < bestTravel))
                 {
-                    largestArea = area;
+                    bestGap = gap;
+                    bestTravel = travel;
                     contact = held;
-                    contactPoint = new Vector3((minX + maxX) * 0.5f,
-                        (heldBounds.center.y + joiningBounds.center.y) * 0.5f, (minZ + maxZ) * 0.5f);
+                    contactOffset = offset;
+                    // 로그에도 합산 면적이 아닌 실제 연결될 두 기물의 겹침 비율을 기록한다.
+                    overlapRatio = candidateOverlap;
                 }
-                if (area >= requiredArea) return true;
-                _projectedOverlaps.Add(Rect.MinMaxRect(minX, minZ, maxX, maxZ));
-                _projectedXEdges.Add(minX);
-                _projectedXEdges.Add(maxX);
             }
-            if (_projectedOverlaps.Count == 0) return false;
-
-            _projectedXEdges.Sort();
-            float totalArea = 0f;
-            for (int i = 0; i < _projectedXEdges.Count - 1; i++)
-            {
-                float left = _projectedXEdges[i];
-                float right = _projectedXEdges[i + 1];
-                if (left >= right) continue;
-
-                _projectedZIntervals.Clear();
-                foreach (Rect overlap in _projectedOverlaps)
-                    if (overlap.xMin < right && overlap.xMax > left)
-                        _projectedZIntervals.Add(new Vector2(overlap.yMin, overlap.yMax));
-                if (_projectedZIntervals.Count == 0) continue;
-
-                _projectedZIntervals.Sort((a, b) => a.x.CompareTo(b.x));
-                float start = _projectedZIntervals[0].x;
-                float end = _projectedZIntervals[0].y;
-                float length = 0f;
-                for (int j = 1; j < _projectedZIntervals.Count; j++)
-                {
-                    Vector2 interval = _projectedZIntervals[j];
-                    if (interval.x > end)
-                    {
-                        length += end - start;
-                        start = interval.x;
-                        end = interval.y;
-                    }
-                    else end = Mathf.Max(end, interval.y);
-                }
-                totalArea += (right - left) * (length + end - start);
-                if (totalArea >= requiredArea) return true;
-            }
-            return false;
+            return contact != null;
         }
 
-        /// <summary>기존 묶음보다 아래에 있는 새 기물을 올려 충돌체 바운드가 맞닿게 하고 조인트 지점을 조정한다.</summary>
-        private static Vector3 RaiseJoiningItemToContact(RecyclingItem held, RecyclingItem joining, Vector3 contactPoint)
+        /// <summary>깊이 방향의 유효 바운드 교차 구간을 구하고, 실제 Collider의 거리 최소점을 탐색한다.</summary>
+        private static bool TryGetClosestColliderOffset(RecyclingItem held, RecyclingItem joining,
+            Vector3 viewDirection, out Vector3 offset, out float gap)
         {
+            offset = Vector3.zero;
+            gap = float.PositiveInfinity;
             Bounds heldBounds = held.Collider.bounds;
             Bounds joiningBounds = joining.Collider.bounds;
-            float lift = heldBounds.min.y - joiningBounds.max.y;
-            if (lift <= 0f) return contactPoint;
+            Vector3 lower = heldBounds.min - joiningBounds.max;
+            Vector3 upper = heldBounds.max - joiningBounds.min;
+            float enter = float.NegativeInfinity;
+            float exit = float.PositiveInfinity;
 
-            Vector3 raisedPosition = joining.Body.position + Vector3.up * lift;
-            joining.Body.position = raisedPosition;
-            joining.transform.SetPositionAndRotation(raisedPosition, joining.Body.rotation);
-            contactPoint.y = heldBounds.min.y;
-            return contactPoint;
+            for (int axis = 0; axis < 3; axis++)
+            {
+                float direction = viewDirection[axis];
+                if (Mathf.Abs(direction) < 0.000001f)
+                {
+                    if (lower[axis] > 0f || upper[axis] < 0f) return false;
+                    continue;
+                }
+                float t0 = lower[axis] / direction;
+                float t1 = upper[axis] / direction;
+                enter = Mathf.Max(enter, Mathf.Min(t0, t1));
+                exit = Mathf.Min(exit, Mathf.Max(t0, t1));
+                if (enter > exit) return false;
+            }
+            if (float.IsInfinity(enter) || float.IsInfinity(exit)) return false;
+
+            // 이미 실제 Collider가 맞닿거나 겹친 상태라면 움직이지 않는다.
+            float initialGap = GetActualColliderGap(held, joining, Vector3.zero);
+            if (initialGap <= ATTACH_SURFACE_TOLERANCE)
+            {
+                gap = initialGap;
+                return true;
+            }
+
+            // Convex Collider 간 거리의 제곱은 한 축의 평행 이동에 대해 볼록하므로
+            // golden-section 탐색으로 최단 거리를 찾는다 (바운드 접촉에 멈추지 않는다).
+            const float golden = 0.61803398875f;
+            float low = enter;
+            float high = exit;
+            float left = high - (high - low) * golden;
+            float right = low + (high - low) * golden;
+            float leftGap = GetActualColliderGap(held, joining, viewDirection * left);
+            float rightGap = GetActualColliderGap(held, joining, viewDirection * right);
+            for (int i = 0; i < ATTACH_DEPTH_SEARCH_STEPS; i++)
+            {
+                if (leftGap <= rightGap)
+                {
+                    high = right;
+                    right = left;
+                    rightGap = leftGap;
+                    left = high - (high - low) * golden;
+                    leftGap = GetActualColliderGap(held, joining, viewDirection * left);
+                }
+                else
+                {
+                    low = left;
+                    left = right;
+                    leftGap = rightGap;
+                    right = low + (high - low) * golden;
+                    rightGap = GetActualColliderGap(held, joining, viewDirection * right);
+                }
+            }
+
+            float depth = leftGap <= rightGap ? left : right;
+            float bestGap = Mathf.Min(leftGap, rightGap);
+            // 최소점이 경계에 있는 경우를 누락하지 않는다.
+            float enterGap = GetActualColliderGap(held, joining, viewDirection * enter);
+            float exitGap = GetActualColliderGap(held, joining, viewDirection * exit);
+            if (enterGap < bestGap) { depth = enter; bestGap = enterGap; }
+            if (exitGap < bestGap) { depth = exit; bestGap = exitGap; }
+
+            if (bestGap <= ATTACH_SURFACE_TOLERANCE)
+            {
+                // 접촉 가능한 여러 깊이 중 현재 위치에서 가장 가까운 최초 접촉 위치를 선택한다.
+                float outsideDepth = 0f;
+                float touchingDepth = depth;
+                for (int i = 0; i < ATTACH_CONTACT_REFINE_STEPS; i++)
+                {
+                    float middle = (outsideDepth + touchingDepth) * 0.5f;
+                    if (GetActualColliderGap(held, joining, viewDirection * middle) <= ATTACH_SURFACE_TOLERANCE)
+                        touchingDepth = middle;
+                    else outsideDepth = middle;
+                }
+                depth = touchingDepth;
+            }
+
+            offset = viewDirection * depth;
+            gap = GetActualColliderGap(held, joining, offset);
+            return true;
+        }
+
+        /// <summary>임의의 후보 이동 위치에서 실제 Collider 최단 표면 거리와 앵커 후보 점을 구한다.</summary>
+        private static float GetActualColliderGap(RecyclingItem held, RecyclingItem joining, Vector3 joinOffset)
+        {
+            return GetActualColliderGap(held, joining, joinOffset, out _, out _);
+        }
+
+        private static float GetActualColliderGap(RecyclingItem held, RecyclingItem joining,
+            Vector3 joinOffset, out Vector3 heldPoint, out Vector3 joiningPoint)
+        {
+            Collider first = held.Collider;
+            Collider second = joining.Collider;
+            Vector3 firstPosition = first.transform.position;
+            Vector3 secondPosition = second.transform.position + joinOffset;
+            Quaternion firstRotation = first.transform.rotation;
+            Quaternion secondRotation = second.transform.rotation;
+
+            // 바운드는 겹쳐도 메시가 떨어져 있을 수 있으므로 실제 Collider를 조회한다.
+            if (Physics.ComputePenetration(first, firstPosition, firstRotation,
+                second, secondPosition, secondRotation, out _, out _))
+            {
+                heldPoint = Physics.ClosestPoint(second.bounds.center + joinOffset,
+                    first, firstPosition, firstRotation);
+                joiningPoint = Physics.ClosestPoint(heldPoint, second, secondPosition, secondRotation);
+                return 0f;
+            }
+
+            Vector3 secondCenter = second.bounds.center + joinOffset;
+            heldPoint = Physics.ClosestPoint(secondCenter, first, firstPosition, firstRotation);
+            joiningPoint = Physics.ClosestPoint(heldPoint, second, secondPosition, secondRotation);
+            // 두 convex Collider에 번갈아 최근접 투영해 메시 표면 사이 간격을 근사한다.
+            for (int i = 0; i < 8; i++)
+            {
+                heldPoint = Physics.ClosestPoint(joiningPoint, first, firstPosition, firstRotation);
+                joiningPoint = Physics.ClosestPoint(heldPoint, second, secondPosition, secondRotation);
+            }
+            return Vector3.Distance(heldPoint, joiningPoint);
+        }
+
+        /// <summary>3D 월드 바운드 8개 꼭짓점을 카메라 뷰포트에 투영해 CCW 볼록 외곽선을 만든다.</summary>
+        private List<Vector2> ProjectBoundsToViewport(Bounds bounds)
+        {
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            var projected = new List<Vector2>(8);
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = new Vector3(
+                    (i & 1) == 0 ? min.x : max.x,
+                    (i & 2) == 0 ? min.y : max.y,
+                    (i & 4) == 0 ? min.z : max.z);
+                Vector3 viewport = _camera.WorldToViewportPoint(corner);
+                projected.Add(new Vector2(viewport.x, viewport.y));
+            }
+            projected.Sort((a, b) =>
+            {
+                int x = a.x.CompareTo(b.x);
+                return x != 0 ? x : a.y.CompareTo(b.y);
+            });
+
+            var hull = new List<Vector2>(16);
+            foreach (Vector2 point in projected)
+            {
+                while (hull.Count >= 2 && Cross(hull[hull.Count - 2], hull[hull.Count - 1], point) <= 0f)
+                    hull.RemoveAt(hull.Count - 1);
+                hull.Add(point);
+            }
+            int lowerCount = hull.Count;
+            for (int i = projected.Count - 2; i >= 0; i--)
+            {
+                Vector2 point = projected[i];
+                while (hull.Count > lowerCount &&
+                       Cross(hull[hull.Count - 2], hull[hull.Count - 1], point) <= 0f)
+                    hull.RemoveAt(hull.Count - 1);
+                hull.Add(point);
+            }
+            if (hull.Count > 1) hull.RemoveAt(hull.Count - 1);
+            return hull;
+        }
+
+        private static float Cross(Vector2 a, Vector2 b, Vector2 c) =>
+            (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+
+        private static float PolygonArea(List<Vector2> polygon)
+        {
+            if (polygon.Count < 3) return 0f;
+            float area = 0f;
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[(i + 1) % polygon.Count];
+                area += a.x * b.y - b.x * a.y;
+            }
+            return Mathf.Abs(area) * 0.5f;
+        }
+
+        /// <summary>CCW 볼록 다각형 두 개의 교집합을 반환한다.</summary>
+        private static List<Vector2> IntersectConvexPolygons(List<Vector2> subject, List<Vector2> clip)
+        {
+            List<Vector2> result = subject;
+            for (int i = 0; i < clip.Count && result.Count >= 3; i++)
+                result = ClipToHalfPlane(result, clip[i], clip[(i + 1) % clip.Count], true);
+            return result;
+        }
+
+        /// <summary>지정된 선의 왼쪽(CCW 내부) 또는 오른쪽에 있는 다각형을 잘라 반환한다.</summary>
+        private static List<Vector2> ClipToHalfPlane(List<Vector2> polygon, Vector2 edgeStart,
+            Vector2 edgeEnd, bool keepLeft)
+        {
+            var result = new List<Vector2>(polygon.Count + 2);
+            if (polygon.Count == 0) return result;
+
+            Vector2 previous = polygon[polygon.Count - 1];
+            float previousSide = Cross(edgeStart, edgeEnd, previous);
+            bool previousKept = keepLeft ? previousSide >= 0f : previousSide <= 0f;
+            foreach (Vector2 current in polygon)
+            {
+                float currentSide = Cross(edgeStart, edgeEnd, current);
+                bool currentKept = keepLeft ? currentSide >= 0f : currentSide <= 0f;
+                if (previousKept != currentKept)
+                {
+                    float t = previousSide / (previousSide - currentSide);
+                    result.Add(Vector2.LerpUnclamped(previous, current, t));
+                }
+                if (currentKept) result.Add(current);
+                previous = current;
+                previousSide = currentSide;
+                previousKept = currentKept;
+            }
+            return result;
         }
 
         /// <summary>분리 여부를 받아 묶음을 내려놓고 분리 시 기물을 강 안쪽의 빈 위치로 흩뜨린다.</summary>
