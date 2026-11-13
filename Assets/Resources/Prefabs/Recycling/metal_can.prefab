@@ -8,11 +8,11 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - {fileID: 900000010}
   - component: {fileID: 1002}
   - component: {fileID: 1003}
   - component: {fileID: 1004}
   - component: {fileID: 1005}
+  - component: {fileID: 900000010}
   m_Layer: 0
   m_Name: metal_can
   m_TagString: Untagged
