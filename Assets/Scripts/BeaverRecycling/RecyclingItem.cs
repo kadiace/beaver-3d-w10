@@ -28,9 +28,7 @@ namespace BeaverRecycling
         private float _appliedKnockbackX;
         private float _appliedKnockbackZ;
         private Vector3 _previousCarryPosition;
-        private Quaternion _previousCarryRotation;
         private Vector3 _carryLinearVelocity;
-        private Vector3 _carryAngularVelocity;
         private bool _carryPoseRecorded;
         private float _releaseMomentumUntil;
         private float _lastFlowTime = float.NegativeInfinity;
@@ -60,7 +58,6 @@ namespace BeaverRecycling
             _appliedKnockbackX = 0f;
             _appliedKnockbackZ = 0f;
             _carryLinearVelocity = Vector3.zero;
-            _carryAngularVelocity = Vector3.zero;
             _carryPoseRecorded = false;
             _releaseMomentumUntil = 0f;
             _lastFlowTime = float.NegativeInfinity;
@@ -141,7 +138,7 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>운반 시 운동 기록을 시작하고, 놓을 때 기록된 선속도와 각속도를 Rigidbody에 전달한다.</summary>
+        /// <summary>운반 중 위치 변화를 기록하고, 놓을 때 기물별 선속도를 Rigidbody에 전달한다.</summary>
         public void SetHeld(bool held)
         {
             bool releasing = _held && !held;
@@ -155,7 +152,6 @@ namespace BeaverRecycling
                 // The first carry step snaps the bundle to the beaver's mouth; never treat that snap as a throw.
                 _carryPoseRecorded = false;
                 _carryLinearVelocity = Vector3.zero;
-                _carryAngularVelocity = Vector3.zero;
                 _releaseMomentumUntil = 0f;
             }
 
@@ -168,31 +164,21 @@ namespace BeaverRecycling
             _body.useGravity = !held;
 
             if (!releasing) return;
-            _body.maxAngularVelocity = Mathf.Max(_body.maxAngularVelocity, _carryAngularVelocity.magnitude);
             _body.linearVelocity = _carryLinearVelocity;
-            _body.angularVelocity = _carryAngularVelocity;
-            if (_carryLinearVelocity.sqrMagnitude > 0.0001f || _carryAngularVelocity.sqrMagnitude > 0.0001f)
+            _body.angularVelocity = Vector3.zero;
+            if (_carryLinearVelocity.sqrMagnitude > 0.0001f)
                 _releaseMomentumUntil = Time.fixedTime + RELEASE_MOMENTUM_SECONDS;
             _carryPoseRecorded = false;
         }
 
-        /// <summary>운반 중 매 물리 스텝의 위치·회전 변화에서 기물별 순간 선속도·각속도를 계산한다.</summary>
+        /// <summary>운반 중 매 물리 스텝의 위치 변화에서 기물별 순간 선속도를 계산한다.</summary>
         public void RecordCarryMotion(float fixedDeltaTime)
         {
             if (!_held) return;
             Vector3 position = _body.position;
-            Quaternion rotation = _body.rotation;
             if (_carryPoseRecorded && fixedDeltaTime > 0f)
-            {
                 _carryLinearVelocity = (position - _previousCarryPosition) / fixedDeltaTime;
-                Quaternion rotationDelta = rotation * Quaternion.Inverse(_previousCarryRotation);
-                rotationDelta.ToAngleAxis(out float angle, out Vector3 axis);
-                if (angle > 180f) angle -= 360f;
-                _carryAngularVelocity = axis.sqrMagnitude < 0.000001f
-                    ? Vector3.zero : axis.normalized * (angle * Mathf.Deg2Rad / fixedDeltaTime);
-            }
             _previousCarryPosition = position;
-            _previousCarryRotation = rotation;
             _carryPoseRecorded = true;
         }
 
