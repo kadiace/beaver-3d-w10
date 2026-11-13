@@ -333,7 +333,8 @@ namespace BeaverRecycling
             foreach (RecyclingItem other in _items)
             {
                 if (other.IsHeld || !other.CanJoin) continue;
-                if (!TryGetProjectedContactPoint(other.Collider.bounds, out RecyclingItem held, out Vector3 contactOffset)) continue;
+                if (!TryGetProjectedContactPoint(other, out RecyclingItem held,
+                    out Vector3 contactOffset, out float overlapRatio)) continue;
                 List<RecyclingItem> incoming = RecyclingItem.Collect(other);
                 if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
                 if (_held.Count + incoming.Count > Capacity)
@@ -342,7 +343,12 @@ namespace BeaverRecycling
                     continue;
                 }
 
-                // 연결된 일반 묶음 전체를 같은 양만큼 이동시켜 기존 Joint의 상대 위치를 보존한다.
+                Vector3 heldBefore = held.Body.position;
+                Vector3 joiningBefore = other.Body.position;
+                float distanceBefore = Vector3.Distance(heldBefore, joiningBefore);
+                float surfaceBefore = GetActualColliderGap(held, other, Vector3.zero);
+
+                // 기존 FixedJoint 상대 배치를 유지하면서 새 묶음 전체를 동일한 깊이 방향으로 이동한다.
                 foreach (RecyclingItem member in incoming)
                 {
                     Vector3 position = member.Body.position + contactOffset;
@@ -351,83 +357,99 @@ namespace BeaverRecycling
                 }
                 Physics.SyncTransforms();
 
-                // 이동한 Collider 표면의 가장 가까운 두 점 사이에 Joint를 연결한다.
-                Vector3 heldPoint = held.Collider.ClosestPoint(other.Collider.bounds.center);
-                Vector3 joiningPoint = other.Collider.ClosestPoint(heldPoint);
-                heldPoint = held.Collider.ClosestPoint(joiningPoint);
+                Vector3 joiningAfter = other.Body.position;
+                float distanceAfter = Vector3.Distance(held.Body.position, joiningAfter);
+                float surfaceAfter = GetActualColliderGap(held, other, Vector3.zero);
+
+                // 실제 Collider의 최단 표면점 사이에 Joint 앵커를 둔다.
+                Vector3 heldPoint, joiningPoint;
+                GetActualColliderGap(held, other, Vector3.zero, out heldPoint, out joiningPoint);
                 Vector3 contactPoint = (heldPoint + joiningPoint) * 0.5f;
                 held.Attach(other, contactPoint);
                 foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
+
+                Debug.Log(
+                    $"[RecyclingAttach] ISO overlap={overlapRatio * 100f:F2}% " +
+                    $"held={held.name}#{held.GetInstanceID()} pos={heldBefore.ToString("F3")} " +
+                    $"incoming={other.name}#{other.GetInstanceID()} " +
+                    $"before={joiningBefore.ToString("F3")} after={joiningAfter.ToString("F3")} " +
+                    $"centerDistance={distanceBefore:F3}m -> {distanceAfter:F3}m " +
+                    $"colliderGap={surfaceBefore:F3}m -> {surfaceAfter:F3}m " +
+                    $"offset={contactOffset.ToString("F3")} ({contactOffset.magnitude:F3}m) " +
+                    $"cameraForward={_camera.transform.forward.ToString("F3")} " +
+                    $"incomingBundleCount={incoming.Count} jointAnchor={contactPoint.ToString("F3")}",
+                    this);
             }
         }
 
-        /// <summary>화면 투영 겹침 30%를 검사하고 시선 방향으로 가장 적게 이동해 닿는 운반 기물을 선택한다.</summary>
-        private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactOffset)
+        // 실제 Collider 접촉까지 끌어오기 위한 검색값. 바운드의 접촉점은 실제 메시 접촉점이 아니다.
+        private const float ATTACH_SURFACE_TOLERANCE = 0.002f;
+        private const int ATTACH_DEPTH_SEARCH_STEPS = 24;
+        private const int ATTACH_CONTACT_REFINE_STEPS = 20;
+
+        /// <summary>카메라 투영 겹침을 먼저 검사한 뒤 실제 Collider 표면 간 거리가 최소인 결합 대상을 선택한다.</summary>
+        private bool TryGetProjectedContactPoint(RecyclingItem joining, out RecyclingItem contact,
+            out Vector3 contactOffset, out float overlapRatio)
         {
             contact = null;
             contactOffset = Vector3.zero;
+            overlapRatio = 0f;
             if (_camera == null) return false;
 
-            // 월드 AABB의 8개 모서리를 카메라 화면에 투영한 볼록 외곽선으로 판정한다.
-            List<Vector2> joiningPolygon = ProjectBoundsToViewport(joiningBounds);
+            List<Vector2> joiningPolygon = ProjectBoundsToViewport(joining.Collider.bounds);
             float joiningArea = PolygonArea(joiningPolygon);
             if (joiningArea <= 0.00000001f) return false;
 
-            float requiredArea = joiningArea * _minimumProjectedOverlap;
-            float nearestTravelSquared = float.PositiveInfinity;
-            float largestAreaAtNearest = 0f;
-            bool meetsOverlap = false;
+            // 1단계: 겹치는 영역의 합집합 면적을 계산해 30% 조건을 먼저 확인한다.
             var uncovered = new List<List<Vector2>> { joiningPolygon };
-
             foreach (RecyclingItem held in _held)
             {
-                Bounds heldBounds = held.Collider.bounds;
-                List<Vector2> heldPolygon = ProjectBoundsToViewport(heldBounds);
-                float individualArea = PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon));
-                if (individualArea <= 0.00000001f) continue;
-
-                // 두 투영 영역이 겹치면, 직교 카메라의 시선 방향으로 어느 깊이에서
-                // 월드 바운드가 처음 맞닿는지 계산할 수 있다. 화면상 위치는 바뀌지 않는다.
-                if (TryGetViewDepthContactOffset(heldBounds, joiningBounds, _camera.transform.forward,
-                    out Vector3 offset))
-                {
-                    float travelSquared = offset.sqrMagnitude;
-                    if (travelSquared < nearestTravelSquared - 0.000001f ||
-                        (Mathf.Abs(travelSquared - nearestTravelSquared) <= 0.000001f &&
-                         individualArea > largestAreaAtNearest))
-                    {
-                        nearestTravelSquared = travelSquared;
-                        largestAreaAtNearest = individualArea;
-                        contact = held;
-                        contactOffset = offset;
-                    }
-                }
-
-                if (meetsOverlap) continue;
-                if (individualArea >= requiredArea)
-                {
-                    meetsOverlap = true;
+                List<Vector2> heldPolygon = ProjectBoundsToViewport(held.Collider.bounds);
+                if (PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon)) <= 0.00000001f)
                     continue;
-                }
-
-                // 운반 기물 여럿이 화면상 같은 영역을 덮어도 겹침 면적을 중복 계산하지 않는다.
                 var nextUncovered = new List<List<Vector2>>();
                 foreach (List<Vector2> piece in uncovered)
                     SubtractConvexPolygon(piece, heldPolygon, nextUncovered);
                 uncovered = nextUncovered;
-
-                float uncoveredArea = 0f;
-                foreach (List<Vector2> piece in uncovered) uncoveredArea += PolygonArea(piece);
-                meetsOverlap = joiningArea - uncoveredArea >= requiredArea;
             }
-            return meetsOverlap && contact != null;
+            float uncoveredArea = 0f;
+            foreach (List<Vector2> piece in uncovered) uncoveredArea += PolygonArea(piece);
+            overlapRatio = Mathf.Clamp01((joiningArea - uncoveredArea) / joiningArea);
+            if (overlapRatio + 0.000001f < _minimumProjectedOverlap) return false;
+
+            // 2단계: 실제 Collider 간 최소 표면 거리를 기준으로 대상을 선정한다.
+            // 표면 거리 동률이면 카메라 forward 축의 이동량이 작은 대상을 우선한다.
+            float bestGap = float.PositiveInfinity;
+            float bestTravel = float.PositiveInfinity;
+            foreach (RecyclingItem held in _held)
+            {
+                List<Vector2> heldPolygon = ProjectBoundsToViewport(held.Collider.bounds);
+                if (PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon)) <= 0.00000001f)
+                    continue;
+
+                if (!TryGetClosestColliderOffset(held, joining, _camera.transform.forward,
+                    out Vector3 offset, out float gap)) continue;
+                float travel = offset.magnitude;
+                if (gap < bestGap - ATTACH_SURFACE_TOLERANCE ||
+                    (Mathf.Abs(gap - bestGap) <= ATTACH_SURFACE_TOLERANCE && travel < bestTravel))
+                {
+                    bestGap = gap;
+                    bestTravel = travel;
+                    contact = held;
+                    contactOffset = offset;
+                }
+            }
+            return contact != null;
         }
 
-        /// <summary>카메라 깊이 축으로 새 바운드를 움직여 실제 3D 바운드가 맞닿는 최소 이동량을 구한다.</summary>
-        private static bool TryGetViewDepthContactOffset(Bounds heldBounds, Bounds joiningBounds,
-            Vector3 viewDirection, out Vector3 offset)
+        /// <summary>깊이 방향의 유효 바운드 교차 구간을 구하고, 실제 Collider의 거리 최소점을 탐색한다.</summary>
+        private static bool TryGetClosestColliderOffset(RecyclingItem held, RecyclingItem joining,
+            Vector3 viewDirection, out Vector3 offset, out float gap)
         {
             offset = Vector3.zero;
+            gap = float.PositiveInfinity;
+            Bounds heldBounds = held.Collider.bounds;
+            Bounds joiningBounds = joining.Collider.bounds;
             Vector3 lower = heldBounds.min - joiningBounds.max;
             Vector3 upper = heldBounds.max - joiningBounds.min;
             float enter = float.NegativeInfinity;
@@ -438,26 +460,118 @@ namespace BeaverRecycling
                 float direction = viewDirection[axis];
                 if (Mathf.Abs(direction) < 0.000001f)
                 {
-                    // 이 축으로는 움직일 수 없으므로 시작부터 범위가 겹쳐야 한다.
                     if (lower[axis] > 0f || upper[axis] < 0f) return false;
                     continue;
                 }
-
                 float t0 = lower[axis] / direction;
                 float t1 = upper[axis] / direction;
                 enter = Mathf.Max(enter, Mathf.Min(t0, t1));
                 exit = Mathf.Min(exit, Mathf.Max(t0, t1));
                 if (enter > exit) return false;
             }
-
             if (float.IsInfinity(enter) || float.IsInfinity(exit)) return false;
 
-            // 서로 떨어져 있으면 최초 접촉, 겹쳐 있으면 가장 가까운 이탈 경계를 선택한다.
-            float depth = enter > 0f ? enter :
-                exit < 0f ? exit :
-                Mathf.Abs(enter) <= Mathf.Abs(exit) ? enter : exit;
+            // 이미 실제 Collider가 맞닿거나 겹친 상태라면 움직이지 않는다.
+            float initialGap = GetActualColliderGap(held, joining, Vector3.zero);
+            if (initialGap <= ATTACH_SURFACE_TOLERANCE)
+            {
+                gap = initialGap;
+                return true;
+            }
+
+            // Convex Collider 간 거리의 제곱은 한 축의 평행 이동에 대해 볼록하므로
+            // golden-section 탐색으로 최단 거리를 찾는다 (바운드 접촉에 멈추지 않는다).
+            const float golden = 0.61803398875f;
+            float low = enter;
+            float high = exit;
+            float left = high - (high - low) * golden;
+            float right = low + (high - low) * golden;
+            float leftGap = GetActualColliderGap(held, joining, viewDirection * left);
+            float rightGap = GetActualColliderGap(held, joining, viewDirection * right);
+            for (int i = 0; i < ATTACH_DEPTH_SEARCH_STEPS; i++)
+            {
+                if (leftGap <= rightGap)
+                {
+                    high = right;
+                    right = left;
+                    rightGap = leftGap;
+                    left = high - (high - low) * golden;
+                    leftGap = GetActualColliderGap(held, joining, viewDirection * left);
+                }
+                else
+                {
+                    low = left;
+                    left = right;
+                    leftGap = rightGap;
+                    right = low + (high - low) * golden;
+                    rightGap = GetActualColliderGap(held, joining, viewDirection * right);
+                }
+            }
+
+            float depth = leftGap <= rightGap ? left : right;
+            float bestGap = Mathf.Min(leftGap, rightGap);
+            // 최소점이 경계에 있는 경우를 누락하지 않는다.
+            float enterGap = GetActualColliderGap(held, joining, viewDirection * enter);
+            float exitGap = GetActualColliderGap(held, joining, viewDirection * exit);
+            if (enterGap < bestGap) { depth = enter; bestGap = enterGap; }
+            if (exitGap < bestGap) { depth = exit; bestGap = exitGap; }
+
+            if (bestGap <= ATTACH_SURFACE_TOLERANCE)
+            {
+                // 접촉 가능한 여러 깊이 중 현재 위치에서 가장 가까운 최초 접촉 위치를 선택한다.
+                float outsideDepth = 0f;
+                float touchingDepth = depth;
+                for (int i = 0; i < ATTACH_CONTACT_REFINE_STEPS; i++)
+                {
+                    float middle = (outsideDepth + touchingDepth) * 0.5f;
+                    if (GetActualColliderGap(held, joining, viewDirection * middle) <= ATTACH_SURFACE_TOLERANCE)
+                        touchingDepth = middle;
+                    else outsideDepth = middle;
+                }
+                depth = touchingDepth;
+            }
+
             offset = viewDirection * depth;
+            gap = GetActualColliderGap(held, joining, offset);
             return true;
+        }
+
+        /// <summary>임의의 후보 이동 위치에서 실제 Collider 최단 표면 거리와 앵커 후보 점을 구한다.</summary>
+        private static float GetActualColliderGap(RecyclingItem held, RecyclingItem joining, Vector3 joinOffset)
+        {
+            return GetActualColliderGap(held, joining, joinOffset, out _, out _);
+        }
+
+        private static float GetActualColliderGap(RecyclingItem held, RecyclingItem joining,
+            Vector3 joinOffset, out Vector3 heldPoint, out Vector3 joiningPoint)
+        {
+            Collider first = held.Collider;
+            Collider second = joining.Collider;
+            Vector3 firstPosition = first.transform.position;
+            Vector3 secondPosition = second.transform.position + joinOffset;
+            Quaternion firstRotation = first.transform.rotation;
+            Quaternion secondRotation = second.transform.rotation;
+
+            // 바운드는 겹쳐도 메시가 떨어져 있을 수 있으므로 실제 Collider를 조회한다.
+            if (Physics.ComputePenetration(first, firstPosition, firstRotation,
+                second, secondPosition, secondRotation, out _, out _))
+            {
+                heldPoint = Physics.ClosestPoint(second.bounds.center + joinOffset,
+                    first, firstPosition, firstRotation);
+                joiningPoint = Physics.ClosestPoint(heldPoint, second, secondPosition, secondRotation);
+                return 0f;
+            }
+
+            Vector3 secondCenter = second.bounds.center + joinOffset;
+            heldPoint = Physics.ClosestPoint(secondCenter, first, firstPosition, firstRotation);
+            joiningPoint = Physics.ClosestPoint(heldPoint, second, secondPosition, secondRotation);
+            // 두 convex Collider에 번갈아 최근접 투영해 메시 표면 사이 간격을 근사한다.
+            for (int i = 0; i < 8; i++)
+            {
+                heldPoint = Physics.ClosestPoint(joiningPoint, first, firstPosition, firstRotation);
+                joiningPoint = Physics.ClosestPoint(heldPoint, second, secondPosition, secondRotation);
+            }
+            return Vector3.Distance(heldPoint, joiningPoint);
         }
 
         /// <summary>3D 월드 바운드 8개 꼭짓점을 카메라 뷰포트에 투영해 CCW 볼록 외곽선을 만든다.</summary>
