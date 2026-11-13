@@ -8,6 +8,9 @@ namespace BeaverRecycling
     [RequireComponent(typeof(Rigidbody))]
     public sealed class RecyclingItem : MonoBehaviour
     {
+        private const float RELEASE_MOMENTUM_SECONDS = 0.45f;
+        private const float RELEASE_MOMENTUM_FADE_SECONDS = 0.15f;
+
         [Header("Wood marker")]
         [SerializeField] private GameObject _woodBadge;
         private readonly Dictionary<RecyclingItem, FixedJoint> _links = new Dictionary<RecyclingItem, FixedJoint>();
@@ -23,6 +26,13 @@ namespace BeaverRecycling
         private Vector3 _knockbackVelocity;
         private float _knockbackTimeRemaining;
         private float _appliedKnockbackX;
+        private float _appliedKnockbackZ;
+        private Vector3 _previousCarryPosition;
+        private Quaternion _previousCarryRotation;
+        private Vector3 _carryLinearVelocity;
+        private Vector3 _carryAngularVelocity;
+        private bool _carryPoseRecorded;
+        private float _releaseMomentumUntil;
         private float _lastFlowTime = float.NegativeInfinity;
 
         public Rigidbody Body => _body;
@@ -48,6 +58,11 @@ namespace BeaverRecycling
             _knockbackVelocity = Vector3.zero;
             _knockbackTimeRemaining = 0f;
             _appliedKnockbackX = 0f;
+            _appliedKnockbackZ = 0f;
+            _carryLinearVelocity = Vector3.zero;
+            _carryAngularVelocity = Vector3.zero;
+            _carryPoseRecorded = false;
+            _releaseMomentumUntil = 0f;
             _lastFlowTime = float.NegativeInfinity;
             transform.localScale = _originalScale;
             _collider.enabled = true;
@@ -73,6 +88,7 @@ namespace BeaverRecycling
             _knockbackVelocity = Vector3.zero;
             _knockbackTimeRemaining = 0f;
             _appliedKnockbackX = 0f;
+            _appliedKnockbackZ = 0f;
             _woodBadge.SetActive(definition.IsWood);
             _body.linearDamping = 0.4f;
             _body.angularDamping = 4f;
@@ -125,20 +141,59 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>운반 여부를 받아 Rigidbody의 물리 이동 방식을 갱신한다.</summary>
+        /// <summary>운반 시 운동 기록을 시작하고, 놓을 때 기록된 선속도와 각속도를 Rigidbody에 전달한다.</summary>
         public void SetHeld(bool held)
         {
-            if (!_body.isKinematic)
+            bool releasing = _held && !held;
+            if (held)
             {
-                _body.linearVelocity = Vector3.zero;
-                _body.angularVelocity = Vector3.zero;
+                if (!_body.isKinematic)
+                {
+                    _body.linearVelocity = Vector3.zero;
+                    _body.angularVelocity = Vector3.zero;
+                }
+                // The first carry step snaps the bundle to the beaver's mouth; never treat that snap as a throw.
+                _carryPoseRecorded = false;
+                _carryLinearVelocity = Vector3.zero;
+                _carryAngularVelocity = Vector3.zero;
+                _releaseMomentumUntil = 0f;
             }
+
             _held = held;
             _knockbackVelocity = Vector3.zero;
             _knockbackTimeRemaining = 0f;
             _appliedKnockbackX = 0f;
+            _appliedKnockbackZ = 0f;
             _body.isKinematic = held;
             _body.useGravity = !held;
+
+            if (!releasing) return;
+            _body.maxAngularVelocity = Mathf.Max(_body.maxAngularVelocity, _carryAngularVelocity.magnitude);
+            _body.linearVelocity = _carryLinearVelocity;
+            _body.angularVelocity = _carryAngularVelocity;
+            if (_carryLinearVelocity.sqrMagnitude > 0.0001f || _carryAngularVelocity.sqrMagnitude > 0.0001f)
+                _releaseMomentumUntil = Time.fixedTime + RELEASE_MOMENTUM_SECONDS;
+            _carryPoseRecorded = false;
+        }
+
+        /// <summary>운반 중 매 물리 스텝의 위치·회전 변화에서 기물별 순간 선속도·각속도를 계산한다.</summary>
+        public void RecordCarryMotion(float fixedDeltaTime)
+        {
+            if (!_held) return;
+            Vector3 position = _body.position;
+            Quaternion rotation = _body.rotation;
+            if (_carryPoseRecorded && fixedDeltaTime > 0f)
+            {
+                _carryLinearVelocity = (position - _previousCarryPosition) / fixedDeltaTime;
+                Quaternion rotationDelta = rotation * Quaternion.Inverse(_previousCarryRotation);
+                rotationDelta.ToAngleAxis(out float angle, out Vector3 axis);
+                if (angle > 180f) angle -= 360f;
+                _carryAngularVelocity = axis.sqrMagnitude < 0.000001f
+                    ? Vector3.zero : axis.normalized * (angle * Mathf.Deg2Rad / fixedDeltaTime);
+            }
+            _previousCarryPosition = position;
+            _previousCarryRotation = rotation;
+            _carryPoseRecorded = true;
         }
 
         /// <summary>분리 유예 시간을 받아 그 시각까지 재접착을 막는다.</summary>
@@ -222,9 +277,16 @@ namespace BeaverRecycling
                     (step / Time.fixedDeltaTime) * (1f - 0.5f * fraction);
                 member._knockbackVelocity *= 1f - fraction;
                 member._knockbackTimeRemaining -= step;
-                velocity.x = (velocity.x - member._appliedKnockbackX) * 0.9f + knockbackVelocity.x;
+                // Preserve actual Rigidbody momentum (including collisions) immediately after a release.
+                // Blend back into the normal creek flow only after a short free-flight window.
+                float flowBlend = Mathf.Clamp01((Time.fixedTime - member._releaseMomentumUntil +
+                    RELEASE_MOMENTUM_FADE_SECONDS) / RELEASE_MOMENTUM_FADE_SECONDS);
+                float residualX = velocity.x - member._appliedKnockbackX;
+                velocity.x = Mathf.Lerp(residualX, residualX * 0.9f, flowBlend) + knockbackVelocity.x;
                 member._appliedKnockbackX = knockbackVelocity.x;
-                velocity.z = (touchesWater ? -_game.FlowSpeed : 0f) + knockbackVelocity.z;
+                velocity.z = Mathf.Lerp(velocity.z - member._appliedKnockbackZ,
+                    touchesWater ? -_game.FlowSpeed : 0f, flowBlend) + knockbackVelocity.z;
+                member._appliedKnockbackZ = knockbackVelocity.z;
                 if (_game.IsInsideRiver(member._body.position) && member._collider.bounds.min.y <= _game.WaterY + 0.2f)
                 {
                     float centerY = _game.WaterY + member._collider.bounds.extents.y * 0.25f;
