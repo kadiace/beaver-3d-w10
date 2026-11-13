@@ -8,6 +8,7 @@ namespace BeaverRecycling
     [RequireComponent(typeof(Rigidbody))]
     public sealed class RecyclingItem : MonoBehaviour
     {
+        private const float ROTATION_RELEASE_SPEED_FACTOR = 0.5f;
         private const float RELEASE_MOMENTUM_SECONDS = 0.45f;
         private const float RELEASE_MOMENTUM_FADE_SECONDS = 0.15f;
 
@@ -171,13 +172,17 @@ namespace BeaverRecycling
             _carryPoseRecorded = false;
         }
 
-        /// <summary>운반 중 매 물리 스텝의 위치 변화에서 기물별 순간 선속도를 계산한다.</summary>
-        public void RecordCarryMotion(float fixedDeltaTime)
+        /// <summary>비버의 직선 이동속도는 유지하고, 회전에서 발생한 접선 속도만 절반으로 줄여 기록한다.</summary>
+        public void RecordCarryMotion(float fixedDeltaTime, Vector3 beaverLinearVelocity)
         {
             if (!_held) return;
             Vector3 position = _body.position;
             if (_carryPoseRecorded && fixedDeltaTime > 0f)
-                _carryLinearVelocity = (position - _previousCarryPosition) / fixedDeltaTime;
+            {
+                Vector3 itemVelocity = (position - _previousCarryPosition) / fixedDeltaTime;
+                Vector3 rotationalVelocity = itemVelocity - beaverLinearVelocity;
+                _carryLinearVelocity = beaverLinearVelocity + rotationalVelocity * ROTATION_RELEASE_SPEED_FACTOR;
+            }
             _previousCarryPosition = position;
             _carryPoseRecorded = true;
         }
