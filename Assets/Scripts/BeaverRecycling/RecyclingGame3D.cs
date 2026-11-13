@@ -17,6 +17,10 @@ namespace BeaverRecycling
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
+        private const float SPLIT_RIVER_MARGIN = 0.25f;
+        private const float SPLIT_ITEM_GAP = 0.05f;
+        private const int SPLIT_SEARCH_RINGS = 48;
+        private const int SPLIT_SEARCH_DIRECTIONS = 16;
         private static readonly int[] UPGRADE_COSTS = { 2, 4, 7 };
 
         [Header("Scene objects")]
@@ -55,12 +59,18 @@ namespace BeaverRecycling
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
         [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.3f;
 
+#if UNITY_EDITOR
+        [Header("Editor Start")]
+        [SerializeField, Min(1)] private int _editorStartDay = 1;
+#endif
+
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
         private readonly List<Rect> _projectedOverlaps = new List<Rect>();
         private readonly List<float> _projectedXEdges = new List<float>();
         private readonly List<Vector2> _projectedZIntervals = new List<Vector2>();
+        private readonly List<Bounds> _splitPlacedBounds = new List<Bounds>();
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
@@ -115,6 +125,9 @@ namespace BeaverRecycling
         }
         void Start()
         {
+#if UNITY_EDITOR
+            _day = Mathf.Clamp(_editorStartDay, 1, _targets.Length);
+#endif
             Managers.Input.UseRecyclingControls(true);
             _hud.Initialize(this);
             _camera.orthographic = true;
@@ -436,13 +449,14 @@ namespace BeaverRecycling
             return contactPoint;
         }
 
-        /// <summary>분리 여부를 받아 묶음을 내려놓고 결합을 해제하며 분리 시 기물을 묶음 중심에서 바깥으로 흩뜨린다.</summary>
+        /// <summary>분리 여부를 받아 묶음을 내려놓고 분리 시 기물을 강 안쪽의 빈 위치로 흩뜨린다.</summary>
         private void ReleaseBundle(bool split)
         {
             bool scatter = split && _held.Count > 1;
             Vector3 center = Vector3.zero;
             if (scatter)
             {
+                _splitPlacedBounds.Clear();
                 foreach (RecyclingItem item in _held) center += item.Body.position;
                 center /= _held.Count;
             }
@@ -456,6 +470,8 @@ namespace BeaverRecycling
                 item.DetachAll();
                 item.BlockAttachment(0.5f);
                 if (!scatter) continue;
+                item.Body.linearVelocity = Vector3.zero;
+                item.Body.angularVelocity = Vector3.zero;
 
                 Vector3 direction = item.Body.position - center;
                 direction.y = 0f;
@@ -469,13 +485,81 @@ namespace BeaverRecycling
                     direction.Normalize();
                 }
 
-                Vector3 scatteredPosition = item.Body.position + direction * _splitScatterDistance;
+                Bounds itemBounds = item.Collider.bounds;
+                Vector3 scatteredPosition = FindSplitPosition(item, itemBounds,
+                    item.Body.position + direction * _splitScatterDistance);
+                itemBounds.center += scatteredPosition - item.Body.position;
+                _splitPlacedBounds.Add(itemBounds);
                 item.Body.position = scatteredPosition;
                 item.transform.SetPositionAndRotation(scatteredPosition, item.Body.rotation);
             }
 
             if (scatter) Physics.SyncTransforms();
             _held.Clear();
+        }
+
+        /// <summary>분리 기물과 희망 위치를 받아 강 안에서 겹침이 적은 가까운 위치를 반환한다.</summary>
+        private Vector3 FindSplitPosition(RecyclingItem item, Bounds bounds, Vector3 desiredPosition)
+        {
+            Vector3 best = ClampSplitPosition(item, bounds, desiredPosition);
+            float bestOverlap = SplitOverlapArea(item, bounds, best);
+            if (bestOverlap <= 0f) return best;
+
+            float step = Mathf.Max(_splitScatterDistance, 0.5f);
+            for (int ring = 1; ring <= SPLIT_SEARCH_RINGS; ring++)
+            {
+                for (int i = 0; i < SPLIT_SEARCH_DIRECTIONS; i++)
+                {
+                    float angle = 2f * Mathf.PI * i / SPLIT_SEARCH_DIRECTIONS;
+                    Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * (ring * step);
+                    Vector3 candidate = ClampSplitPosition(item, bounds, desiredPosition + offset);
+                    float overlap = SplitOverlapArea(item, bounds, candidate);
+                    if (overlap <= 0f) return candidate;
+                    if (overlap < bestOverlap)
+                    {
+                        best = candidate;
+                        bestOverlap = overlap;
+                    }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>기물의 바운드와 목표 위치를 받아 충돌체가 강 경계 안에 놓이는 위치를 반환한다.</summary>
+        private Vector3 ClampSplitPosition(RecyclingItem item, Bounds bounds, Vector3 position)
+        {
+            Vector3 centerOffset = bounds.center - item.Body.position;
+            float minX = _riverMinimum.x + bounds.extents.x + SPLIT_RIVER_MARGIN - centerOffset.x;
+            float maxX = _riverMaximum.x - bounds.extents.x - SPLIT_RIVER_MARGIN - centerOffset.x;
+            float minZ = Mathf.Max(_riverMinimum.y, _waterfallZ) + bounds.extents.z + SPLIT_RIVER_MARGIN - centerOffset.z;
+            float maxZ = _riverMaximum.y - bounds.extents.z - SPLIT_RIVER_MARGIN - centerOffset.z;
+            position.x = minX <= maxX ? Mathf.Clamp(position.x, minX, maxX) : (minX + maxX) * 0.5f;
+            position.z = minZ <= maxZ ? Mathf.Clamp(position.z, minZ, maxZ) : (minZ + maxZ) * 0.5f;
+            return position;
+        }
+
+        /// <summary>분리 기물의 바운드와 후보 위치를 받아 주변 기물과 XZ에서 겹치는 면적의 합을 반환한다.</summary>
+        private float SplitOverlapArea(RecyclingItem item, Bounds bounds, Vector3 position)
+        {
+            bounds.center += position - item.Body.position;
+            float overlap = 0f;
+            foreach (Bounds placed in _splitPlacedBounds) overlap += SplitOverlapArea(bounds, placed);
+            foreach (RecyclingItem other in _items)
+            {
+                if (other.IsResolved || _held.Contains(other)) continue;
+                overlap += SplitOverlapArea(bounds, other.Collider.bounds);
+            }
+            return overlap;
+        }
+
+        /// <summary>두 기물 바운드를 받아 최소 간격을 포함한 XZ 겹침 면적을 반환한다.</summary>
+        private static float SplitOverlapArea(Bounds first, Bounds second)
+        {
+            float width = Mathf.Min(first.max.x + SPLIT_ITEM_GAP, second.max.x) -
+                Mathf.Max(first.min.x - SPLIT_ITEM_GAP, second.min.x);
+            float depth = Mathf.Min(first.max.z + SPLIT_ITEM_GAP, second.max.z) -
+                Mathf.Max(first.min.z - SPLIT_ITEM_GAP, second.min.z);
+            return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
         /// <summary>현재 비버 위치에서 사용할 수 있는 가장 가까운 투입구를 반환한다.</summary>
