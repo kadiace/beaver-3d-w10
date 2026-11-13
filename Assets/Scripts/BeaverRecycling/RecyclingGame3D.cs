@@ -327,13 +327,13 @@ namespace BeaverRecycling
             foreach (RecyclingItem member in _held) member.SetHeld(true);
         }
 
-        /// <summary>운반 묶음과 새 기물의 XZ 겹침 비율을 검사해 기준을 넘은 상대 묶음을 한도 안에서 합친다.</summary>
+        /// <summary>운반 묶음과 새 기물의 화면 겹침을 검사하고 시선 방향으로 맞닿게 정렬한 뒤 결합한다.</summary>
         private void CollectContacts()
         {
             foreach (RecyclingItem other in _items)
             {
                 if (other.IsHeld || !other.CanJoin) continue;
-                if (!TryGetProjectedContactPoint(other.Collider.bounds, out RecyclingItem held, out Vector3 contactPoint)) continue;
+                if (!TryGetProjectedContactPoint(other.Collider.bounds, out RecyclingItem held, out Vector3 contactOffset)) continue;
                 List<RecyclingItem> incoming = RecyclingItem.Collect(other);
                 if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
                 if (_held.Count + incoming.Count > Capacity)
@@ -341,27 +341,42 @@ namespace BeaverRecycling
                     if (Time.time > _capacityNoticeAt) { _hud.Message("운반 한도가 가득 찼어요"); _capacityNoticeAt = Time.time + 1.5f; }
                     continue;
                 }
-                contactPoint = RaiseJoiningItemToContact(held, other, contactPoint);
+
+                // 연결된 일반 묶음 전체를 같은 양만큼 이동시켜 기존 Joint의 상대 위치를 보존한다.
+                foreach (RecyclingItem member in incoming)
+                {
+                    Vector3 position = member.Body.position + contactOffset;
+                    member.Body.position = position;
+                    member.transform.SetPositionAndRotation(position, member.Body.rotation);
+                }
+                Physics.SyncTransforms();
+
+                // 이동한 Collider 표면의 가장 가까운 두 점 사이에 Joint를 연결한다.
+                Vector3 heldPoint = held.Collider.ClosestPoint(other.Collider.bounds.center);
+                Vector3 joiningPoint = other.Collider.ClosestPoint(heldPoint);
+                heldPoint = held.Collider.ClosestPoint(joiningPoint);
+                Vector3 contactPoint = (heldPoint + joiningPoint) * 0.5f;
                 held.Attach(other, contactPoint);
                 foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
             }
         }
 
-        /// <summary>메인 카메라의 투영 영역에서 새 기물의 면적 대비 운반 묶음의 겹침 비율을 판정한다.</summary>
-        private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactPoint)
+        /// <summary>화면 투영 겹침 10%를 검사하고 시선 방향으로 가장 적게 이동해 닿는 운반 기물을 선택한다.</summary>
+        private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactOffset)
         {
             contact = null;
-            contactPoint = default;
+            contactOffset = Vector3.zero;
             if (_camera == null) return false;
 
             // 월드 AABB의 8개 모서리를 카메라 화면에 투영한 볼록 외곽선으로 판정한다.
-            // Rect로 감싸면 아이소메트릭 시점에서 비어 있는 모서리까지 겹침으로 계산된다.
             List<Vector2> joiningPolygon = ProjectBoundsToViewport(joiningBounds);
             float joiningArea = PolygonArea(joiningPolygon);
             if (joiningArea <= 0.00000001f) return false;
 
             float requiredArea = joiningArea * _minimumProjectedOverlap;
-            float largestArea = 0f;
+            float nearestTravelSquared = float.PositiveInfinity;
+            float largestAreaAtNearest = 0f;
+            bool meetsOverlap = false;
             var uncovered = new List<List<Vector2>> { joiningPolygon };
 
             foreach (RecyclingItem held in _held)
@@ -371,16 +386,31 @@ namespace BeaverRecycling
                 float individualArea = PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon));
                 if (individualArea <= 0.00000001f) continue;
 
-                if (individualArea > largestArea)
+                // 두 투영 영역이 겹치면, 직교 카메라의 시선 방향으로 어느 깊이에서
+                // 월드 바운드가 처음 맞닿는지 계산할 수 있다. 화면상 위치는 바뀌지 않는다.
+                if (TryGetViewDepthContactOffset(heldBounds, joiningBounds, _camera.transform.forward,
+                    out Vector3 offset))
                 {
-                    largestArea = individualArea;
-                    contact = held;
-                    contactPoint = (heldBounds.center + joiningBounds.center) * 0.5f;
+                    float travelSquared = offset.sqrMagnitude;
+                    if (travelSquared < nearestTravelSquared - 0.000001f ||
+                        (Mathf.Abs(travelSquared - nearestTravelSquared) <= 0.000001f &&
+                         individualArea > largestAreaAtNearest))
+                    {
+                        nearestTravelSquared = travelSquared;
+                        largestAreaAtNearest = individualArea;
+                        contact = held;
+                        contactOffset = offset;
+                    }
                 }
-                if (individualArea >= requiredArea) return true;
 
-                // 여러 운반 기물이 동일한 화면 영역을 차지하더라도 중복 가산하지 않는다.
-                // joiningPolygon에서 각 heldPolygon을 차례로 빼고 남은 면적을 구한다.
+                if (meetsOverlap) continue;
+                if (individualArea >= requiredArea)
+                {
+                    meetsOverlap = true;
+                    continue;
+                }
+
+                // 운반 기물 여럿이 화면상 같은 영역을 덮어도 겹침 면적을 중복 계산하지 않는다.
                 var nextUncovered = new List<List<Vector2>>();
                 foreach (List<Vector2> piece in uncovered)
                     SubtractConvexPolygon(piece, heldPolygon, nextUncovered);
@@ -388,9 +418,46 @@ namespace BeaverRecycling
 
                 float uncoveredArea = 0f;
                 foreach (List<Vector2> piece in uncovered) uncoveredArea += PolygonArea(piece);
-                if (joiningArea - uncoveredArea >= requiredArea) return true;
+                meetsOverlap = joiningArea - uncoveredArea >= requiredArea;
             }
-            return false;
+            return meetsOverlap && contact != null;
+        }
+
+        /// <summary>카메라 깊이 축으로 새 바운드를 움직여 실제 3D 바운드가 맞닿는 최소 이동량을 구한다.</summary>
+        private static bool TryGetViewDepthContactOffset(Bounds heldBounds, Bounds joiningBounds,
+            Vector3 viewDirection, out Vector3 offset)
+        {
+            offset = Vector3.zero;
+            Vector3 lower = heldBounds.min - joiningBounds.max;
+            Vector3 upper = heldBounds.max - joiningBounds.min;
+            float enter = float.NegativeInfinity;
+            float exit = float.PositiveInfinity;
+
+            for (int axis = 0; axis < 3; axis++)
+            {
+                float direction = viewDirection[axis];
+                if (Mathf.Abs(direction) < 0.000001f)
+                {
+                    // 이 축으로는 움직일 수 없으므로 시작부터 범위가 겹쳐야 한다.
+                    if (lower[axis] > 0f || upper[axis] < 0f) return false;
+                    continue;
+                }
+
+                float t0 = lower[axis] / direction;
+                float t1 = upper[axis] / direction;
+                enter = Mathf.Max(enter, Mathf.Min(t0, t1));
+                exit = Mathf.Min(exit, Mathf.Max(t0, t1));
+                if (enter > exit) return false;
+            }
+
+            if (float.IsInfinity(enter) || float.IsInfinity(exit)) return false;
+
+            // 서로 떨어져 있으면 최초 접촉, 겹쳐 있으면 가장 가까운 이탈 경계를 선택한다.
+            float depth = enter > 0f ? enter :
+                exit < 0f ? exit :
+                Mathf.Abs(enter) <= Mathf.Abs(exit) ? enter : exit;
+            offset = viewDirection * depth;
+            return true;
         }
 
         /// <summary>3D 월드 바운드 8개 꼭짓점을 카메라 뷰포트에 투영해 CCW 볼록 외곽선을 만든다.</summary>
@@ -499,21 +566,6 @@ namespace BeaverRecycling
                 previousKept = currentKept;
             }
             return result;
-        }
-
-        /// <summary>기존 묶음보다 아래에 있는 새 기물을 올려 충돌체 바운드가 맞닿게 하고 조인트 지점을 조정한다.</summary>
-        private static Vector3 RaiseJoiningItemToContact(RecyclingItem held, RecyclingItem joining, Vector3 contactPoint)
-        {
-            Bounds heldBounds = held.Collider.bounds;
-            Bounds joiningBounds = joining.Collider.bounds;
-            float lift = heldBounds.min.y - joiningBounds.max.y;
-            if (lift <= 0f) return contactPoint;
-
-            Vector3 raisedPosition = joining.Body.position + Vector3.up * lift;
-            joining.Body.position = raisedPosition;
-            joining.transform.SetPositionAndRotation(raisedPosition, joining.Body.rotation);
-            contactPoint.y = heldBounds.min.y;
-            return contactPoint;
         }
 
         /// <summary>분리 여부를 받아 묶음을 내려놓고 결합을 해제하며 분리 시 기물을 묶음 중심에서 바깥으로 흩뜨린다.</summary>
