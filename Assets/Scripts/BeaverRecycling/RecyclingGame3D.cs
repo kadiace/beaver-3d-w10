@@ -387,7 +387,7 @@ namespace BeaverRecycling
         private const int ATTACH_DEPTH_SEARCH_STEPS = 24;
         private const int ATTACH_CONTACT_REFINE_STEPS = 20;
 
-        /// <summary>카메라 투영 겹침을 먼저 검사한 뒤 실제 Collider 표면 간 거리가 최소인 결합 대상을 선택한다.</summary>
+        /// <summary>새 기물의 ISO 투영 면적 중 단일 운반 기물과 30% 이상 겹치는 대상만 결합 후보로 고른다.</summary>
         private bool TryGetProjectedContactPoint(RecyclingItem joining, out RecyclingItem contact,
             out Vector3 contactOffset, out float overlapRatio)
         {
@@ -400,33 +400,18 @@ namespace BeaverRecycling
             float joiningArea = PolygonArea(joiningPolygon);
             if (joiningArea <= 0.00000001f) return false;
 
-            // 1단계: 겹치는 영역의 합집합 면적을 계산해 30% 조건을 먼저 확인한다.
-            var uncovered = new List<List<Vector2>> { joiningPolygon };
-            foreach (RecyclingItem held in _held)
-            {
-                List<Vector2> heldPolygon = ProjectBoundsToViewport(held.Collider.bounds);
-                if (PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon)) <= 0.00000001f)
-                    continue;
-                var nextUncovered = new List<List<Vector2>>();
-                foreach (List<Vector2> piece in uncovered)
-                    SubtractConvexPolygon(piece, heldPolygon, nextUncovered);
-                uncovered = nextUncovered;
-            }
-            float uncoveredArea = 0f;
-            foreach (List<Vector2> piece in uncovered) uncoveredArea += PolygonArea(piece);
-            overlapRatio = Mathf.Clamp01((joiningArea - uncoveredArea) / joiningArea);
-            if (overlapRatio + 0.000001f < _minimumProjectedOverlap) return false;
-
-            // 2단계: 실제 Collider 간 최소 표면 거리를 기준으로 대상을 선정한다.
-            // 표면 거리 동률이면 카메라 forward 축의 이동량이 작은 대상을 우선한다.
+            // 분모는 항상 새로 붙는 일반 오브젝트의 투영 면적이다.
+            // 각 운반 기물과 개별 비교하며, 여러 운반 기물의 겹침을 합산하지 않는다.
             float bestGap = float.PositiveInfinity;
             float bestTravel = float.PositiveInfinity;
             foreach (RecyclingItem held in _held)
             {
                 List<Vector2> heldPolygon = ProjectBoundsToViewport(held.Collider.bounds);
-                if (PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon)) <= 0.00000001f)
-                    continue;
+                float overlapArea = PolygonArea(IntersectConvexPolygons(joiningPolygon, heldPolygon));
+                float candidateOverlap = Mathf.Clamp01(overlapArea / joiningArea);
+                if (candidateOverlap < _minimumProjectedOverlap) continue;
 
+                // 30% 조건을 충족한 두 기물 사이에서만 카메라 깊이 방향 최단 거리를 구한다.
                 if (!TryGetClosestColliderOffset(held, joining, _camera.transform.forward,
                     out Vector3 offset, out float gap)) continue;
                 float travel = offset.magnitude;
@@ -437,6 +422,8 @@ namespace BeaverRecycling
                     bestTravel = travel;
                     contact = held;
                     contactOffset = offset;
+                    // 로그에도 합산 면적이 아닌 실제 연결될 두 기물의 겹침 비율을 기록한다.
+                    overlapRatio = candidateOverlap;
                 }
             }
             return contact != null;
@@ -638,21 +625,6 @@ namespace BeaverRecycling
             for (int i = 0; i < clip.Count && result.Count >= 3; i++)
                 result = ClipToHalfPlane(result, clip[i], clip[(i + 1) % clip.Count], true);
             return result;
-        }
-
-        /// <summary>볼록 클리퍼의 각 변에 대해 외부 조각을 떼어내 중복 없는 차집합을 만든다.</summary>
-        private static void SubtractConvexPolygon(List<Vector2> subject, List<Vector2> clip,
-            List<List<Vector2>> uncovered)
-        {
-            List<Vector2> inside = subject;
-            for (int i = 0; i < clip.Count && inside.Count >= 3; i++)
-            {
-                Vector2 start = clip[i];
-                Vector2 end = clip[(i + 1) % clip.Count];
-                List<Vector2> outside = ClipToHalfPlane(inside, start, end, false);
-                if (PolygonArea(outside) > 0.00000001f) uncovered.Add(outside);
-                inside = ClipToHalfPlane(inside, start, end, true);
-            }
         }
 
         /// <summary>지정된 선의 왼쪽(CCW 내부) 또는 오른쪽에 있는 다각형을 잘라 반환한다.</summary>
