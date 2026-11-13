@@ -31,6 +31,7 @@ namespace BeaverRecycling
         private Vector3 _previousCarryPosition;
         private Vector3 _carryLinearVelocity;
         private bool _carryPoseRecorded;
+        private bool _pendingThrownSubmission;
         private float _releaseMomentumUntil;
         private float _lastFlowTime = float.NegativeInfinity;
 
@@ -60,6 +61,7 @@ namespace BeaverRecycling
             _appliedKnockbackZ = 0f;
             _carryLinearVelocity = Vector3.zero;
             _carryPoseRecorded = false;
+            _pendingThrownSubmission = false;
             _releaseMomentumUntil = 0f;
             _lastFlowTime = float.NegativeInfinity;
             transform.localScale = _originalScale;
@@ -153,6 +155,7 @@ namespace BeaverRecycling
                 // The first carry step snaps the bundle to the beaver's mouth; never treat that snap as a throw.
                 _carryPoseRecorded = false;
                 _carryLinearVelocity = Vector3.zero;
+                _pendingThrownSubmission = false;
                 _releaseMomentumUntil = 0f;
             }
 
@@ -167,7 +170,8 @@ namespace BeaverRecycling
             if (!releasing) return;
             _body.linearVelocity = _carryLinearVelocity;
             _body.angularVelocity = Vector3.zero;
-            if (_carryLinearVelocity.sqrMagnitude > 0.0001f)
+            _pendingThrownSubmission = _carryLinearVelocity.sqrMagnitude > 0.0001f;
+            if (_pendingThrownSubmission)
                 _releaseMomentumUntil = Time.fixedTime + RELEASE_MOMENTUM_SECONDS;
             _carryPoseRecorded = false;
         }
@@ -212,6 +216,7 @@ namespace BeaverRecycling
             if (_resolved) return;
             _resolved = true;
             _held = false;
+            _pendingThrownSubmission = false;
             DetachAll();
             _collider.enabled = false;
             _body.isKinematic = true;
@@ -252,7 +257,14 @@ namespace BeaverRecycling
 
         void FixedUpdate()
         {
-            if (_game == null || !_game.IsWorking || _held || _resolved || _lastFlowTime == Time.fixedTime) return;
+            if (_game == null || !_game.IsWorking || _held || _resolved) return;
+            // Check the real item position once, just as its release inertia fully becomes creek flow.
+            if (_pendingThrownSubmission && Time.fixedTime >= _releaseMomentumUntil)
+            {
+                _pendingThrownSubmission = false;
+                if (_game.TrySubmitThrownItem(this)) return;
+            }
+            if (_lastFlowTime == Time.fixedTime) return;
             List<RecyclingItem> group = Collect(this);
             bool touchesWater = false;
             foreach (RecyclingItem member in group)
