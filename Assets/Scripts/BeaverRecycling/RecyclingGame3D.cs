@@ -183,7 +183,8 @@ namespace BeaverRecycling
             Vector3 delta = _beaver.CarryPoint.position - _held[0].Body.position;
             foreach (RecyclingItem member in _held) member.Body.position += delta;
             Physics.SyncTransforms();
-            foreach (RecyclingItem member in _held) member.RecordCarryMotion(Time.fixedDeltaTime);
+            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
+            foreach (RecyclingItem member in _held) member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity);
             CollectContacts();
         }
 
