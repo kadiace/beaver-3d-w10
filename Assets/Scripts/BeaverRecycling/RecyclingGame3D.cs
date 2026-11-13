@@ -53,7 +53,7 @@ namespace BeaverRecycling
 
         [Header("Bundle")]
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
-        [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.1f;
+        [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.3f;
 
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
@@ -361,7 +361,7 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>화면 투영 겹침 10%를 검사하고 시선 방향으로 가장 적게 이동해 닿는 운반 기물을 선택한다.</summary>
+        /// <summary>화면 투영 겹침 30%를 검사하고 시선 방향으로 가장 적게 이동해 닿는 운반 기물을 선택한다.</summary>
         private bool TryGetProjectedContactPoint(Bounds joiningBounds, out RecyclingItem contact, out Vector3 contactOffset)
         {
             contact = null;
