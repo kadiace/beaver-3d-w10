@@ -10,7 +10,7 @@ namespace BeaverRecycling
     {
         private const float ROTATION_RELEASE_SPEED_FACTOR = 0.5f;
         private const float RELEASE_MOMENTUM_SECONDS = 0.45f;
-        private const float THROWN_SUBMISSION_SECONDS = 0.6f;
+        private const float THROWN_SUBMISSION_SECONDS = 1f;
         private const float RELEASE_MOMENTUM_FADE_SECONDS = 0.15f;
 
         [Header("Wood marker")]
@@ -264,7 +264,7 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (_game == null || !_game.IsWorking || _held || _resolved) return;
-            // Submission has its own 0.6s window; do not change the 0.45s momentum/flow physics.
+            // Submission has its own 1.0s window; do not change the 0.45s momentum/flow physics.
             if (_pendingThrownSubmission)
             {
                 if (Time.fixedTime >= _thrownSubmissionUntil)
