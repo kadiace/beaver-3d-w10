@@ -143,9 +143,11 @@ namespace BeaverRecycling
             _pauseButton.interactable = false;
             _modalTitle.text = title;
             _modalBody.text = body;
-            _primaryText.text = primary;
+            // Selected actions use the same submit button for keyboard and gamepad.
+            string submitHint = Managers.Input.GamePadConnected ? " [South]" : " [Enter]";
+            _primaryText.text = primary + submitHint;
             _secondary.gameObject.SetActive(!string.IsNullOrEmpty(secondary));
-            _secondaryText.text = secondary;
+            _secondaryText.text = string.IsNullOrEmpty(secondary) ? "" : secondary + submitHint;
             _upgradeGroup.SetActive(upgrades);
             RectTransform primaryRect = (RectTransform)_primary.transform;
             primaryRect.anchoredPosition = new Vector2(string.IsNullOrEmpty(secondary) ? 0f : -190f, primaryRect.anchoredPosition.y);
