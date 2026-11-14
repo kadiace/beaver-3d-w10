@@ -9,7 +9,7 @@ namespace BeaverRecycling
     public sealed class RecyclingSortingWindow3D : MonoBehaviour
     {
         private const float PHYSICS_STEP = 0.02f;
-        private const float FINISH_DELAY = 3f;
+        private const float FALLBACK_FINISH_DELAY = 3f;
         private const float RESULT_SECONDS = 1.3f;
         private const float LINE_REACH = 22f;
         private const float ITEM_SCALE = 0.25f;
@@ -114,7 +114,10 @@ namespace BeaverRecycling
             {
                 RefreshTarget();
                 if (Managers.Input.SortExcludePressed) ExcludeNearest();
-                if (_spawnedCount == _definitions.Length && _elapsed >= _lastSpawnedAt + FINISH_DELAY)
+                // Complete as soon as every remaining item passes the chute mouth.
+                // Retain the old timeout only as a fallback for items that miss the chute.
+                if (_spawnedCount == _definitions.Length &&
+                    (AllItemsEnteredChute() || _elapsed >= _lastSpawnedAt + FALLBACK_FINISH_DELAY))
                     FinishSorting();
             }
             if (!_finished || _elapsed < _finishedAt + RESULT_SECONDS) return;
@@ -288,6 +291,40 @@ namespace BeaverRecycling
             _sprites[index].gameObject.SetActive(false);
             _selectedIndex = -1;
             _status.text = "아이템 1개 제외";
+        }
+
+        /// <summary>제외되지 않은 아이템이 모두 통 입구를 통과했는지 확인한다. 바닥 접촉은 기다리지 않는다.</summary>
+        private bool AllItemsEnteredChute()
+        {
+            if (_chuteWalls == null || _chuteWalls.Length < 2 ||
+                _chuteWalls[0] == null || _chuteWalls[1] == null) return false;
+
+            // Derive the mouth from the actual wall rectangles so prefab layout edits remain supported.
+            Vector2 firstTip = UpperWallTip(_chuteWalls[0].rectTransform);
+            Vector2 secondTip = UpperWallTip(_chuteWalls[1].rectTransform);
+            float mouthY = Mathf.Min(firstTip.y, secondTip.y);
+            float leftX = Mathf.Min(firstTip.x, secondTip.x);
+            float rightX = Mathf.Max(firstTip.x, secondTip.x);
+
+            for (int i = 0; i < _spawnedCount; i++)
+            {
+                if (_excluded[i]) continue;
+                Vector2 position = _playfield.InverseTransformPoint(_sprites[i].position);
+                float radius = _radii[i];
+                if (position.y + radius > mouthY ||
+                    position.x - radius < leftX || position.x + radius > rightX)
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>통 벽의 양 끝 중 화면상 높은 끝점을 플레이필드 좌표로 반환한다.</summary>
+        private Vector2 UpperWallTip(RectTransform wall)
+        {
+            Rect bounds = wall.rect;
+            Vector2 first = _playfield.InverseTransformPoint(wall.TransformPoint(new Vector3(bounds.xMin, 0f, 0f)));
+            Vector2 second = _playfield.InverseTransformPoint(wall.TransformPoint(new Vector3(bounds.xMax, 0f, 0f)));
+            return first.y >= second.y ? first : second;
         }
 
         /// <summary>모든 투입이 끝난 뒤 남은 아이템만 한 번 평가하고 최종 점수를 표시한다.</summary>
