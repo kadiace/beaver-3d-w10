@@ -1039,7 +1039,7 @@ namespace BeaverRecycling
             _bombs.Remove(bomb);
         }
 
-        /// <summary>풀에 반환된 기물을 받아 생성 목록·운반·카메라 추적에서 제거한다.</summary>
+        /// <summary>풀에 반환된 기물을 받아 생성 목록과 운반 상태에서 제거한다.</summary>
         public void ForgetItem(RecyclingItem item)
         {
             _items.Remove(item);
@@ -1280,8 +1280,8 @@ namespace BeaverRecycling
         }
 
         /// <summary>
-        /// Resets camera tracking to follow the beaver at the start of a day.
-        /// Uses the beaver transform and updates the tracked item and camera target.
+        /// Initializes camera follow to the beaver at the start of a day.
+        /// Uses the beaver transform to initialize the camera target.
         /// </summary>
         private void ResetCameraTarget()
         {

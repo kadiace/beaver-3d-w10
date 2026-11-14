@@ -1026,6 +1026,28 @@
                                       },
                                       {
                                           "name":  "",
+                                          "id":  "7f713fa7-1c86-4fe6-b877-fb4c5ca06bc1",
+                                          "path":  "<Keyboard>/enter",
+                                          "interactions":  "",
+                                          "processors":  "",
+                                          "groups":  "Keyboard&Mouse",
+                                          "action":  "Submit",
+                                          "isComposite":  false,
+                                          "isPartOfComposite":  false
+                                      },
+                                      {
+                                          "name":  "",
+                                          "id":  "d3accb14-2e7f-461f-9375-68e7ef67ef37",
+                                          "path":  "<Keyboard>/numpadEnter",
+                                          "interactions":  "",
+                                          "processors":  "",
+                                          "groups":  "Keyboard&Mouse",
+                                          "action":  "Submit",
+                                          "isComposite":  false,
+                                          "isPartOfComposite":  false
+                                      },
+                                      {
+                                          "name":  "",
                                           "id":  "ac76f1bc-9f53-4667-b017-0b7d7aaed27a",
                                           "path":  "\u003cGamepad\u003e/start",
                                           "interactions":  "",
