@@ -10,6 +10,7 @@ namespace BeaverRecycling
     {
         private const float ROTATION_RELEASE_SPEED_FACTOR = 0.5f;
         private const float RELEASE_MOMENTUM_SECONDS = 0.45f;
+        private const float THROWN_SUBMISSION_SECONDS = 0.6f;
         private const float RELEASE_MOMENTUM_FADE_SECONDS = 0.15f;
 
         [Header("Wood marker")]
@@ -33,6 +34,7 @@ namespace BeaverRecycling
         private bool _carryPoseRecorded;
         private bool _pendingThrownSubmission;
         private float _releaseMomentumUntil;
+        private float _thrownSubmissionUntil;
         private float _lastFlowTime = float.NegativeInfinity;
 
         public Rigidbody Body => _body;
@@ -63,6 +65,7 @@ namespace BeaverRecycling
             _carryPoseRecorded = false;
             _pendingThrownSubmission = false;
             _releaseMomentumUntil = 0f;
+            _thrownSubmissionUntil = 0f;
             _lastFlowTime = float.NegativeInfinity;
             transform.localScale = _originalScale;
             _collider.enabled = true;
@@ -157,6 +160,7 @@ namespace BeaverRecycling
                 _carryLinearVelocity = Vector3.zero;
                 _pendingThrownSubmission = false;
                 _releaseMomentumUntil = 0f;
+                _thrownSubmissionUntil = 0f;
             }
 
             _held = held;
@@ -172,7 +176,10 @@ namespace BeaverRecycling
             _body.angularVelocity = Vector3.zero;
             _pendingThrownSubmission = _carryLinearVelocity.sqrMagnitude > 0.0001f;
             if (_pendingThrownSubmission)
+            {
                 _releaseMomentumUntil = Time.fixedTime + RELEASE_MOMENTUM_SECONDS;
+                _thrownSubmissionUntil = Time.fixedTime + THROWN_SUBMISSION_SECONDS;
+            }
             _carryPoseRecorded = false;
         }
 
@@ -257,11 +264,10 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (_game == null || !_game.IsWorking || _held || _resolved) return;
-            // Allow thrown chute submissions throughout free flight and the transition to creek flow.
-            // Stop checking once creek flow has fully taken over.
+            // Submission has its own 0.6s window; do not change the 0.45s momentum/flow physics.
             if (_pendingThrownSubmission)
             {
-                if (Time.fixedTime >= _releaseMomentumUntil)
+                if (Time.fixedTime >= _thrownSubmissionUntil)
                     _pendingThrownSubmission = false;
                 else if (_game.TrySubmitThrownItem(this)) return;
             }
