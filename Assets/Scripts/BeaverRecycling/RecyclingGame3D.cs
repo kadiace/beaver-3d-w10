@@ -253,9 +253,9 @@ namespace BeaverRecycling
         }
 
         /// <summary>운반 종료 직전, 오브젝트 경계를 벗어난 묶음을 비버의 이동 영역 내 가장 가까운 위치로 옮긴다.</summary>
-        private void CorrectReleasedBundlePosition()
+        private bool CorrectReleasedBundlePosition()
         {
-            if (_held.Count == 0) return;
+            if (_held.Count == 0) return false;
 
             Bounds bundleBounds = _held[0].Collider.bounds;
             bool outside = !IsInsideObjectArea(bundleBounds);
@@ -265,7 +265,7 @@ namespace BeaverRecycling
                 bundleBounds.Encapsulate(itemBounds);
                 outside |= !IsInsideObjectArea(itemBounds);
             }
-            if (!outside) return;
+            if (!outside) return false;
 
             Vector2 minimum = _beaver.MovementMinimum;
             Vector2 maximum = _beaver.MovementMaximum;
@@ -278,7 +278,7 @@ namespace BeaverRecycling
             float targetZ = minZ <= maxZ ? Mathf.Clamp(bundleBounds.center.z, minZ, maxZ)
                 : (minimum.y + maximum.y) * 0.5f;
             Vector3 offset = new Vector3(targetX - bundleBounds.center.x, 0f, targetZ - bundleBounds.center.z);
-            if (offset.sqrMagnitude <= 0f) return;
+            if (offset.sqrMagnitude <= 0f) return true;
 
             foreach (RecyclingItem item in _held)
             {
@@ -287,6 +287,7 @@ namespace BeaverRecycling
                 item.transform.position = position;
             }
             Physics.SyncTransforms();
+            return true;
         }
 
 #if UNITY_EDITOR
@@ -928,7 +929,7 @@ namespace BeaverRecycling
         /// <summary>분리·놓기 전에 경계 밖 묶음을 비버 작업 구역으로 보정하고 분리 시 기물을 흩뜨린다.</summary>
         private void ReleaseBundle(bool split)
         {
-            CorrectReleasedBundlePosition();
+            bool correctedToPlayerArea = CorrectReleasedBundlePosition();
             bool scatter = split && _held.Count > 1;
             Vector3 center = Vector3.zero;
             if (scatter)
@@ -964,7 +965,7 @@ namespace BeaverRecycling
 
                 Bounds itemBounds = item.Collider.bounds;
                 Vector3 scatteredPosition = FindSplitPosition(item, itemBounds,
-                    item.Body.position + direction * _splitScatterDistance);
+                    item.Body.position + direction * _splitScatterDistance, correctedToPlayerArea);
                 itemBounds.center += scatteredPosition - item.Body.position;
                 _splitPlacedBounds.Add(itemBounds);
                 item.Body.position = scatteredPosition;
@@ -976,9 +977,10 @@ namespace BeaverRecycling
         }
 
         /// <summary>분리 기물과 희망 위치를 받아 강 안에서 겹침이 적은 가까운 위치를 반환한다.</summary>
-        private Vector3 FindSplitPosition(RecyclingItem item, Bounds bounds, Vector3 desiredPosition)
+        private Vector3 FindSplitPosition(RecyclingItem item, Bounds bounds, Vector3 desiredPosition,
+            bool constrainToPlayerArea)
         {
-            Vector3 best = ClampSplitPosition(item, bounds, desiredPosition);
+            Vector3 best = ClampSplitPosition(item, bounds, desiredPosition, constrainToPlayerArea);
             float bestOverlap = SplitOverlapArea(item, bounds, best);
             if (bestOverlap <= 0f) return best;
 
@@ -989,7 +991,7 @@ namespace BeaverRecycling
                 {
                     float angle = 2f * Mathf.PI * i / SPLIT_SEARCH_DIRECTIONS;
                     Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * (ring * step);
-                    Vector3 candidate = ClampSplitPosition(item, bounds, desiredPosition + offset);
+                    Vector3 candidate = ClampSplitPosition(item, bounds, desiredPosition + offset, constrainToPlayerArea);
                     float overlap = SplitOverlapArea(item, bounds, candidate);
                     if (overlap <= 0f) return candidate;
                     if (overlap < bestOverlap)
@@ -1002,14 +1004,17 @@ namespace BeaverRecycling
             return best;
         }
 
-        /// <summary>기물의 바운드와 목표 위치를 받아 충돌체가 강 경계 안에 놓이는 위치를 반환한다.</summary>
-        private Vector3 ClampSplitPosition(RecyclingItem item, Bounds bounds, Vector3 position)
+        /// <summary>분리 기물의 바운드를 강 안에 맞추되, 경계 밖에서 복귀한 기물은 비버 이동 영역에 맞춘다.</summary>
+        private Vector3 ClampSplitPosition(RecyclingItem item, Bounds bounds, Vector3 position,
+            bool constrainToPlayerArea)
         {
+            Vector2 minimum = constrainToPlayerArea ? _beaver.MovementMinimum : _riverMinimum;
+            Vector2 maximum = constrainToPlayerArea ? _beaver.MovementMaximum : _riverMaximum;
             Vector3 centerOffset = bounds.center - item.Body.position;
-            float minX = _riverMinimum.x + bounds.extents.x + SPLIT_RIVER_MARGIN - centerOffset.x;
-            float maxX = _riverMaximum.x - bounds.extents.x - SPLIT_RIVER_MARGIN - centerOffset.x;
-            float minZ = Mathf.Max(_riverMinimum.y, _waterfallZ) + bounds.extents.z + SPLIT_RIVER_MARGIN - centerOffset.z;
-            float maxZ = _riverMaximum.y - bounds.extents.z - SPLIT_RIVER_MARGIN - centerOffset.z;
+            float minX = minimum.x + bounds.extents.x + SPLIT_RIVER_MARGIN - centerOffset.x;
+            float maxX = maximum.x - bounds.extents.x - SPLIT_RIVER_MARGIN - centerOffset.x;
+            float minZ = Mathf.Max(minimum.y, _waterfallZ) + bounds.extents.z + SPLIT_RIVER_MARGIN - centerOffset.z;
+            float maxZ = maximum.y - bounds.extents.z - SPLIT_RIVER_MARGIN - centerOffset.z;
             position.x = minX <= maxX ? Mathf.Clamp(position.x, minX, maxX) : (minX + maxX) * 0.5f;
             position.z = minZ <= maxZ ? Mathf.Clamp(position.z, minZ, maxZ) : (minZ + maxZ) * 0.5f;
             return position;
