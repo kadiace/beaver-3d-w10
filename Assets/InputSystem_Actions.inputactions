@@ -971,30 +971,8 @@
                                       },
                                       {
                                           "name":  "up",
-                                          "id":  "563fbfdd-0f09-408d-aa75-8642c4f08ef0",
-                                          "path":  "\u003cKeyboard\u003e/w",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "Navigate",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "up",
                                           "id":  "eb480147-c587-4a33-85ed-eb0ab9942c43",
                                           "path":  "\u003cKeyboard\u003e/upArrow",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "Navigate",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "down",
-                                          "id":  "2bf42165-60bc-42ca-8072-8c13ab40239b",
-                                          "path":  "\u003cKeyboard\u003e/s",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  "Keyboard\u0026Mouse",
@@ -1015,30 +993,8 @@
                                       },
                                       {
                                           "name":  "left",
-                                          "id":  "74214943-c580-44e4-98eb-ad7eebe17902",
-                                          "path":  "\u003cKeyboard\u003e/a",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "Navigate",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "left",
                                           "id":  "cea9b045-a000-445b-95b8-0c171af70a3b",
                                           "path":  "\u003cKeyboard\u003e/leftArrow",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "Navigate",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "right",
-                                          "id":  "8607c725-d935-4808-84b1-8354e29bab63",
-                                          "path":  "\u003cKeyboard\u003e/d",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  "Keyboard\u0026Mouse",
@@ -1335,30 +1291,8 @@
                                       },
                                       {
                                           "name":  "up",
-                                          "id":  "dac57117-dbca-e15e-7fd1-552e3cf571a2",
-                                          "path":  "\u003cKeyboard\u003e/w",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "up",
                                           "id":  "f07d7738-1f9e-1ec7-e936-736a01403c55",
                                           "path":  "\u003cKeyboard\u003e/upArrow",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "down",
-                                          "id":  "68df4d48-8ce3-8dbb-f066-5b297b4565fb",
-                                          "path":  "\u003cKeyboard\u003e/s",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  ";Keyboard\u0026Mouse",
@@ -1379,30 +1313,8 @@
                                       },
                                       {
                                           "name":  "left",
-                                          "id":  "ff3bfa34-3555-a54e-31ed-53791cc3e192",
-                                          "path":  "\u003cKeyboard\u003e/a",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "left",
                                           "id":  "08dadab9-5c73-1b57-034e-55ac970a9906",
                                           "path":  "\u003cKeyboard\u003e/leftArrow",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "right",
-                                          "id":  "4f6bfe49-f0e1-eb06-cb8e-81014a9dc1a6",
-                                          "path":  "\u003cKeyboard\u003e/d",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  ";Keyboard\u0026Mouse",
@@ -1440,39 +1352,6 @@
                                           "processors":  "",
                                           "groups":  "Joystick",
                                           "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  false
-                                      },
-                                      {
-                                          "name":  "",
-                                          "id":  "6befd7cf-11e3-c854-c48a-bf123d84e287",
-                                          "path":  "\u003cMouse\u003e/position",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "PointerPosition",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  false
-                                      },
-                                      {
-                                          "name":  "",
-                                          "id":  "d5bef88d-2a2f-a42f-9133-b3caacfcbbb8",
-                                          "path":  "\u003cMouse\u003e/delta",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "PointerDelta",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  false
-                                      },
-                                      {
-                                          "name":  "",
-                                          "id":  "83bf430c-f120-18c8-893e-9787a2d548cd",
-                                          "path":  "\u003cMouse\u003e/rightButton",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Keyboard\u0026Mouse",
-                                          "action":  "SecondaryClick",
                                           "isComposite":  false,
                                           "isPartOfComposite":  false
                                       },

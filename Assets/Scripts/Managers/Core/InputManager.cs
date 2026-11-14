@@ -1,7 +1,9 @@
 using System;
 
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 
 public class InputManager
 {
@@ -12,6 +14,15 @@ public class InputManager
     private InputActionMap _uiMap;
     private InputMode _inputMode = InputMode.Player;
     private bool _useRecyclingControls;
+
+    // Keep the shared EventSystem mouse bindings for the other game modes.
+    private InputSystemUIInputModule _uiInputModule;
+    private InputActionReference _savedPoint;
+    private InputActionReference _savedLeftClick;
+    private InputActionReference _savedRightClick;
+    private InputActionReference _savedMiddleClick;
+    private InputActionReference _savedScrollWheel;
+    private bool _savedBackgroundDeselect;
 
     [Header("Player actions")]
     private InputAction _move;
@@ -109,19 +120,46 @@ public class InputManager
         _uiMap.Enable();
         _playerMap.Disable();
         _recyclingMap.Disable();
+        ConfigureUiPointerInput();
         if (mode == InputMode.Player)
         {
             (_useRecyclingControls ? _recyclingMap : _playerMap).Enable();
             Cursor.lockState = _useRecyclingControls ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = _useRecyclingControls;
+            Cursor.visible = false;
             Time.timeScale = 1f;
         }
         else
         {
             Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            Cursor.visible = !_useRecyclingControls;
             Time.timeScale = 0f;
         }
     }
 
+    /// <summary>분리수거 모드에선 UI 포인터를 제거해 방향키/Submit으로만 버튼을 조작한다.</summary>
+    private void ConfigureUiPointerInput()
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null) return;
+        InputSystemUIInputModule module = eventSystem.GetComponent<InputSystemUIInputModule>();
+        if (module == null) return;
+
+        if (_uiInputModule != module)
+        {
+            _uiInputModule = module;
+            _savedPoint = module.point;
+            _savedLeftClick = module.leftClick;
+            _savedRightClick = module.rightClick;
+            _savedMiddleClick = module.middleClick;
+            _savedScrollWheel = module.scrollWheel;
+            _savedBackgroundDeselect = module.deselectOnBackgroundClick;
+        }
+
+        module.point = _useRecyclingControls ? null : _savedPoint;
+        module.leftClick = _useRecyclingControls ? null : _savedLeftClick;
+        module.rightClick = _useRecyclingControls ? null : _savedRightClick;
+        module.middleClick = _useRecyclingControls ? null : _savedMiddleClick;
+        module.scrollWheel = _useRecyclingControls ? null : _savedScrollWheel;
+        module.deselectOnBackgroundClick = !_useRecyclingControls && _savedBackgroundDeselect;
+    }
 }

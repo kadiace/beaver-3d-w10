@@ -7950,7 +7950,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1.1
-  m_Text: "\uBC29\uD5A5\uD0A4/WASD: \uC774\uB3D9   E: \uC9D1\uAE30/\uB193\uAE30  
+  m_Text: "\uBC29\uD5A5\uD0A4: \uC774\uB3D9   E: \uC9D1\uAE30/\uB193\uAE30  
     Q: \uBD84\uB9AC   ESC: \uBA54\uB274"
 --- !u!1 &3100000353
 GameObject:
