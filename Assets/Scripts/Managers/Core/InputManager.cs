@@ -30,6 +30,7 @@ public class InputManager
     [Header("UI actions")]
     private InputAction _uiClick;
     private InputAction _uiCancel;
+    private InputAction _uiSortExclude;
 
     public Vector2 MoveInput => _inputMode == InputMode.Player ? _move.ReadValue<Vector2>() : Vector2.zero;
     public bool HasPointer => _pointerPosition.controls.Count > 0;
@@ -51,6 +52,7 @@ public class InputManager
     public bool RotateRightHeld => _rotateRight.IsPressed();
     public bool FloodPreviewPressed => _floodPreview.WasPressedThisFrame();
     public bool ConfirmPressed => _inputMode == InputMode.UI && _uiClick.WasPressedThisFrame();
+    public bool SortExcludePressed => _inputMode == InputMode.UI && _uiSortExclude.WasPressedThisFrame();
     public bool GamePadConnected { get; private set; }
 
     /// <summary>프로젝트 공용 Input Actions에서 게임과 UI 액션을 찾아 보관하고 입력 모드를 초기화한다.</summary>
@@ -71,6 +73,7 @@ public class InputManager
         _splitBundle = _recyclingMap.FindAction("SplitBundle", true);
         _uiClick = _uiMap.FindAction("Click", true);
         _uiCancel = _uiMap.FindAction("Cancel", true);
+        _uiSortExclude = _uiMap.FindAction("SortExclude", true);
 
         InputSystem.onActionChange += CheckDeviceType;
         SetInputMode(InputMode.Player);

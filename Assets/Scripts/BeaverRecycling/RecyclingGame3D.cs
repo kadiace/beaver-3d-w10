@@ -9,7 +9,7 @@ namespace BeaverRecycling
 {
     public sealed class RecyclingGame3D : MonoBehaviour
     {
-        private enum DayPhase { Preparation, Supply, Closing, Result, Paused, Clear }
+        private enum DayPhase { Preparation, Supply, Closing, Result, Paused, Sorting, Clear }
         private const int NO_TRASH_LOSS_SCORE_BONUS = 10;
         private const int NO_TRASH_LOSS_WOOD_BONUS = 3;
         private const int NO_MISCLASSIFICATION_SCORE_BONUS = 10;
@@ -74,6 +74,7 @@ namespace BeaverRecycling
         private RecyclingItem _tracked;
         private DayPhase _phase;
         private DayPhase _beforePause;
+        private DayPhase _beforeSorting;
         private Vector2 _movement;
         private Vector2 _dragDistance;
         private Vector3 _cameraTarget;
@@ -248,6 +249,51 @@ namespace BeaverRecycling
             _bombs.Add(bomb);
             return true;
         }
+        /// <summary>에디터 플레이 모드에서만 무작위 투입구와 가상 기물로 분류 미니게임을 실행한다.</summary>
+        [ContextMenu("Debug/Run Random Sorting Mini-game")]
+        private void DebugOpenRandomSortingFromInspector() => DebugStartRandomSorting();
+
+        public bool DebugStartRandomSorting()
+        {
+            if (!Application.isPlaying || _phase == DayPhase.Sorting || _catalog == null || _hud == null)
+                return false;
+
+            RecyclingCategory[] chuteCategories =
+            {
+                RecyclingCategory.Plastic, RecyclingCategory.Glass,
+                RecyclingCategory.Film, RecyclingCategory.Metal
+            };
+            RecyclingCategory chosenChute = chuteCategories[UnityEngine.Random.Range(0, chuteCategories.Length)];
+            RecyclingDefinition[] definitions = _catalog.DebugItems.Where(item => item != null).ToArray();
+            RecyclingDefinition[] matching = definitions.Where(item => item.Category == chosenChute).ToArray();
+            RecyclingDefinition[] mismatching = definitions.Where(item => item.Category != chosenChute).ToArray();
+            if (matching.Length == 0 || mismatching.Length == 0) return false;
+
+            // Include both a matching and a non-matching item so the random run always tests sorting.
+            int count = UnityEngine.Random.Range(4, 7);
+            var sample = new List<RecyclingDefinition>(count)
+            {
+                matching[UnityEngine.Random.Range(0, matching.Length)],
+                mismatching[UnityEngine.Random.Range(0, mismatching.Length)]
+            };
+            while (sample.Count < count)
+                sample.Add(definitions[UnityEngine.Random.Range(0, definitions.Length)]);
+
+            DayPhase previousPhase = _phase;
+            _phase = DayPhase.Sorting;
+            _movement = Vector2.zero;
+            _hud.HideModal();
+            SetUiMode(true);
+            _hud.ShowSorting(sample, chosenChute, (submission, includedCount) =>
+            {
+                // These items are synthetic: do not modify actual inventory, score or day statistics.
+                _phase = previousPhase;
+                SetUiMode(!IsWorking);
+                if (!IsWorking) UpdateModal();
+            });
+            return true;
+        }
+
 #endif
 
         /// <summary>활성 정의를 난수로 골라 풀에서 생성하고 새 기물의 상태를 초기화한다.</summary>
@@ -812,7 +858,7 @@ namespace BeaverRecycling
             return true;
         }
 
-        /// <summary>선택된 투입구와 운반 묶음을 확정한다.</summary>
+        /// <summary>운반 묶음을 제출하고, 다른 재질이 섞였을 때만 분류 미니게임을 연다.</summary>
         private void Submit(RecyclingChute3D chute)
         {
             var submitted = new List<RecyclingItem>(_held);
@@ -820,16 +866,45 @@ namespace BeaverRecycling
             SubmitItems(chute, submitted);
         }
 
-        /// <summary>수동 제출과 던져 넣기를 동일한 분류·점수·묶음 보너스·흡수 연출로 정산한다.</summary>
+        /// <summary>수동 제출과 던져 넣은 묶음을 흡수하고, 다른 재질이 섞였을 때만 분류 미니게임을 연다.</summary>
         private void SubmitItems(RecyclingChute3D chute, List<RecyclingItem> submitted)
         {
-            RecyclingSubmission submission = RecyclingRules.Evaluate(submitted, chute.Category);
+            RecyclingDefinition[] definitions = submitted.Select(item => item.Definition).ToArray();
+            bool needsSorting = definitions.Any(definition => definition.Category != chute.Category);
+            Vector3 intakePosition = chute.IntakePosition;
+            foreach (RecyclingItem item in submitted) item.Resolve(intakePosition, false);
+
+            if (!needsSorting)
+            {
+                ApplySubmission(RecyclingRules.EvaluateDefinitions(definitions, chute.Category),
+                    definitions.Length, intakePosition);
+                return;
+            }
+
+            _beforeSorting = _phase;
+            _phase = DayPhase.Sorting;
+            _movement = Vector2.zero;
+            SetUiMode(true);
+            _hud.ShowSorting(definitions, chute.Category,
+                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition));
+        }
+
+        /// <summary>미니게임이 끝나면 작업 단계로 복귀하고 최종 제출 결과를 적용한다.</summary>
+        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        {
+            _phase = _beforeSorting;
+            SetUiMode(false);
+            ApplySubmission(submission, submittedCount, intakePosition);
+        }
+
+        /// <summary>즉시 제출과 미니게임 제출에 동일한 점수 및 기록 처리를 적용한다.</summary>
+        private void ApplySubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        {
             _dayScore += submission.Score;
             _correct += submission.Correct;
             _wrong += submission.Wrong;
-            if (submission.Correct == submitted.Count) _bestBundle = Mathf.Max(_bestBundle, submitted.Count);
-            foreach (RecyclingItem item in submitted) item.Resolve(chute.IntakePosition, true);
-            _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", chute.IntakePosition,
+            if (submission.Correct == submittedCount) _bestBundle = Mathf.Max(_bestBundle, submittedCount);
+            _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", intakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }
 

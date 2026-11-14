@@ -109,6 +109,35 @@ namespace BeaverRecycling
                     pureBundle = false;
                 }
             }
+            return BuildSubmission(correct, wrong, pureBundle);
+        }
+
+        /// <summary>미니게임에 남은 아이템 정의와 투입구 종류를 받아 제외된 아이템 없이 분류 결과를 계산한다.</summary>
+        public static RecyclingSubmission EvaluateDefinitions(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute)
+        {
+            int correct = 0;
+            int wrong = 0;
+            bool pureBundle = definitions.Count > 0;
+            foreach (RecyclingDefinition definition in definitions)
+            {
+                if (definition.IsWood)
+                {
+                    pureBundle = false;
+                    continue;
+                }
+                if (definition.Category == chute) correct++;
+                else
+                {
+                    wrong++;
+                    pureBundle = false;
+                }
+            }
+            return BuildSubmission(correct, wrong, pureBundle);
+        }
+
+        /// <summary>정상·오분류 개수와 순수 묶음 여부를 받아 공통 점수 및 묶음 보너스를 반환한다.</summary>
+        private static RecyclingSubmission BuildSubmission(int correct, int wrong, bool pureBundle)
+        {
             float multiplier = correct >= 6 ? 0.75f : correct >= 4 ? 0.5f : correct >= 2 ? 0.25f : 0f;
             int bonus = pureBundle ? Mathf.FloorToInt(correct * BASE_SCORE * multiplier) : 0;
             return new RecyclingSubmission(correct, wrong, bonus,

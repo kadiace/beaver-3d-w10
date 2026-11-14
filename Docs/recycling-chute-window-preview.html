@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>분류기 미니게임 창 시안</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: #102827;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      color: #f6f2df;
+      background:
+        radial-gradient(ellipse at 50% 85%, #55949a 0 12%, transparent 12.5%),
+        linear-gradient(105deg, #364f36 0 24%, #6d9a9d 24% 76%, #334f35 76%);
+    }
+
+    .world {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-columns: 1fr 2.2fr 1fr;
+      opacity: .64;
+      filter: blur(3px);
+    }
+
+    .bank { background: repeating-linear-gradient(140deg, #406146 0 56px, #3a573f 56px 72px); }
+    .river { background: repeating-linear-gradient(168deg, #568b94 0 35px, #629da3 35px 39px, #568b94 39px 80px); }
+
+    .hud {
+      position: fixed;
+      top: 28px;
+      left: 32px;
+      display: flex;
+      gap: 18px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff5d5;
+      text-shadow: 0 2px 5px #1b302a;
+    }
+
+    .shade {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(10, 25, 25, .67);
+    }
+
+    .window {
+      width: min(480px, 100%);
+      padding: 16px;
+      border: 3px solid #d8bd75;
+      border-radius: 22px;
+      background: #283e3a;
+      box-shadow: 0 12px 0 #182b29, 0 28px 70px rgba(0, 0, 0, .48);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 4px 12px;
+    }
+
+    .title { margin: 0; font-size: 19px; letter-spacing: -.03em; }
+    .tag { color: #b6d1c3; font-size: 12px; font-weight: 700; }
+
+    .chamber {
+      position: relative;
+      height: 250px;
+      overflow: hidden;
+      border: 2px solid #718b79;
+      border-radius: 12px;
+      background:
+        linear-gradient(90deg, transparent 49.7%, rgba(187, 215, 190, .08) 50%, transparent 50.3%),
+        linear-gradient(#172b2c, #1c3531 80%, #253f37);
+    }
+
+    .chamber::before {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      top: -1px;
+      left: 29%;
+      width: 42%;
+      height: 15px;
+      border: 2px solid #b59b62;
+      border-top: 0;
+      border-radius: 0 0 10px 10px;
+      background: #6e6148;
+    }
+
+    .floor {
+      position: absolute;
+      z-index: 2;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      height: 19px;
+      border-top: 4px solid #d8bd75;
+      background: #536747;
+    }
+
+    .judge-line {
+      position: absolute;
+      z-index: 1;
+      top: 50%;
+      right: 0;
+      left: 0;
+      height: 5px;
+      background: #eb4039;
+      box-shadow: 0 0 10px #eb4039;
+      pointer-events: none;
+    }
+
+    .feed-board {
+      position: absolute;
+      z-index: 1;
+      top: 38px;
+      right: 20px;
+      width: 340px;
+      height: 5px;
+      background: #ad8756;
+      pointer-events: none;
+    }
+
+    .square {
+      position: absolute;
+      z-index: 2;
+      width: 17px;
+      height: 17px;
+      border: 2px solid rgba(255, 255, 255, .82);
+      border-radius: 5px;
+      box-shadow: 0 5px 0 rgba(0, 0, 0, .24), inset 0 -6px rgba(0, 0, 0, .1);
+      transform: rotate(0);
+    }
+
+    .square.target { outline: 3px solid white; outline-offset: 3px; }
+    .square { background: #48615b; }
+    .square img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+
+    .score-pop {
+      position: absolute;
+      z-index: 3;
+      bottom: 64px;
+      width: 80px;
+      margin-left: -40px;
+      color: #ffdc83;
+      font-size: 20px;
+      font-weight: 900;
+      text-align: center;
+      text-shadow: 0 2px 4px #102827;
+      pointer-events: none;
+      animation: score-pop .7s ease-out forwards;
+    }
+
+    @keyframes score-pop {
+      0% { opacity: 1; transform: translateY(8px) scale(.65); }
+      25% { opacity: 1; transform: translateY(-12px) scale(1.15); }
+      100% { opacity: 0; transform: translateY(-42px) scale(1); }
+    }
+
+    .result {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 61px;
+      padding: 12px 5px 0;
+      font-size: 14px;
+      color: #c3d3c4;
+    }
+
+    .score {
+      color: #ffdc83;
+      font-size: 25px;
+      font-weight: 900;
+      opacity: 0;
+      transform: translateY(8px) scale(.9);
+      transition: opacity .25s, transform .25s;
+    }
+
+    .score.visible { opacity: 1; transform: none; }
+
+    .preview-control {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      padding: 9px 14px;
+      border: 1px solid #b9d0bb;
+      border-radius: 8px;
+      background: #243d37;
+      color: white;
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .score { transition-duration: .01ms; }
+    }
+  </style>
+</head>
+<body>
+  <div class="world" aria-hidden="true"><div class="bank"></div><div class="river"></div><div class="bank"></div></div>
+  <div class="hud" aria-hidden="true"><span>2일차 · 공급 38초</span><span>획득 점수 24 / 50</span><span>목재 3</span></div>
+  <main class="shade">
+    <section class="window" aria-label="분류기 미니게임 시안">
+      <header class="header">
+        <h1 class="title">분류기 투입 중</h1>
+        <span class="tag">플라스틱 투입구</span>
+      </header>
+      <div class="chamber" id="chamber" aria-label="아이템 낙하 영역">
+        <div class="feed-board"></div>
+        <div class="judge-line" id="judgeLine"></div>
+        <div class="floor"></div>
+      </div>
+      <div class="result">
+        <span id="status">아이템이 떨어지고 있어요</span>
+        <strong class="score" id="score" aria-live="polite">+0점</strong>
+      </div>
+    </section>
+  </main>
+  <button class="preview-control" id="replay" type="button">낙하 다시 보기</button>
+  <script>
+    const windowCard = document.querySelector('.window');
+    const chamber = document.getElementById('chamber');
+    const judgeLine = document.getElementById('judgeLine');
+    const status = document.getElementById('status');
+    const score = document.getElementById('score');
+    const items = [
+      { id: 'plastic_bottle', x: 25, correct: true },
+      { id: 'plastic_box', x: 37, correct: true },
+      { id: 'plastic_bottle', x: 49, correct: true },
+      { id: 'plastic_box', x: 61, correct: true },
+      { id: 'metal_can', x: 73, correct: false }
+    ];
+    let activeSquares = [];
+    let target = null;
+    let runId = 0;
+    let resolved = 0;
+    let landed = 0;
+    let wrongLanded = 0;
+    let runningScore = 0;
+    let startedAt = 0;
+
+    function fitWindow() {
+      windowCard.style.transform = 'scale(1)';
+      const bounds = windowCard.getBoundingClientRect();
+      const scale = Math.min(2.8, (innerWidth - 40) / bounds.width, (innerHeight - 40) / bounds.height);
+      windowCard.style.transform = `scale(${Math.max(.4, scale)})`;
+    }
+
+    function play() {
+      runId++;
+      chamber.querySelectorAll('.square, .score-pop').forEach(element => element.remove());
+      score.classList.remove('visible');
+      score.textContent = '+0점';
+      status.textContent = '스페이스 · 빨간 선의 아이템 제외';
+      activeSquares = [];
+      target = null;
+      resolved = 0;
+      landed = 0;
+      wrongLanded = 0;
+      runningScore = 0;
+      startedAt = performance.now();
+
+      items.forEach((item, index) => {
+        const square = document.createElement('div');
+        square.className = 'square';
+        square.style.left = `${chamber.clientWidth - 20 - index * 29 - 8.5}px`;
+        square.style.top = '18.5px';
+        const sprite = document.createElement('img');
+        sprite.src = `../Assets/Resources/Sprites/Voxels/${item.id}.png`;
+        sprite.alt = item.id;
+        square.appendChild(sprite);
+        chamber.appendChild(square);
+        const entry = { square, item, index, settled: false, excluded: false };
+        activeSquares.push(entry);
+      });
+      requestAnimationFrame(() => updateFrame(runId));
+    }
+
+    function bundleBonus() {
+      if (wrongLanded > 0) return 0;
+      const multiplier = landed >= 6 ? .75 : landed >= 4 ? .5 : landed >= 2 ? .25 : 0;
+      return Math.floor(landed * 3 * multiplier);
+    }
+
+    function addScore(points, x) {
+      runningScore += points;
+      score.textContent = `${runningScore >= 0 ? '+' : ''}${runningScore}점`;
+      score.classList.add('visible');
+      const popup = document.createElement('div');
+      popup.className = 'score-pop';
+      popup.style.left = `${x}%`;
+      popup.style.color = points < 0 ? '#ff6b5d' : '#ffdc83';
+      popup.textContent = `${points > 0 ? '+' : ''}${points}점`;
+      chamber.appendChild(popup);
+      popup.addEventListener('animationend', () => popup.remove());
+    }
+
+    function finish() {
+      status.textContent = `분류 완료 · ${landed}개 투입`;
+      score.classList.add('visible');
+    }
+
+    function updateFrame(currentRun) {
+      if (currentRun !== runId) return;
+      const elapsed = (performance.now() - startedAt) / 1000;
+      const edgeX = chamber.clientWidth - 20;
+      const startY = 27;
+      const landingY = chamber.clientHeight - 28.5;
+      activeSquares.forEach(entry => {
+        if (entry.settled || entry.excluded) return;
+        const releaseAt = entry.index * .24;
+        const queueTravel = Math.min(elapsed, releaseAt) * 29 / .24;
+        let x = edgeX - entry.index * 29 + queueTravel;
+        let y = startY;
+        let travel = queueTravel;
+        if (elapsed >= releaseAt) {
+          const fallTime = elapsed - releaseAt;
+          const drop = (30 + entry.index * 37 % 80) * fallTime + 550 * fallTime * fallTime;
+          y = Math.min(startY + drop, landingY);
+          const progress = (y - startY) / (landingY - startY);
+          x = edgeX + (chamber.clientWidth * entry.item.x / 100 - edgeX) * progress;
+          travel += y - startY + Math.abs(edgeX - x);
+        }
+        entry.square.style.left = `${x - 8.5}px`;
+        entry.square.style.top = `${y - 8.5}px`;
+        entry.square.style.transform = `rotate(${-travel * 360 / (Math.PI * 17)}deg)`;
+        if (y < landingY) return;
+        entry.settled = true;
+        entry.square.classList.remove('target');
+        resolved++;
+        landed++;
+        if (!entry.item.correct) wrongLanded++;
+        const points = (entry.item.correct ? 3 : -4) + (resolved === items.length ? bundleBonus() : 0);
+        addScore(points, entry.item.x);
+        if (resolved === items.length) finish();
+      });
+
+      const line = judgeLine.getBoundingClientRect();
+      const lineY = line.top + line.height / 2;
+      let closest = null;
+      let distance = Infinity;
+      activeSquares.forEach(entry => {
+        entry.square.classList.remove('target');
+        if (entry.settled || entry.excluded) return;
+        const rect = entry.square.getBoundingClientRect();
+        const next = Math.abs(rect.top + rect.height / 2 - lineY);
+        if (next < distance) { closest = entry; distance = next; }
+      });
+      target = closest;
+      if (target) target.square.classList.add('target');
+      if (resolved < items.length) requestAnimationFrame(() => updateFrame(currentRun));
+    }
+
+    addEventListener('keydown', event => {
+      if (event.code !== 'Space' || event.repeat || !target) return;
+      event.preventDefault();
+      const rect = target.square.getBoundingClientRect();
+      const line = judgeLine.getBoundingClientRect();
+      const distance = Math.abs(rect.top + rect.height / 2 - line.top - line.height / 2);
+      if (distance > rect.height / 2 + line.height / 2) return;
+      target.excluded = true;
+      target.square.remove();
+      target = null;
+      resolved++;
+      status.textContent = '아이템 1개 제외';
+      if (resolved !== items.length) return;
+      const bonus = bundleBonus();
+      if (bonus > 0) addScore(bonus, 50);
+      finish();
+    });
+
+    document.getElementById('replay').addEventListener('click', play);
+    addEventListener('resize', fitWindow);
+    fitWindow();
+    play();
+  </script>
+</body>
+</html>
