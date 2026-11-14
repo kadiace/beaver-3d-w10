@@ -125,6 +125,7 @@ namespace BeaverRecycling
         public void ShowModal(string title, string body, string primary, string secondary, bool upgrades)
         {
             _modal.SetActive(true);
+            _pauseButton.interactable = false;
             _modalTitle.text = title;
             _modalBody.text = body;
             _primaryText.text = primary;
