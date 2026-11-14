@@ -88,7 +88,7 @@ public class InputManager
          (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame ||
           Keyboard.current.numpadEnterKey.wasPressedThisFrame)));
     public bool SortExcludePressed => _inputMode == InputMode.UI && (_uiSortExclude.WasPressedThisFrame() ||
-        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame));
+        (_useRecyclingControls && WasBoundKeyboardButtonPressed(_interact)));
     // Physical availability, not whichever device was used most recently.
     // Querying Gamepad.all also reflects hot-plugging while a modal pauses Time.timeScale.
     public bool GamePadConnected => Gamepad.all.Count > 0;

@@ -145,7 +145,7 @@ namespace BeaverRecycling
             if (!force && _displayedGamepadConnected == gamepadConnected) return;
             _displayedGamepadConnected = gamepadConnected;
             _status.text = _sortingStatusPrefix +
-                (gamepadConnected ? "South" : "X") + " · 빨간 선의 아이템 제외";
+                (gamepadConnected ? "South" : "Z") + " · 빨간 선의 아이템 제외";
         }
 
         /// <summary>Fisher-Yates 방식으로 제출 아이템의 투입 순서를 섞는다.</summary>
