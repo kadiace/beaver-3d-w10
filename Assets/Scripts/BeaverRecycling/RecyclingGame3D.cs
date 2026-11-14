@@ -18,8 +18,6 @@ namespace BeaverRecycling
         private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float SPLIT_RIVER_MARGIN = 0.25f;
-        private const float OBJECT_BOUNDARY_WALL_THICKNESS = 1f;
-        private const float OBJECT_BOUNDARY_WALL_HEIGHT = 40f;
         private const float SPLIT_ITEM_GAP = 0.05f;
         private const int SPLIT_SEARCH_RINGS = 48;
         private const int SPLIT_SEARCH_DIRECTIONS = 16;
@@ -30,6 +28,7 @@ namespace BeaverRecycling
         [SerializeField] private RecyclingBeaver3D _beaver;
         [SerializeField] private BoxCollider _pickupSensor;
         [SerializeField] private RecyclingChute3D[] _chutes;
+        [SerializeField] private Transform _objectBoundaryRoot;
         [SerializeField] private RecyclingHud3D _hud;
         [SerializeField] private Camera _camera;
         [SerializeField] private Transform _spawnPoint;
@@ -73,7 +72,6 @@ namespace BeaverRecycling
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
         private readonly List<Bounds> _splitPlacedBounds = new List<Bounds>();
-        private Bounds[] _chuteDockBounds;
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
@@ -135,7 +133,6 @@ namespace BeaverRecycling
             _camera.orthographic = true;
             _camera.orthographicSize = 13.5f;
             ResetCameraTarget();
-            CreateObjectBoundaries();
             PrepareDay();
         }
 
@@ -238,117 +235,57 @@ namespace BeaverRecycling
         public bool IsInsideRiver(Vector3 position) => position.x >= _riverMinimum.x && position.x <= _riverMaximum.x &&
             position.z >= _riverMinimum.y && position.z <= _riverMaximum.y;
 
-        /// <summary>강과 네 처트 Dock을 하나로 잇는 물리 경계를 만들고 폭포 쪽 출구는 열어둔다.</summary>
-        private void CreateObjectBoundaries()
+        /// <summary>기물의 XZ Collider 바운드가 강 또는 처트의 허용 구역 안에 완전히 놓이는지 반환한다.</summary>
+        private bool IsInsideObjectArea(Bounds bounds)
         {
-            _chuteDockBounds = new Bounds[_chutes.Length];
-            for (int i = 0; i < _chutes.Length; i++) _chuteDockBounds[i] = _chutes[i].DockBounds;
+            if (bounds.min.z < _riverMinimum.y || bounds.max.z > _riverMaximum.y) return false;
+            if (bounds.min.x >= _riverMinimum.x && bounds.max.x <= _riverMaximum.x) return true;
 
-            Transform root = new GameObject("Object Boundaries").transform;
-            root.SetParent(transform, false);
-            CreateSideBoundaryWalls(root, -1);
-            CreateSideBoundaryWalls(root, 1);
-
-            float thickness = OBJECT_BOUNDARY_WALL_THICKNESS;
-            CreateBoundaryWall(root, "Upstream",
-                new Vector3((_riverMinimum.x + _riverMaximum.x) * 0.5f,
-                    _waterY + 5f, _riverMaximum.y + thickness * 0.5f),
-                new Vector3(_riverMaximum.x - _riverMinimum.x + thickness * 2f,
-                    OBJECT_BOUNDARY_WALL_HEIGHT, thickness));
-        }
-
-        /// <summary>좌우 강둑의 처트 개구부를 제외한 구간과 처트 외곽에 충돌 벽을 배치한다.</summary>
-        private void CreateSideBoundaryWalls(Transform root, int side)
-        {
-            List<Bounds> docks = new List<Bounds>();
-            foreach (Bounds dock in _chuteDockBounds)
+            foreach (RecyclingChute3D chute in _chutes)
             {
-                if (side < 0 ? dock.center.x < _riverMinimum.x : dock.center.x > _riverMaximum.x)
-                    docks.Add(dock);
+                Bounds dock = chute.DockBounds;
+                if (bounds.min.z < dock.min.z || bounds.max.z > dock.max.z) continue;
+                float minimumX = Mathf.Min(_riverMinimum.x, dock.min.x);
+                float maximumX = Mathf.Max(_riverMaximum.x, dock.max.x);
+                if (bounds.min.x >= minimumX && bounds.max.x <= maximumX) return true;
             }
-            docks.Sort((a, b) => a.min.z.CompareTo(b.min.z));
+            return false;
+        }
 
-            string bankName = side < 0 ? "Left" : "Right";
-            float bankX = side < 0 ? _riverMinimum.x : _riverMaximum.x;
-            float thickness = OBJECT_BOUNDARY_WALL_THICKNESS;
-            float cursor = _riverMinimum.y;
-            int segment = 0;
-            foreach (Bounds dock in docks)
+        /// <summary>운반 종료 직전, 오브젝트 경계를 벗어난 묶음을 비버의 이동 영역 내 가장 가까운 위치로 옮긴다.</summary>
+        private void CorrectReleasedBundlePosition()
+        {
+            if (_held.Count == 0) return;
+
+            Bounds bundleBounds = _held[0].Collider.bounds;
+            bool outside = !IsInsideObjectArea(bundleBounds);
+            for (int i = 1; i < _held.Count; i++)
             {
-                float minZ = Mathf.Max(_riverMinimum.y, dock.min.z);
-                float maxZ = Mathf.Min(_riverMaximum.y, dock.max.z);
-                if (minZ >= maxZ) continue;
-
-                if (minZ > cursor)
-                    CreateBoundaryWall(root, bankName + " Bank " + (++segment),
-                        new Vector3(bankX + side * thickness * 0.5f, _waterY + 5f, (cursor + minZ) * 0.5f),
-                        new Vector3(thickness, OBJECT_BOUNDARY_WALL_HEIGHT, minZ - cursor));
-
-                float outerX = side < 0 ? dock.min.x : dock.max.x;
-                float centerX = (bankX + outerX) * 0.5f;
-                float chuteWidth = Mathf.Abs(bankX - outerX);
-                CreateBoundaryWall(root, bankName + " Chute Outer " + (++segment),
-                    new Vector3(outerX + side * thickness * 0.5f, _waterY + 5f, (minZ + maxZ) * 0.5f),
-                    new Vector3(thickness, OBJECT_BOUNDARY_WALL_HEIGHT, maxZ - minZ));
-                CreateBoundaryWall(root, bankName + " Chute Downstream " + segment,
-                    new Vector3(centerX, _waterY + 5f, minZ - thickness * 0.5f),
-                    new Vector3(chuteWidth, OBJECT_BOUNDARY_WALL_HEIGHT, thickness));
-                CreateBoundaryWall(root, bankName + " Chute Upstream " + segment,
-                    new Vector3(centerX, _waterY + 5f, maxZ + thickness * 0.5f),
-                    new Vector3(chuteWidth, OBJECT_BOUNDARY_WALL_HEIGHT, thickness));
-                cursor = Mathf.Max(cursor, maxZ);
+                Bounds itemBounds = _held[i].Collider.bounds;
+                bundleBounds.Encapsulate(itemBounds);
+                outside |= !IsInsideObjectArea(itemBounds);
             }
+            if (!outside) return;
 
-            if (cursor < _riverMaximum.y)
-                CreateBoundaryWall(root, bankName + " Bank Last",
-                    new Vector3(bankX + side * thickness * 0.5f, _waterY + 5f,
-                        (cursor + _riverMaximum.y) * 0.5f),
-                    new Vector3(thickness, OBJECT_BOUNDARY_WALL_HEIGHT, _riverMaximum.y - cursor));
-        }
+            Vector2 minimum = _beaver.MovementMinimum;
+            Vector2 maximum = _beaver.MovementMaximum;
+            float minX = minimum.x + bundleBounds.extents.x;
+            float maxX = maximum.x - bundleBounds.extents.x;
+            float minZ = minimum.y + bundleBounds.extents.z;
+            float maxZ = maximum.y - bundleBounds.extents.z;
+            float targetX = minX <= maxX ? Mathf.Clamp(bundleBounds.center.x, minX, maxX)
+                : (minimum.x + maximum.x) * 0.5f;
+            float targetZ = minZ <= maxZ ? Mathf.Clamp(bundleBounds.center.z, minZ, maxZ)
+                : (minimum.y + maximum.y) * 0.5f;
+            Vector3 offset = new Vector3(targetX - bundleBounds.center.x, 0f, targetZ - bundleBounds.center.z);
+            if (offset.sqrMagnitude <= 0f) return;
 
-        /// <summary>월드 좌표 중심과 크기를 받아 시각 메시가 없는 고정 충돌 벽을 생성한다.</summary>
-        private static void CreateBoundaryWall(Transform root, string name, Vector3 center, Vector3 size)
-        {
-            GameObject wall = new GameObject(name);
-            wall.transform.SetParent(root, false);
-            wall.transform.position = center;
-            wall.AddComponent<BoxCollider>().size = size;
-        }
-
-        /// <summary>운반 중인 묶음의 실제 Collider 영역을 강과 처트 합집합 안에 유지한다.</summary>
-        private void ConstrainHeldItems()
-        {
-            float minShiftZ = float.NegativeInfinity;
-            float maxShiftZ = float.PositiveInfinity;
             foreach (RecyclingItem item in _held)
             {
-                Bounds bounds = item.Collider.bounds;
-                minShiftZ = Mathf.Max(minShiftZ, _riverMinimum.y - bounds.min.z);
-                maxShiftZ = Mathf.Min(maxShiftZ, _riverMaximum.y - bounds.max.z);
+                Vector3 position = item.Body.position + offset;
+                item.Body.position = position;
+                item.transform.position = position;
             }
-            float shiftZ = minShiftZ <= maxShiftZ ? Mathf.Clamp(0f, minShiftZ, maxShiftZ) : 0f;
-
-            float minShiftX = float.NegativeInfinity;
-            float maxShiftX = float.PositiveInfinity;
-            foreach (RecyclingItem item in _held)
-            {
-                Bounds bounds = item.Collider.bounds;
-                float allowedMinX = _riverMinimum.x;
-                float allowedMaxX = _riverMaximum.x;
-                foreach (Bounds dock in _chuteDockBounds)
-                {
-                    if (bounds.min.z + shiftZ < dock.min.z || bounds.max.z + shiftZ > dock.max.z) continue;
-                    if (dock.center.x < _riverMinimum.x) allowedMinX = Mathf.Min(allowedMinX, dock.min.x);
-                    if (dock.center.x > _riverMaximum.x) allowedMaxX = Mathf.Max(allowedMaxX, dock.max.x);
-                }
-                minShiftX = Mathf.Max(minShiftX, allowedMinX - bounds.min.x);
-                maxShiftX = Mathf.Min(maxShiftX, allowedMaxX - bounds.max.x);
-            }
-            float shiftX = minShiftX <= maxShiftX ? Mathf.Clamp(0f, minShiftX, maxShiftX) : 0f;
-            if (Mathf.Approximately(shiftX, 0f) && Mathf.Approximately(shiftZ, 0f)) return;
-
-            Vector3 offset = new Vector3(shiftX, 0f, shiftZ);
-            foreach (RecyclingItem item in _held) item.Body.position += offset;
             Physics.SyncTransforms();
         }
 
@@ -673,7 +610,7 @@ namespace BeaverRecycling
             return true;
         }
 
-        /// <summary>추가 묶음과 이동량을 검사해 강 경계와 주변 Collider를 침범하지 않는지 반환한다.</summary>
+        /// <summary>추가 묶음이 비버나 주변 기물과 새롭게 겹치지 않는지 검사한다. 운반 경계는 제한하지 않는다.</summary>
         private bool CanMoveBridgeBundle(List<RecyclingItem> incoming, RecyclingItem target, Vector3 offset)
         {
             if (offset.sqrMagnitude <= ATTACH_SURFACE_TOLERANCE * ATTACH_SURFACE_TOLERANCE) return true;
@@ -692,11 +629,6 @@ namespace BeaverRecycling
                     Vector3 displacement = offset * (step / (float)BRIDGE_MOVE_CHECK_STEPS);
                     Bounds moved = before;
                     moved.center += displacement;
-                    if (Mathf.Max(0f, _riverMinimum.x - moved.min.x) > Mathf.Max(0f, _riverMinimum.x - before.min.x) + ATTACH_SURFACE_TOLERANCE ||
-                        Mathf.Max(0f, moved.max.x - _riverMaximum.x) > Mathf.Max(0f, before.max.x - _riverMaximum.x) + ATTACH_SURFACE_TOLERANCE ||
-                        Mathf.Max(0f, _waterfallZ - moved.min.z) > Mathf.Max(0f, _waterfallZ - before.min.z) + ATTACH_SURFACE_TOLERANCE ||
-                        Mathf.Max(0f, moved.max.z - _riverMaximum.y) > Mathf.Max(0f, before.max.z - _riverMaximum.y) + ATTACH_SURFACE_TOLERANCE) return false;
-
                     Vector3 closestAfter = Physics.ClosestPoint(beaverCenter, moving,
                         moving.transform.position + displacement, moving.transform.rotation);
                     float beaverDistanceAfter = Vector3.Distance(beaverCenter, closestAfter);
@@ -711,7 +643,8 @@ namespace BeaverRecycling
                     {
                         Collider obstacle = _overlapBuffer[i];
                         RecyclingItem other = obstacle.GetComponentInParent<RecyclingItem>();
-                        if (obstacle == moving || other == target || incomingSet.Contains(other)) continue;
+                        if (obstacle == moving || obstacle.transform.IsChildOf(_objectBoundaryRoot) ||
+                            other == target || incomingSet.Contains(other)) continue;
                         if (!Physics.ComputePenetration(moving, moving.transform.position + displacement,
                             moving.transform.rotation, obstacle, obstacle.transform.position, obstacle.transform.rotation,
                             out _, out float depth)) continue;
@@ -992,9 +925,10 @@ namespace BeaverRecycling
             return result;
         }
 
-        /// <summary>분리 여부를 받아 묶음을 내려놓고 분리 시 기물을 강 안쪽의 빈 위치로 흩뜨린다.</summary>
+        /// <summary>분리·놓기 전에 경계 밖 묶음을 비버 작업 구역으로 보정하고 분리 시 기물을 흩뜨린다.</summary>
         private void ReleaseBundle(bool split)
         {
+            CorrectReleasedBundlePosition();
             bool scatter = split && _held.Count > 1;
             Vector3 center = Vector3.zero;
             if (scatter)
