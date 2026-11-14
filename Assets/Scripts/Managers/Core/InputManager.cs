@@ -53,7 +53,9 @@ public class InputManager
     public bool FloodPreviewPressed => _floodPreview.WasPressedThisFrame();
     public bool ConfirmPressed => _inputMode == InputMode.UI && _uiSubmit.WasPressedThisFrame();
     public bool SortExcludePressed => _inputMode == InputMode.UI && _uiSortExclude.WasPressedThisFrame();
-    public bool GamePadConnected { get; private set; }
+    // Physical availability, not whichever device was used most recently.
+    // Querying Gamepad.all also reflects hot-plugging while a modal pauses Time.timeScale.
+    public bool GamePadConnected => Gamepad.all.Count > 0;
 
     /// <summary>프로젝트 공용 Input Actions에서 게임과 UI 액션을 찾아 보관하고 입력 모드를 초기화한다.</summary>
     public void Init()
@@ -75,7 +77,6 @@ public class InputManager
         _uiCancel = _uiMap.FindAction("Cancel", true);
         _uiSortExclude = _uiMap.FindAction("SortExclude", true);
 
-        InputSystem.onActionChange += CheckDeviceType;
         SetInputMode(InputMode.Player);
     }
 
@@ -123,11 +124,4 @@ public class InputManager
         }
     }
 
-    /// <summary>공용 액션이 수행된 입력 장치를 확인하고 게임패드 사용 상태를 갱신한다.</summary>
-    private void CheckDeviceType(object actionObject, InputActionChange change)
-    {
-        if (change != InputActionChange.ActionPerformed) return;
-        if (actionObject is InputAction action && action.actionMap?.asset == _actions)
-            GamePadConnected = action.activeControl?.device is Gamepad;
-    }
 }

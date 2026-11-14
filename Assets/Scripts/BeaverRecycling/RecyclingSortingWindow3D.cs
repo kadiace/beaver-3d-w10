@@ -58,6 +58,8 @@ namespace BeaverRecycling
         private int _spawnedCount;
         private int _includedCount;
         private int _selectedIndex = -1;
+        private string _sortingStatusPrefix;
+        private bool _displayedGamepadConnected;
 
         /// <summary>제출 아이템을 섞고 상단 중앙에서 중력으로 떨어지는 물리 시뮬레이션을 시작한다.</summary>
         public void Play(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute,
@@ -77,7 +79,8 @@ namespace BeaverRecycling
             _selectedIndex = -1;
             _finished = false;
             _score.gameObject.SetActive(false);
-            _status.text = RecyclingRules.Name(chute) + " 분류 · 스페이스/South · 빨간 선의 아이템 제외";
+            _sortingStatusPrefix = RecyclingRules.Name(chute) + " 분류 · ";
+            RefreshSortingControls(true);
             Color chuteColor = RecyclingRules.Color(chute);
             foreach (Image wall in _chuteWalls)
                 if (wall != null) wall.color = chuteColor;
@@ -95,6 +98,7 @@ namespace BeaverRecycling
         void Update()
         {
             if (_completed == null) return;
+            RefreshSortingControls();
             float deltaTime = Time.unscaledDeltaTime;
             _elapsed += deltaTime;
             while (_spawnedCount < _definitions.Length && _elapsed >= _nextSpawnAt)
@@ -131,6 +135,17 @@ namespace BeaverRecycling
             if (!_simulationOwned) return;
             _activeSimulationWindows--;
             if (_activeSimulationWindows == 0) Physics2D.simulationMode = _previousSimulationMode;
+        }
+
+        /// <summary>연결된 게임패드 유무에 따라 분류 창에 표시된 조작 키를 즉시 갱신한다.</summary>
+        private void RefreshSortingControls(bool force = false)
+        {
+            if (_finished) return;
+            bool gamepadConnected = Managers.Input.GamePadConnected;
+            if (!force && _displayedGamepadConnected == gamepadConnected) return;
+            _displayedGamepadConnected = gamepadConnected;
+            _status.text = _sortingStatusPrefix +
+                (gamepadConnected ? "South" : "스페이스") + " · 빨간 선의 아이템 제외";
         }
 
         /// <summary>Fisher-Yates 방식으로 제출 아이템의 투입 순서를 섞는다.</summary>
@@ -309,7 +324,8 @@ namespace BeaverRecycling
             _borders[index].SetActive(false);
             _sprites[index].gameObject.SetActive(false);
             _selectedIndex = -1;
-            _status.text = "아이템 1개 제외";
+            _sortingStatusPrefix = "아이템 1개 제외 · ";
+            RefreshSortingControls(true);
         }
 
         /// <summary>제외되지 않은 아이템이 모두 통 입구를 통과했는지 확인한다. 바닥 접촉은 기다리지 않는다.</summary>
