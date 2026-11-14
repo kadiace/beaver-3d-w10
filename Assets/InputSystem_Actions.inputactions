@@ -1279,18 +1279,7 @@
                                  ],
                      "bindings":  [
                                       {
-                                          "name":  "",
-                                          "id":  "e7a98f9d-ab96-5568-6dc6-f0f13cb529e0",
-                                          "path":  "\u003cGamepad\u003e/leftStick",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Gamepad",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  false
-                                      },
-                                      {
-                                          "name":  "WASD",
+                                          "name":  "Arrow Keys",
                                           "id":  "a9b8e50f-cdbb-444c-50fa-400e845a5717",
                                           "path":  "Dpad",
                                           "interactions":  "",
@@ -1302,30 +1291,8 @@
                                       },
                                       {
                                           "name":  "up",
-                                          "id":  "dac57117-dbca-e15e-7fd1-552e3cf571a2",
-                                          "path":  "\u003cKeyboard\u003e/w",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "up",
                                           "id":  "f07d7738-1f9e-1ec7-e936-736a01403c55",
                                           "path":  "\u003cKeyboard\u003e/upArrow",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "down",
-                                          "id":  "68df4d48-8ce3-8dbb-f066-5b297b4565fb",
-                                          "path":  "\u003cKeyboard\u003e/s",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  ";Keyboard\u0026Mouse",
@@ -1346,30 +1313,8 @@
                                       },
                                       {
                                           "name":  "left",
-                                          "id":  "ff3bfa34-3555-a54e-31ed-53791cc3e192",
-                                          "path":  "\u003cKeyboard\u003e/a",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "left",
                                           "id":  "08dadab9-5c73-1b57-034e-55ac970a9906",
                                           "path":  "\u003cKeyboard\u003e/leftArrow",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  ";Keyboard\u0026Mouse",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "right",
-                                          "id":  "4f6bfe49-f0e1-eb06-cb8e-81014a9dc1a6",
-                                          "path":  "\u003cKeyboard\u003e/d",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  ";Keyboard\u0026Mouse",
@@ -1387,28 +1332,6 @@
                                           "action":  "Move",
                                           "isComposite":  false,
                                           "isPartOfComposite":  true
-                                      },
-                                      {
-                                          "name":  "",
-                                          "id":  "4b9297ec-2b10-bc1a-f57d-81594763e7e5",
-                                          "path":  "\u003cXRController\u003e/{Primary2DAxis}",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "XR",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  false
-                                      },
-                                      {
-                                          "name":  "",
-                                          "id":  "5457ecd9-b654-3e57-a5fe-d2e5762258a8",
-                                          "path":  "\u003cJoystick\u003e/stick",
-                                          "interactions":  "",
-                                          "processors":  "",
-                                          "groups":  "Joystick",
-                                          "action":  "Move",
-                                          "isComposite":  false,
-                                          "isPartOfComposite":  false
                                       },
                                       {
                                           "name":  "",
