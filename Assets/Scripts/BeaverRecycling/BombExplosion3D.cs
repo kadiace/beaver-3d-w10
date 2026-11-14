@@ -99,7 +99,7 @@ namespace BeaverRecycling
         void Update()
         {
             if (_game == null || !_game.IsWorking || _exploded) return;
-            if (transform.position.z <= _game.WaterfallZ ||
+            if (_collider.bounds.min.z <= _game.ObjectBoundaryExitZ ||
                 transform.position.y < _game.FallbackY || Mathf.Abs(transform.position.x) > 25f)
                 _game.ResolveBombExit(this);
         }
