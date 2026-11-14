@@ -178,11 +178,19 @@ namespace BeaverRecycling
                     }
                 }
                 if (_elapsed >= _supplySeconds + _closingSeconds ||
-                    (_phase == DayPhase.Closing && _items.Count == 0 && _bombs.Count == 0)) FinishDay();
+                    (_phase == DayPhase.Closing && !HasOutstandingRecyclingItems())) FinishDay();
                 if (IsWorking) RefreshHover();
             }
             RefreshHud();
             RefreshChutes();
+        }
+
+        /// <summary>아직 정산되지 않은 쓰레기·목재가 남아 있는지 확인한다. 폭탄과 소멸 연출 중인 기물은 제외한다.</summary>
+        private bool HasOutstandingRecyclingItems()
+        {
+            foreach (RecyclingItem item in _items)
+                if (item != null && !item.IsResolved) return true;
+            return false;
         }
 
         void FixedUpdate()
