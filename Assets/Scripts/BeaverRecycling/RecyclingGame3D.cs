@@ -237,6 +237,51 @@ namespace BeaverRecycling
             _bombs.Add(bomb);
             return true;
         }
+        /// <summary>에디터 플레이 모드에서만 무작위 투입구와 가상 기물로 분류 미니게임을 실행한다.</summary>
+        [ContextMenu("Debug/Run Random Sorting Mini-game")]
+        private void DebugOpenRandomSortingFromInspector() => DebugStartRandomSorting();
+
+        public bool DebugStartRandomSorting()
+        {
+            if (!Application.isPlaying || _phase == DayPhase.Sorting || _catalog == null || _hud == null)
+                return false;
+
+            RecyclingCategory[] chuteCategories =
+            {
+                RecyclingCategory.Plastic, RecyclingCategory.Glass,
+                RecyclingCategory.Film, RecyclingCategory.Metal
+            };
+            RecyclingCategory chosenChute = chuteCategories[UnityEngine.Random.Range(0, chuteCategories.Length)];
+            RecyclingDefinition[] definitions = _catalog.DebugItems.Where(item => item != null).ToArray();
+            RecyclingDefinition[] matching = definitions.Where(item => item.Category == chosenChute).ToArray();
+            RecyclingDefinition[] mismatching = definitions.Where(item => item.Category != chosenChute).ToArray();
+            if (matching.Length == 0 || mismatching.Length == 0) return false;
+
+            // Include both a matching and a non-matching item so the random run always tests sorting.
+            int count = UnityEngine.Random.Range(4, 7);
+            var sample = new List<RecyclingDefinition>(count)
+            {
+                matching[UnityEngine.Random.Range(0, matching.Length)],
+                mismatching[UnityEngine.Random.Range(0, mismatching.Length)]
+            };
+            while (sample.Count < count)
+                sample.Add(definitions[UnityEngine.Random.Range(0, definitions.Length)]);
+
+            DayPhase previousPhase = _phase;
+            _phase = DayPhase.Sorting;
+            _movement = Vector2.zero;
+            _hud.HideModal();
+            SetUiMode(true);
+            _hud.ShowSorting(sample, chosenChute, (submission, includedCount) =>
+            {
+                // These items are synthetic: do not modify actual inventory, score or day statistics.
+                _phase = previousPhase;
+                SetUiMode(!IsWorking);
+                if (!IsWorking) UpdateModal();
+            });
+            return true;
+        }
+
 #endif
 
         /// <summary>활성 정의를 난수로 골라 풀에서 생성하고 새 기물의 상태를 초기화한다.</summary>

@@ -466,16 +466,16 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2386001592031185939}
-  m_LocalRotation: {x: -0, y: -0, z: -0.7115112, w: 0.7026748}
+  m_LocalRotation: {x: -0, y: -0, z: -0.6293204, w: 0.777146}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.36967507, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3964092239382812536}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -90.716}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -78}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -83, y: -50.4}
+  m_AnchoredPosition: {x: -83, y: -50.5}
   m_SizeDelta: {x: 340, y: 5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1615263868570168996
@@ -1005,6 +1005,9 @@ MonoBehaviour:
   _playfield: {fileID: 3964092239382812536}
   _feedBoard: {fileID: 4659686501897307639}
   _judgeLine: {fileID: 7764850219246502481}
+  _chuteWalls:
+  - {fileID: 7482221648180279296}
+  - {fileID: 3087874846098697516}
   _spriteTemplate: {fileID: 120089711058699953}
   _status: {fileID: 2478874037076244210}
   _score: {fileID: 2750966390325317347}
@@ -1039,16 +1042,16 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8851761292020984324}
-  m_LocalRotation: {x: -0, y: -0, z: -0.77753943, w: 0.62883425}
+  m_LocalRotation: {x: -0, y: -0, z: -0.777146, w: 0.6293204}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.36967507, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3964092239382812536}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -102.072}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -102}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 81.1, y: -51.3}
+  m_AnchoredPosition: {x: 83, y: -50.5}
   m_SizeDelta: {x: 340, y: 5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1215128611323490205

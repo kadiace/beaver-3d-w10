@@ -21,6 +21,7 @@ namespace BeaverRecycling
         [SerializeField] private RectTransform _playfield;
         [SerializeField] private RectTransform _feedBoard;
         [SerializeField] private RectTransform _judgeLine;
+        [SerializeField] private Image[] _chuteWalls;
         [SerializeField] private Image _spriteTemplate;
         [SerializeField] private Text _status;
         [SerializeField] private Text _score;
@@ -74,7 +75,10 @@ namespace BeaverRecycling
             _selectedIndex = -1;
             _finished = false;
             _score.gameObject.SetActive(false);
-            _status.text = "스페이스 · 빨간 선의 아이템 제외";
+            _status.text = RecyclingRules.Name(chute) + " 분류 · 스페이스 · 빨간 선의 아이템 제외";
+            Color chuteColor = RecyclingRules.Color(chute);
+            foreach (Image wall in _chuteWalls)
+                if (wall != null) wall.color = chuteColor;
             _spriteTemplate.gameObject.SetActive(false);
             _feedBoard.gameObject.SetActive(false);
             if (!_simulationOwned)
