@@ -43,7 +43,24 @@ public class InputManager
     private InputAction _uiCancel;
     private InputAction _uiSortExclude;
 
-    public Vector2 MoveInput => _inputMode == InputMode.Player ? _move.ReadValue<Vector2>() : Vector2.zero;
+    // The active control scheme can prefer a connected pad. Read recycling keyboard
+    // controls directly as well so a plugged-in gamepad never locks out the keyboard.
+    public Vector2 MoveInput
+    {
+        get
+        {
+            if (_inputMode != InputMode.Player) return Vector2.zero;
+
+            Vector2 input = _move.ReadValue<Vector2>();
+            if (!_useRecyclingControls || Keyboard.current == null) return input;
+
+            Keyboard keyboard = Keyboard.current;
+            Vector2 arrows = new Vector2(
+                (keyboard.rightArrowKey.isPressed ? 1f : 0f) - (keyboard.leftArrowKey.isPressed ? 1f : 0f),
+                (keyboard.upArrowKey.isPressed ? 1f : 0f) - (keyboard.downArrowKey.isPressed ? 1f : 0f));
+            return arrows.sqrMagnitude > 0f ? arrows.normalized : input;
+        }
+    }
     public bool HasPointer => _pointerPosition.controls.Count > 0;
     public Vector2 PointerPosition => _pointerPosition.ReadValue<Vector2>();
     public Vector2 PointerDelta => _pointerDelta.ReadValue<Vector2>();
@@ -53,17 +70,24 @@ public class InputManager
     public bool SecondaryReleased => _secondaryClick.WasReleasedThisFrame();
     public bool SecondaryHeld => _secondaryClick.IsPressed();
     public float CameraZoom => _cameraZoom.ReadValue<Vector2>().y;
-    public bool InteractPressed => _interact.WasPressedThisFrame();
-    public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame();
-    public bool CancelPressed => _inputMode == InputMode.Player
-        ? _cancel.WasPressedThisFrame() : _uiCancel.WasPressedThisFrame();
+    public bool InteractPressed => _interact.WasPressedThisFrame() ||
+        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame);
+    public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame() ||
+        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame);
+    public bool CancelPressed => (_inputMode == InputMode.Player
+        ? _cancel.WasPressedThisFrame() : _uiCancel.WasPressedThisFrame()) ||
+        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame);
     public bool RotateLeftPressed => _rotateLeft.WasPressedThisFrame();
     public bool RotateLeftHeld => _rotateLeft.IsPressed();
     public bool RotateRightPressed => _rotateRight.WasPressedThisFrame();
     public bool RotateRightHeld => _rotateRight.IsPressed();
     public bool FloodPreviewPressed => _floodPreview.WasPressedThisFrame();
-    public bool ConfirmPressed => _inputMode == InputMode.UI && _uiSubmit.WasPressedThisFrame();
-    public bool SortExcludePressed => _inputMode == InputMode.UI && _uiSortExclude.WasPressedThisFrame();
+    public bool ConfirmPressed => _inputMode == InputMode.UI && (_uiSubmit.WasPressedThisFrame() ||
+        (_useRecyclingControls && Keyboard.current != null &&
+         (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame ||
+          Keyboard.current.numpadEnterKey.wasPressedThisFrame)));
+    public bool SortExcludePressed => _inputMode == InputMode.UI && (_uiSortExclude.WasPressedThisFrame() ||
+        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame));
     // Physical availability, not whichever device was used most recently.
     // Querying Gamepad.all also reflects hot-plugging while a modal pauses Time.timeScale.
     public bool GamePadConnected => Gamepad.all.Count > 0;

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace BeaverRecycling
@@ -126,6 +128,45 @@ namespace BeaverRecycling
             return false;
         }
 
+        /// <summary>패드 제어 스킴이 활성화돼도 키보드 방향키와 확인 키로 모달을 조작할 수 있게 한다.</summary>
+        private void HandleKeyboardModalInput()
+        {
+            // The normal UI input module handles keyboard events when it receives them.
+            // Only dispatch a fallback when its active control is not the keyboard.
+            if (!Managers.Input.GamePadConnected) return;
+            Keyboard keyboard = Keyboard.current;
+            EventSystem eventSystem = EventSystem.current;
+            if (keyboard == null || eventSystem == null) return;
+
+            InputSystemUIInputModule module = eventSystem.GetComponent<InputSystemUIInputModule>();
+            InputAction moveAction = module != null && module.move != null ? module.move.action : null;
+            InputAction submitAction = module != null && module.submit != null ? module.submit.action : null;
+
+            MoveDirection direction = MoveDirection.None;
+            if (keyboard.upArrowKey.wasPressedThisFrame) direction = MoveDirection.Up;
+            else if (keyboard.downArrowKey.wasPressedThisFrame) direction = MoveDirection.Down;
+            else if (keyboard.leftArrowKey.wasPressedThisFrame) direction = MoveDirection.Left;
+            else if (keyboard.rightArrowKey.wasPressedThisFrame) direction = MoveDirection.Right;
+
+            if (direction != MoveDirection.None &&
+                !(moveAction != null && moveAction.activeControl != null &&
+                  moveAction.activeControl.device == keyboard && moveAction.WasPerformedThisFrame()))
+            {
+                Vector2 vector = direction == MoveDirection.Up ? Vector2.up :
+                    direction == MoveDirection.Down ? Vector2.down :
+                    direction == MoveDirection.Left ? Vector2.left : Vector2.right;
+                AxisEventData data = new AxisEventData(eventSystem) { moveDir = direction, moveVector = vector };
+                ExecuteEvents.Execute(eventSystem.currentSelectedGameObject, data, ExecuteEvents.moveHandler);
+            }
+
+            bool confirm = keyboard.spaceKey.wasPressedThisFrame ||
+                keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame;
+            if (confirm && !(submitAction != null && submitAction.activeControl != null &&
+                submitAction.activeControl.device == keyboard && submitAction.WasPressedThisFrame()))
+                ExecuteEvents.Execute(eventSystem.currentSelectedGameObject,
+                    new BaseEventData(eventSystem), ExecuteEvents.submitHandler);
+        }
+
         /// <summary>일차·시간·점수·목재·운반 정보를 받아 최소 HUD 수치를 갱신한다.</summary>
         public void Refresh(int day, string phase, float seconds, int score, int target, int wood, string carry, bool working)
         {
@@ -229,7 +270,11 @@ namespace BeaverRecycling
             if (Time.unscaledTime > _messageUntil) _message.text = "";
             if (Time.unscaledTime > _toastUntil) _toast.transform.parent.gameObject.SetActive(false);
             if (_focusOutlines == null) return;
-            if (_modal.activeInHierarchy) FocusModal();
+            if (_modal.activeInHierarchy)
+            {
+                FocusModal();
+                HandleKeyboardModalInput();
+            }
             GameObject selected = _modal.activeInHierarchy && EventSystem.current != null
                 ? EventSystem.current.currentSelectedGameObject : null;
             for (int i = 0; i < _focusOutlines.Length; i++)
