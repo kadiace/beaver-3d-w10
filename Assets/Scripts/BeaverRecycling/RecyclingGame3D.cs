@@ -16,6 +16,7 @@ namespace BeaverRecycling
         private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
+        private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
@@ -181,9 +182,11 @@ namespace BeaverRecycling
         {
             if (!IsWorking) return;
             float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
+            float speed = (_baseSpeed + 0.5f * _levels[1]) * slowdown;
+            if (_held.Count == 0) speed *= EMPTY_HANDED_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
-            _beaver.Move(_movement, (_baseSpeed + 0.5f * _levels[1]) * slowdown, Time.fixedDeltaTime);
+            _beaver.Move(_movement, speed, Time.fixedDeltaTime);
             if (_held.Count == 0) return;
             Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
             Vector3 beaverPosition = _beaver.transform.position;
