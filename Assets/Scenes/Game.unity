@@ -2602,8 +2602,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7737dd0bdd09308da46de4b7ab65e59a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BeaverRecycling.RecyclingBeaver3D
-  _minimum: {x: -11.2, y: 17}
-  _maximum: {x: 11.2, y: 43}
+  _minimum: {x: -12, y: 17}
+  _maximum: {x: 12, y: 43}
   _carryPoint: {fileID: 3100000090}
   _visual: {fileID: 3100000004}
   _knockbackSpinSpeed: 720
@@ -2667,7 +2667,7 @@ Transform:
   m_GameObject: {fileID: 3100000094}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -12.5, y: -2.05, z: 35}
+  m_LocalPosition: {x: -14.45, y: -2.05, z: 35}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3780,7 +3780,7 @@ Transform:
   m_GameObject: {fileID: 3100000146}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -12.5, y: -2.05, z: 24}
+  m_LocalPosition: {x: -14.45, y: -2.05, z: 24}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -4893,7 +4893,7 @@ Transform:
   m_GameObject: {fileID: 3100000198}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 12.5, y: -2.05, z: 24}
+  m_LocalPosition: {x: 14.45, y: -2.05, z: 24}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6006,7 +6006,7 @@ Transform:
   m_GameObject: {fileID: 3100000250}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 12.5, y: -2.05, z: 35}
+  m_LocalPosition: {x: 14.45, y: -2.05, z: 35}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
