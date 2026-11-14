@@ -1199,7 +1199,8 @@ namespace BeaverRecycling
                 _hud.ShowModal(_day + "일차 · 출근 준비",
                     "오늘의 목표 " + _targets[_day - 1] + "점" + categoryLine + "\n\n" +
                     movementKey + " 이동\n" + interactKey + " 집기 / 놓기 / 투입구에서 놓으면 분류\n" +
-                    splitKey + " 묶음 분리\n" + menuKey + " 일시정지",
+                    splitKey + " 묶음 분리\n" + menuKey + " 일시정지\n" +
+                    (_displayedGamepadConnected ? "South 확인" : "Space / Enter 확인"),
                     "출근", "", false);
             }
             else if (_phase == DayPhase.Paused)
@@ -1245,13 +1246,25 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>현재 점수와 운반 묶음의 재질 개수를 짧은 HUD 문구로 전달한다.</summary>
+        /// <summary>운반 묶음의 내용과 네 투입구 중 가장 높은 즉시 제출 예상 점수를 HUD에 표시한다.</summary>
         private void RefreshHud()
         {
             string carried = "빈손 · 같은 재질을 모아 투입구에 제출하세요";
             if (_held.Count > 0)
+            {
                 carried = "운반 " + _held.Count + "/" + Capacity + "  ·  " + string.Join("  ",
                     _held.GroupBy(p => p.Definition.Category).Select(g => RecyclingRules.Name(g.Key) + " " + g.Count()));
+
+                // Use the same scoring rules as a direct submission, without excluding items in the sorting mini-game.
+                int bestScore = int.MinValue;
+                foreach (RecyclingChute3D chute in _chutes)
+                {
+                    if (chute == null) continue;
+                    bestScore = Mathf.Max(bestScore, RecyclingRules.Evaluate(_held, chute.Category).Score);
+                }
+                if (bestScore != int.MinValue)
+                    carried += "  ·  최고 예상 " + (bestScore >= 0 ? "+" : "") + bestScore + "점";
+            }
             string phase = _phase == DayPhase.Supply ? "공급" : _phase == DayPhase.Closing ? "마감 정리" : "준비 / 정산";
             float remaining = _phase == DayPhase.Supply ? _supplySeconds - _elapsed : _supplySeconds + _closingSeconds - _elapsed;
             _hud.Refresh(_day, phase, remaining, _dayScore, _targets[_day - 1], _wood, carried, IsWorking);
