@@ -28,7 +28,7 @@ public class InputManager
     private InputAction _splitBundle;
 
     [Header("UI actions")]
-    private InputAction _uiClick;
+    private InputAction _uiSubmit;
     private InputAction _uiCancel;
     private InputAction _uiSortExclude;
 
@@ -51,7 +51,7 @@ public class InputManager
     public bool RotateRightPressed => _rotateRight.WasPressedThisFrame();
     public bool RotateRightHeld => _rotateRight.IsPressed();
     public bool FloodPreviewPressed => _floodPreview.WasPressedThisFrame();
-    public bool ConfirmPressed => _inputMode == InputMode.UI && _uiClick.WasPressedThisFrame();
+    public bool ConfirmPressed => _inputMode == InputMode.UI && _uiSubmit.WasPressedThisFrame();
     public bool SortExcludePressed => _inputMode == InputMode.UI && _uiSortExclude.WasPressedThisFrame();
     public bool GamePadConnected { get; private set; }
 
@@ -71,7 +71,7 @@ public class InputManager
         _floodPreview = _playerMap.FindAction("ToggleFloodPreview", true);
         _interact = _recyclingMap.FindAction("Interact", true);
         _splitBundle = _recyclingMap.FindAction("SplitBundle", true);
-        _uiClick = _uiMap.FindAction("Click", true);
+        _uiSubmit = _uiMap.FindAction("Submit", true);
         _uiCancel = _uiMap.FindAction("Cancel", true);
         _uiSortExclude = _uiMap.FindAction("SortExclude", true);
 

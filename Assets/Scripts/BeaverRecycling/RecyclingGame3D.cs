@@ -1195,9 +1195,9 @@ namespace BeaverRecycling
         {
             if (_phase == DayPhase.Preparation)
                 _hud.ShowModal(_day + "일차 · 출근 준비", "오늘의 목표 " + _targets[_day - 1] + "점\n" +
-                    RecyclingRules.DayCategories(_day) + "\n\nWASD 이동 · E 집기/놓기\n투입구에서 놓으면 분류 · Q 묶음 분리\n\n나무 폭포 통과 +3점·목재\n쓰레기 유실 0회 +10점·+3목재\n오분류 0회 +10점·+3목재\n목표 초과 10점당 +1목재", "출근", "", false);
+                    RecyclingRules.DayCategories(_day) + "\n\nWASD/스틱 이동 · E/South 집기/놓기\n투입구에서 놓으면 분류 · Q/West 묶음 분리\nESC/Menu 일시정지\n\n나무 폭포 통과 +3점·목재\n쓰레기 유실 0회 +10점·+3목재\n오분류 0회 +10점·+3목재\n목표 초과 10점당 +1목재", "출근", "", false);
             else if (_phase == DayPhase.Paused)
-                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
+                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ/West로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
