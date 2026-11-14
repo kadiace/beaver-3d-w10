@@ -18,6 +18,16 @@ namespace BeaverRecycling
         private float _currentBobHeight;
         private float _lastMoveFixedTime;
 
+        [Header("Eye fire")]
+        [SerializeField] private MeshRenderer _leftEye;
+        [SerializeField] private MeshRenderer _rightEye;
+        private Material _eyeGlowMaterial;
+        private Material _outerFlameMaterial;
+        private Material _innerFlameMaterial;
+        private Transform[] _outerFlames;
+        private Transform[] _innerFlames;
+        private int _carriedItemCount = -1;
+
         [Header("Stun effect")]
         [SerializeField] private Transform _stunStar;
         [SerializeField, Min(0f)] private float _stunStarOrbitRadius = 0.55f;
@@ -47,6 +57,23 @@ namespace BeaverRecycling
             _previousPosition = _currentPosition = transform.position;
             _previousRotation = _currentRotation = transform.rotation;
             _lastMoveFixedTime = Time.time - Time.fixedDeltaTime;
+            _eyeGlowMaterial = new Material(_leftEye.sharedMaterial);
+            _outerFlameMaterial = new Material(_leftEye.sharedMaterial);
+            _innerFlameMaterial = new Material(_leftEye.sharedMaterial);
+            _eyeGlowMaterial.EnableKeyword("_EMISSION");
+            _outerFlameMaterial.EnableKeyword("_EMISSION");
+            _innerFlameMaterial.EnableKeyword("_EMISSION");
+            _outerFlameMaterial.SetColor("_BaseColor", new Color(1f, 0.22f, 0.015f));
+            _outerFlameMaterial.SetColor("_EmissionColor", new Color(3f, 0.35f, 0.02f));
+            _innerFlameMaterial.SetColor("_BaseColor", new Color(1f, 0.86f, 0.18f));
+            _innerFlameMaterial.SetColor("_EmissionColor", new Color(3f, 2f, 0.18f));
+            _leftEye.sharedMaterial = _eyeGlowMaterial;
+            _rightEye.sharedMaterial = _eyeGlowMaterial;
+            _outerFlames = new[] { CreateFlame(_leftEye, "Left outer flame", _outerFlameMaterial),
+                CreateFlame(_rightEye, "Right outer flame", _outerFlameMaterial) };
+            _innerFlames = new[] { CreateFlame(_leftEye, "Left inner flame", _innerFlameMaterial),
+                CreateFlame(_rightEye, "Right inner flame", _innerFlameMaterial) };
+            SetCarriedItemCount(0);
         }
 
         void LateUpdate()
@@ -54,6 +81,65 @@ namespace BeaverRecycling
             _visual.position = VisualPosition + Vector3.up * Mathf.Lerp(_previousBobHeight, _currentBobHeight, InterpolationFactor);
             _visual.rotation = Quaternion.Slerp(_previousRotation, _currentRotation, InterpolationFactor);
             AnimateStunStar(Time.deltaTime);
+            AnimateEyeFire();
+        }
+
+        /// <summary>눈 위치에 충돌 없는 불꽃 메시를 만들고 운반량에 따라 켜질 수 있도록 보관한다.</summary>
+        private Transform CreateFlame(MeshRenderer eye, string objectName, Material material)
+        {
+            GameObject flame = new GameObject(objectName);
+            flame.transform.SetParent(_visual, false);
+            flame.transform.localPosition = eye.transform.localPosition + new Vector3(0f, 0.09f, 0.015f);
+            flame.AddComponent<MeshFilter>().sharedMesh = eye.GetComponent<MeshFilter>().sharedMesh;
+            MeshRenderer renderer = flame.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            flame.SetActive(false);
+            return flame.transform;
+        }
+
+        /// <summary>현재 운반 중인 아이템 수에 맞춰 눈의 안광과 불꽃 표시 상태를 갱신한다.</summary>
+        public void SetCarriedItemCount(int count)
+        {
+            if (_carriedItemCount == count) return;
+            _carriedItemCount = count;
+            float intensity = Mathf.Clamp01((count - 1f) / 5f);
+            _eyeGlowMaterial.SetColor("_BaseColor", count > 0
+                ? Color.Lerp(new Color(1f, 0.48f, 0.08f), new Color(1f, 0.16f, 0.02f), intensity)
+                : new Color(0.035f, 0.045f, 0.05f));
+            _eyeGlowMaterial.SetColor("_EmissionColor", count > 0
+                ? new Color(2f + 2f * intensity, 0.55f + 0.35f * intensity, 0.04f)
+                : Color.black);
+            bool showFlames = count > 1;
+            foreach (Transform flame in _outerFlames) flame.gameObject.SetActive(showFlames);
+            foreach (Transform flame in _innerFlames) flame.gameObject.SetActive(showFlames);
+        }
+
+        /// <summary>운반량과 시간에 따라 눈 위 불꽃의 높이와 폭을 흔들리게 한다.</summary>
+        private void AnimateEyeFire()
+        {
+            if (_carriedItemCount < 2) return;
+            float strength = Mathf.Clamp01((_carriedItemCount - 1f) / 5f);
+            for (int i = 0; i < _outerFlames.Length; i++)
+            {
+                float flicker = 0.85f + 0.15f * Mathf.Sin(Time.time * 17f + i * 2.3f);
+                float height = (0.1f + 0.19f * strength) * flicker;
+                _outerFlames[i].localScale = new Vector3(0.075f + 0.035f * strength, height, 0.055f);
+                _outerFlames[i].localPosition = (_outerFlames[i].localPosition.x < 0f
+                    ? _leftEye.transform.localPosition : _rightEye.transform.localPosition)
+                    + new Vector3(Mathf.Sin(Time.time * 11f + i) * 0.012f,
+                        0.1f + height * 0.45f, 0.015f);
+                _innerFlames[i].localScale = new Vector3(0.035f, height * 0.7f, 0.04f);
+                _innerFlames[i].localPosition = _outerFlames[i].localPosition + new Vector3(0f, -0.02f, 0.015f);
+            }
+        }
+
+        void OnDestroy()
+        {
+            Destroy(_eyeGlowMaterial);
+            Destroy(_outerFlameMaterial);
+            Destroy(_innerFlameMaterial);
         }
 
         /// <summary>이동 입력, 이동 속도, deltaTime을 사용해 작업 구역 안에서 비버의 위치·방향·걸음 표현을 갱신한다.</summary>
