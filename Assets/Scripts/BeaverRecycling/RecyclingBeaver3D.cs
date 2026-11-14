@@ -32,6 +32,8 @@ namespace BeaverRecycling
         private float _stride;
 
         public Transform CarryPoint => _carryPoint;
+        public Vector2 MovementMinimum => _minimum;
+        public Vector2 MovementMaximum => _maximum;
         public Vector3 VisualPosition => Vector3.Lerp(_previousPosition, _currentPosition, InterpolationFactor);
         private float InterpolationFactor => Mathf.Clamp01((Time.time - _lastMoveFixedTime) / Time.fixedDeltaTime);
 
