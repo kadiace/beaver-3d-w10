@@ -10,6 +10,13 @@ namespace BeaverRecycling
         [SerializeField] private Transform _carryPoint;
         [SerializeField] private Transform _visual;
         [SerializeField, Min(0f)] private float _knockbackSpinSpeed = 720f;
+        private Vector3 _previousPosition;
+        private Vector3 _currentPosition;
+        private Quaternion _previousRotation;
+        private Quaternion _currentRotation;
+        private float _previousBobHeight;
+        private float _currentBobHeight;
+        private float _lastMoveFixedTime;
 
         [Header("Stun effect")]
         [SerializeField] private Transform _stunStar;
@@ -25,6 +32,8 @@ namespace BeaverRecycling
         private float _stride;
 
         public Transform CarryPoint => _carryPoint;
+        public Vector3 VisualPosition => Vector3.Lerp(_previousPosition, _currentPosition, InterpolationFactor);
+        private float InterpolationFactor => Mathf.Clamp01((Time.time - _lastMoveFixedTime) / Time.fixedDeltaTime);
 
         void Awake()
         {
@@ -33,16 +42,24 @@ namespace BeaverRecycling
             _stunStarStartingRotation = _stunStar.localRotation;
             _stunCamera = Camera.main.transform;
             _stunStar.gameObject.SetActive(false);
+            _previousPosition = _currentPosition = transform.position;
+            _previousRotation = _currentRotation = transform.rotation;
+            _lastMoveFixedTime = Time.time - Time.fixedDeltaTime;
         }
 
         void LateUpdate()
         {
+            _visual.position = VisualPosition + Vector3.up * Mathf.Lerp(_previousBobHeight, _currentBobHeight, InterpolationFactor);
+            _visual.rotation = Quaternion.Slerp(_previousRotation, _currentRotation, InterpolationFactor);
             AnimateStunStar(Time.deltaTime);
         }
 
         /// <summary>이동 입력, 이동 속도, deltaTime을 사용해 작업 구역 안에서 비버의 위치·방향·걸음 표현을 갱신한다.</summary>
         public void Move(Vector2 input, float speed, float deltaTime)
         {
+            _previousPosition = _currentPosition;
+            _previousRotation = _currentRotation;
+            _previousBobHeight = _currentBobHeight;
             Vector2 movement = Vector2.ClampMagnitude(input, 1f);
             Vector3 direction = new Vector3(movement.x, 0f, movement.y);
             float knockbackStep = Mathf.Min(deltaTime, _knockbackTimeRemaining);
@@ -63,8 +80,11 @@ namespace BeaverRecycling
             else if (direction.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.RotateTowards(transform.rotation,
                     Quaternion.LookRotation(direction), 540f * deltaTime);
+            _currentPosition = transform.position;
+            _currentRotation = transform.rotation;
+            _lastMoveFixedTime = Time.fixedTime;
             _stride += deltaTime * speed * 5f;
-            _visual.localPosition = Vector3.up * (movement.sqrMagnitude > 0f ? Mathf.Abs(Mathf.Sin(_stride)) * 0.045f : 0f);
+            _currentBobHeight = movement.sqrMagnitude > 0f ? Mathf.Abs(Mathf.Sin(_stride)) * 0.045f : 0f;
         }
 
         /// <summary>기절 상태를 받아 머리 위 별 이펙트를 켜거나 끈다.</summary>
@@ -108,7 +128,12 @@ namespace BeaverRecycling
             _knockbackTimeRemaining = 0f;
             SetStunned(false);
             transform.SetPositionAndRotation(_startingPosition, Quaternion.identity);
+            _previousPosition = _currentPosition = transform.position;
+            _previousRotation = _currentRotation = transform.rotation;
+            _previousBobHeight = _currentBobHeight = 0f;
+            _lastMoveFixedTime = Time.time - Time.fixedDeltaTime;
             _visual.localPosition = Vector3.zero;
+            _visual.localRotation = Quaternion.identity;
         }
     }
 }

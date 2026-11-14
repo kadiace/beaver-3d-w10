@@ -176,11 +176,10 @@ namespace BeaverRecycling
             _carryPoseRecorded = false;
         }
 
-        /// <summary>비버의 직선 이동속도는 유지하고, 회전에서 발생한 접선 속도만 절반으로 줄여 기록한다.</summary>
-        public void RecordCarryMotion(float fixedDeltaTime, Vector3 beaverLinearVelocity)
+        /// <summary>이번 물리 프레임의 목표 위치와 비버 속도로 아이템의 놓기 속도를 기록한다. 회전으로 생긴 속도는 절반으로 줄인다.</summary>
+        public void RecordCarryMotion(float fixedDeltaTime, Vector3 beaverLinearVelocity, Vector3 position)
         {
             if (!_held) return;
-            Vector3 position = _body.position;
             if (_carryPoseRecorded && fixedDeltaTime > 0f)
             {
                 Vector3 itemVelocity = (position - _previousCarryPosition) / fixedDeltaTime;

@@ -60,6 +60,9 @@ namespace BeaverRecycling
         [Header("Bundle")]
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
         [SerializeField, Range(0f, 1f)] private float _minimumProjectedOverlap = 0.3f;
+        [SerializeField, Min(0.01f)] private float _bridgeAttachRadius = 0.25f;
+        [SerializeField, Min(0f)] private float _bridgeAttachStartDistance = 0.4f;
+        [SerializeField, Min(0f)] private float _bridgeAttachMaxDistance = 0.6f;
 
 #if UNITY_EDITOR
         [Header("Editor Start")]
@@ -74,6 +77,7 @@ namespace BeaverRecycling
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
+        private RaycastHit[] _bridgeHitBuffer = new RaycastHit[64];
         private DayPhase _phase;
         private DayPhase _beforePause;
         private DayPhase _beforeSorting;
@@ -185,6 +189,12 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (!IsWorking) return;
+            if (_held.Count > 0 &&
+                (_held[0].Body.position - _beaver.CarryPoint.position).sqrMagnitude <= 0.0001f)
+            {
+                Physics.SyncTransforms();
+                CollectContacts();
+            }
             float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
             float speed = (_baseSpeed + 0.5f * _levels[1]) * slowdown;
             if (_held.Count == 0) speed *= EMPTY_HANDED_SPEED_MULTIPLIER;
@@ -194,18 +204,19 @@ namespace BeaverRecycling
             if (_held.Count == 0) return;
             Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
             Vector3 beaverPosition = _beaver.transform.position;
+            Vector3 anchorPosition = beaverPosition + rotationDelta *
+                (_held[0].Body.position - previousBeaverPosition);
+            Vector3 carryOffset = _beaver.CarryPoint.position - anchorPosition;
+            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
             foreach (RecyclingItem member in _held)
             {
-                member.Body.position = beaverPosition + rotationDelta * (member.Body.position - previousBeaverPosition);
-                member.Body.rotation = rotationDelta * member.Body.rotation;
+                Vector3 targetPosition = beaverPosition + rotationDelta *
+                    (member.Body.position - previousBeaverPosition) + carryOffset;
+                Quaternion targetRotation = rotationDelta * member.Body.rotation;
+                member.Body.MovePosition(targetPosition);
+                member.Body.MoveRotation(targetRotation);
+                member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity, targetPosition);
             }
-            Vector3 delta = _beaver.CarryPoint.position - _held[0].Body.position;
-            foreach (RecyclingItem member in _held) member.Body.position += delta;
-            Physics.SyncTransforms();
-            ConstrainHeldItems();
-            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
-            foreach (RecyclingItem member in _held) member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity);
-            CollectContacts();
         }
 
         void LateUpdate()
@@ -506,7 +517,7 @@ namespace BeaverRecycling
             foreach (RecyclingItem member in _held) member.SetHeld(true);
         }
 
-        /// <summary>운반 묶음과 새 기물의 화면 겹침을 검사하고 시선 방향으로 맞닿게 정렬한 뒤 결합한다.</summary>
+        /// <summary>화면 겹침과 비버 앞 보조 영역을 검사해 유효한 기물 묶음을 운반 묶음에 결합한다.</summary>
         private void CollectContacts()
         {
             foreach (RecyclingItem other in _items)
@@ -514,57 +525,205 @@ namespace BeaverRecycling
                 if (other.IsHeld || !other.CanJoin) continue;
                 if (!TryGetProjectedContactPoint(other, out RecyclingItem held,
                     out Vector3 contactOffset, out float overlapRatio)) continue;
-                List<RecyclingItem> incoming = RecyclingItem.Collect(other);
-                if (incoming.Any(p => p.IsHeld || !p.CanJoin)) continue;
-                if (_held.Count + incoming.Count > Capacity)
-                {
-                    if (Time.time > _capacityNoticeAt) { _hud.Message("운반 한도가 가득 찼어요"); _capacityNoticeAt = Time.time + 1.5f; }
-                    continue;
-                }
-
-                Vector3 heldBefore = held.Body.position;
-                Vector3 joiningBefore = other.Body.position;
-                float distanceBefore = Vector3.Distance(heldBefore, joiningBefore);
-                float surfaceBefore = GetActualColliderGap(held, other, Vector3.zero);
-
-                // 기존 FixedJoint 상대 배치를 유지하면서 새 묶음 전체를 동일한 깊이 방향으로 이동한다.
-                foreach (RecyclingItem member in incoming)
-                {
-                    Vector3 position = member.Body.position + contactOffset;
-                    member.Body.position = position;
-                    member.transform.SetPositionAndRotation(position, member.Body.rotation);
-                }
-                Physics.SyncTransforms();
-
-                Vector3 joiningAfter = other.Body.position;
-                float distanceAfter = Vector3.Distance(held.Body.position, joiningAfter);
-                float surfaceAfter = GetActualColliderGap(held, other, Vector3.zero);
-
-                // 실제 Collider의 최단 표면점 사이에 Joint 앵커를 둔다.
-                Vector3 heldPoint, joiningPoint;
-                GetActualColliderGap(held, other, Vector3.zero, out heldPoint, out joiningPoint);
-                Vector3 contactPoint = (heldPoint + joiningPoint) * 0.5f;
-                held.Attach(other, contactPoint);
-                foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
-
-                Debug.Log(
-                    $"[RecyclingAttach] ISO overlap={overlapRatio * 100f:F2}% " +
-                    $"held={held.name}#{held.GetInstanceID()} pos={heldBefore.ToString("F3")} " +
-                    $"incoming={other.name}#{other.GetInstanceID()} " +
-                    $"before={joiningBefore.ToString("F3")} after={joiningAfter.ToString("F3")} " +
-                    $"centerDistance={distanceBefore:F3}m -> {distanceAfter:F3}m " +
-                    $"colliderGap={surfaceBefore:F3}m -> {surfaceAfter:F3}m " +
-                    $"offset={contactOffset.ToString("F3")} ({contactOffset.magnitude:F3}m) " +
-                    $"cameraForward={_camera.transform.forward.ToString("F3")} " +
-                    $"incomingBundleCount={incoming.Count} jointAnchor={contactPoint.ToString("F3")}",
-                    this);
+                List<RecyclingItem> incoming = GetAttachableBundle(other);
+                if (incoming == null) continue;
+                AttachBundle(held, other, incoming, contactOffset, overlapRatio, false);
             }
+            CollectBridgeContacts();
+        }
+
+        /// <summary>추가할 기물의 연결 묶음을 검사하고, 운반 가능하면 묶음을 반환한다.</summary>
+        private List<RecyclingItem> GetAttachableBundle(RecyclingItem other)
+        {
+            List<RecyclingItem> incoming = RecyclingItem.Collect(other);
+            if (incoming.Any(p => p.IsHeld || !p.CanJoin)) return null;
+            if (_held.Count + incoming.Count <= Capacity) return incoming;
+            if (Time.time > _capacityNoticeAt)
+            {
+                _hud.Message("운반 한도가 가득 찼어요");
+                _capacityNoticeAt = Time.time + 1.5f;
+            }
+            return null;
+        }
+
+        /// <summary>운반 기물과 새 기물, 연결 묶음과 이동량을 받아 묶음을 이동하고 조인트를 생성한다.</summary>
+        private void AttachBundle(RecyclingItem held, RecyclingItem other, List<RecyclingItem> incoming,
+            Vector3 contactOffset, float overlapRatio, bool bridge)
+        {
+            Vector3 heldBefore = held.Body.position;
+            Vector3 joiningBefore = other.Body.position;
+            float distanceBefore = Vector3.Distance(heldBefore, joiningBefore);
+            float surfaceBefore = GetActualColliderGap(held, other, Vector3.zero);
+            foreach (RecyclingItem member in incoming)
+            {
+                Vector3 position = member.Body.position + contactOffset;
+                member.Body.position = position;
+                member.transform.SetPositionAndRotation(position, member.Body.rotation);
+            }
+            Physics.SyncTransforms();
+
+            Vector3 joiningAfter = other.Body.position;
+            float distanceAfter = Vector3.Distance(held.Body.position, joiningAfter);
+            float surfaceAfter = GetActualColliderGap(held, other, Vector3.zero);
+            GetActualColliderGap(held, other, Vector3.zero, out Vector3 heldPoint, out Vector3 joiningPoint);
+            Vector3 contactPoint = (heldPoint + joiningPoint) * 0.5f;
+            held.Attach(other, contactPoint);
+            foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
+
+            Debug.Log(
+                $"[RecyclingAttach] {(bridge ? "bridge" : "ISO")} overlap={overlapRatio * 100f:F2}% " +
+                $"held={held.name}#{held.GetInstanceID()} pos={heldBefore.ToString("F3")} " +
+                $"incoming={other.name}#{other.GetInstanceID()} " +
+                $"before={joiningBefore.ToString("F3")} after={joiningAfter.ToString("F3")} " +
+                $"centerDistance={distanceBefore:F3}m -> {distanceAfter:F3}m " +
+                $"colliderGap={surfaceBefore:F3}m -> {surfaceAfter:F3}m " +
+                $"offset={contactOffset.ToString("F3")} ({contactOffset.magnitude:F3}m) " +
+                $"cameraForward={_camera.transform.forward.ToString("F3")} " +
+                $"incomingBundleCount={incoming.Count} jointAnchor={contactPoint.ToString("F3")}",
+                this);
         }
 
         // 실제 Collider 접촉까지 끌어오기 위한 검색값. 바운드의 접촉점은 실제 메시 접촉점이 아니다.
         private const float ATTACH_SURFACE_TOLERANCE = 0.002f;
         private const int ATTACH_DEPTH_SEARCH_STEPS = 24;
         private const int ATTACH_CONTACT_REFINE_STEPS = 20;
+        private const int BRIDGE_MOVE_CHECK_STEPS = 4;
+        private const float BRIDGE_BEAVER_RADIUS = 0.3f;
+
+        /// <summary>비버 앞 빈 공간의 기물 중 표면 거리가 가장 가까운 묶음부터 차례대로 결합한다.</summary>
+        private void CollectBridgeContacts()
+        {
+            while (TryGetBridgeArea(out Vector3 start, out Vector3 end, out RecyclingItem held))
+            {
+                int count;
+                while ((count = Physics.OverlapCapsuleNonAlloc(start, end, _bridgeAttachRadius, _overlapBuffer,
+                    ~0, QueryTriggerInteraction.Ignore)) == _overlapBuffer.Length)
+                    Array.Resize(ref _overlapBuffer, _overlapBuffer.Length * 2);
+
+                var candidates = new HashSet<RecyclingItem>();
+                for (int i = 0; i < count; i++)
+                {
+                    RecyclingItem item = _overlapBuffer[i].GetComponentInParent<RecyclingItem>();
+                    if (item != null && _items.Contains(item) && item.CanJoin) candidates.Add(item);
+                }
+
+                RecyclingItem best = null;
+                List<RecyclingItem> bestBundle = null;
+                Vector3 bestOffset = Vector3.zero;
+                float bestGap = float.PositiveInfinity;
+                foreach (RecyclingItem candidate in candidates)
+                {
+                    float gap = GetActualColliderGap(held, candidate, Vector3.zero,
+                        out Vector3 heldPoint, out Vector3 joiningPoint);
+                    if (gap > _bridgeAttachMaxDistance || gap > bestGap + ATTACH_SURFACE_TOLERANCE) continue;
+                    if (best != null && Mathf.Abs(gap - bestGap) <= ATTACH_SURFACE_TOLERANCE &&
+                        candidate.GetInstanceID() >= best.GetInstanceID()) continue;
+
+                    Vector3 offset = gap <= ATTACH_SURFACE_TOLERANCE ? Vector3.zero : heldPoint - joiningPoint;
+                    if (offset.magnitude > _bridgeAttachMaxDistance ||
+                        GetActualColliderGap(held, candidate, offset) > ATTACH_SURFACE_TOLERANCE) continue;
+                    List<RecyclingItem> incoming = GetAttachableBundle(candidate);
+                    if (incoming == null || !CanMoveBridgeBundle(incoming, held, offset)) continue;
+                    best = candidate;
+                    bestBundle = incoming;
+                    bestOffset = offset;
+                    bestGap = gap;
+                }
+
+                if (best == null) return;
+                AttachBundle(held, best, bestBundle, bestOffset, 0f, true);
+            }
+        }
+
+        /// <summary>비버 입 앞에서 운반 지점으로 뻗는 영역과 가장 가까운 운반 기물을 반환한다.</summary>
+        private bool TryGetBridgeArea(out Vector3 start, out Vector3 end, out RecyclingItem closest)
+        {
+            Vector3 carry = _beaver.CarryPoint.position;
+            start = _beaver.transform.position + _beaver.transform.forward * _bridgeAttachStartDistance;
+            start.y = carry.y;
+            end = start;
+            closest = null;
+            Vector3 delta = carry - start;
+            float length = delta.magnitude;
+            if (length <= ATTACH_SURFACE_TOLERANCE) return false;
+            Vector3 direction = delta / length;
+
+            foreach (RecyclingItem member in _held)
+            {
+                if ((member.Collider.ClosestPoint(start) - start).sqrMagnitude <=
+                    _bridgeAttachRadius * _bridgeAttachRadius) return false;
+            }
+
+            int count;
+            while ((count = Physics.SphereCastNonAlloc(start, _bridgeAttachRadius, direction, _bridgeHitBuffer,
+                length, ~0, QueryTriggerInteraction.Ignore)) == _bridgeHitBuffer.Length)
+                Array.Resize(ref _bridgeHitBuffer, _bridgeHitBuffer.Length * 2);
+            float closestDistance = float.PositiveInfinity;
+            for (int i = 0; i < count; i++)
+            {
+                RecyclingItem member = _bridgeHitBuffer[i].collider.GetComponentInParent<RecyclingItem>();
+                if (member == null || !_held.Contains(member)) continue;
+                float distance = _bridgeHitBuffer[i].distance;
+                if (distance >= closestDistance) continue;
+                closest = member;
+                closestDistance = distance;
+            }
+            if (closest == null || closestDistance <= ATTACH_SURFACE_TOLERANCE) return false;
+            end = start + direction * closestDistance;
+            return true;
+        }
+
+        /// <summary>추가 묶음과 이동량을 검사해 강 경계와 주변 Collider를 침범하지 않는지 반환한다.</summary>
+        private bool CanMoveBridgeBundle(List<RecyclingItem> incoming, RecyclingItem target, Vector3 offset)
+        {
+            if (offset.sqrMagnitude <= ATTACH_SURFACE_TOLERANCE * ATTACH_SURFACE_TOLERANCE) return true;
+            var incomingSet = new HashSet<RecyclingItem>(incoming);
+            Vector3 beaverCenter = _beaver.transform.position;
+            beaverCenter.y = _beaver.CarryPoint.position.y;
+            foreach (RecyclingItem member in incoming)
+            {
+                Collider moving = member.Collider;
+                Bounds before = moving.bounds;
+                Vector3 closestBefore = Physics.ClosestPoint(beaverCenter, moving,
+                    moving.transform.position, moving.transform.rotation);
+                float beaverDistanceBefore = Vector3.Distance(beaverCenter, closestBefore);
+                for (int step = 1; step <= BRIDGE_MOVE_CHECK_STEPS; step++)
+                {
+                    Vector3 displacement = offset * (step / (float)BRIDGE_MOVE_CHECK_STEPS);
+                    Bounds moved = before;
+                    moved.center += displacement;
+                    if (Mathf.Max(0f, _riverMinimum.x - moved.min.x) > Mathf.Max(0f, _riverMinimum.x - before.min.x) + ATTACH_SURFACE_TOLERANCE ||
+                        Mathf.Max(0f, moved.max.x - _riverMaximum.x) > Mathf.Max(0f, before.max.x - _riverMaximum.x) + ATTACH_SURFACE_TOLERANCE ||
+                        Mathf.Max(0f, _waterfallZ - moved.min.z) > Mathf.Max(0f, _waterfallZ - before.min.z) + ATTACH_SURFACE_TOLERANCE ||
+                        Mathf.Max(0f, moved.max.z - _riverMaximum.y) > Mathf.Max(0f, before.max.z - _riverMaximum.y) + ATTACH_SURFACE_TOLERANCE) return false;
+
+                    Vector3 closestAfter = Physics.ClosestPoint(beaverCenter, moving,
+                        moving.transform.position + displacement, moving.transform.rotation);
+                    float beaverDistanceAfter = Vector3.Distance(beaverCenter, closestAfter);
+                    if (beaverDistanceAfter < BRIDGE_BEAVER_RADIUS &&
+                        beaverDistanceAfter < beaverDistanceBefore - ATTACH_SURFACE_TOLERANCE) return false;
+
+                    int count;
+                    while ((count = Physics.OverlapBoxNonAlloc(moved.center, moved.extents, _overlapBuffer,
+                        Quaternion.identity, ~0, QueryTriggerInteraction.Ignore)) == _overlapBuffer.Length)
+                        Array.Resize(ref _overlapBuffer, _overlapBuffer.Length * 2);
+                    for (int i = 0; i < count; i++)
+                    {
+                        Collider obstacle = _overlapBuffer[i];
+                        RecyclingItem other = obstacle.GetComponentInParent<RecyclingItem>();
+                        if (obstacle == moving || other == target || incomingSet.Contains(other)) continue;
+                        if (!Physics.ComputePenetration(moving, moving.transform.position + displacement,
+                            moving.transform.rotation, obstacle, obstacle.transform.position, obstacle.transform.rotation,
+                            out _, out float depth)) continue;
+                        bool wasOverlapping = Physics.ComputePenetration(moving, moving.transform.position,
+                            moving.transform.rotation, obstacle, obstacle.transform.position, obstacle.transform.rotation,
+                            out _, out float previousDepth);
+                        if (!wasOverlapping || depth > previousDepth + ATTACH_SURFACE_TOLERANCE) return false;
+                    }
+                }
+            }
+            return true;
+        }
 
         /// <summary>새 기물의 ISO 투영 면적 중 단일 운반 기물과 30% 이상 겹치는 대상만 결합 후보로 고른다.</summary>
         private bool TryGetProjectedContactPoint(RecyclingItem joining, out RecyclingItem contact,
@@ -1322,9 +1481,10 @@ namespace BeaverRecycling
                     ? "" : "\n새 분류 추가 - " + newCategories;
                 _hud.ShowModal(_day + "일차 · 출근 준비",
                     "오늘의 목표 " + _targets[_day - 1] + "점" + categoryLine + "\n\n" +
-                    movementKey + " 이동\n" + interactKey + " 집기 / 놓기 / 투입구에서 놓으면 분류\n" +
-                    splitKey + " 묶음 분리\n" + menuKey + " 일시정지\n" +
-                    (_displayedGamepadConnected ? "South 확인" : "Space / Enter 확인"),
+                    movementKey + " 이동 · " + interactKey + " 집기/놓기 · " + splitKey + " 분리\n" +
+                    menuKey + " 메뉴 · " + (_displayedGamepadConnected ? "South 확인" : "Space / Enter 확인") +
+                    "\n\n투입구에서 놓으면 분류 · 나무 폭포 통과 +3점·목재\n" +
+                    "유실 없음 +10점·+3목재 · 오분류 없음 +10점·+3목재\n목표 초과 10점당 +1목재",
                     "출근", "", false);
             }
             else if (_phase == DayPhase.Paused)
