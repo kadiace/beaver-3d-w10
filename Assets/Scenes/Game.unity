@@ -580,6 +580,7 @@ MonoBehaviour:
   _baseCapacity: 6
   _splitScatterDistance: 0.6
   _minimumProjectedOverlap: 0.3
+  _editorStartDay: 1
 --- !u!1 &3100000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -7950,8 +7951,8 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1.1
-  m_Text: "\uBC29\uD5A5\uD0A4/WASD: \uC774\uB3D9   E: \uC9D1\uAE30/\uB193\uAE30  
-    Q: \uBD84\uB9AC"
+  m_Text: "\uBC29\uD5A5\uD0A4: \uC774\uB3D9   X: \uC9D1\uAE30/\uB193\uAE30   Z: \uBD84\uB9AC  
+    ESC: \uBA54\uB274"
 --- !u!1 &3100000353
 GameObject:
   m_ObjectHideFlags: 0
@@ -8687,7 +8688,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 100}
-  m_SizeDelta: {x: 910, y: 260}
+  m_SizeDelta: {x: 910, y: 300}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3100000391
 CanvasRenderer:
@@ -9786,6 +9787,7 @@ MonoBehaviour:
   _score: {fileID: 3100000318}
   _wood: {fileID: 3100000322}
   _carry: {fileID: 3100000348}
+  _controls: {fileID: 3100000352}
   _message: {fileID: 3100000356}
   _hover: {fileID: 3100000364}
   _toast: {fileID: 3100000372}

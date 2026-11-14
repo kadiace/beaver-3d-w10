@@ -1,7 +1,9 @@
 using System;
 
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 
 public class InputManager
 {
@@ -12,6 +14,15 @@ public class InputManager
     private InputActionMap _uiMap;
     private InputMode _inputMode = InputMode.Player;
     private bool _useRecyclingControls;
+
+    // Keep the shared EventSystem mouse bindings for the other game modes.
+    private InputSystemUIInputModule _uiInputModule;
+    private InputActionReference _savedPoint;
+    private InputActionReference _savedLeftClick;
+    private InputActionReference _savedRightClick;
+    private InputActionReference _savedMiddleClick;
+    private InputActionReference _savedScrollWheel;
+    private bool _savedBackgroundDeselect;
 
     [Header("Player actions")]
     private InputAction _move;
@@ -28,7 +39,7 @@ public class InputManager
     private InputAction _splitBundle;
 
     [Header("UI actions")]
-    private InputAction _uiClick;
+    private InputAction _uiSubmit;
     private InputAction _uiCancel;
     private InputAction _uiSortExclude;
 
@@ -51,9 +62,11 @@ public class InputManager
     public bool RotateRightPressed => _rotateRight.WasPressedThisFrame();
     public bool RotateRightHeld => _rotateRight.IsPressed();
     public bool FloodPreviewPressed => _floodPreview.WasPressedThisFrame();
-    public bool ConfirmPressed => _inputMode == InputMode.UI && _uiClick.WasPressedThisFrame();
+    public bool ConfirmPressed => _inputMode == InputMode.UI && _uiSubmit.WasPressedThisFrame();
     public bool SortExcludePressed => _inputMode == InputMode.UI && _uiSortExclude.WasPressedThisFrame();
-    public bool GamePadConnected { get; private set; }
+    // Physical availability, not whichever device was used most recently.
+    // Querying Gamepad.all also reflects hot-plugging while a modal pauses Time.timeScale.
+    public bool GamePadConnected => Gamepad.all.Count > 0;
 
     /// <summary>프로젝트 공용 Input Actions에서 게임과 UI 액션을 찾아 보관하고 입력 모드를 초기화한다.</summary>
     public void Init()
@@ -71,11 +84,10 @@ public class InputManager
         _floodPreview = _playerMap.FindAction("ToggleFloodPreview", true);
         _interact = _recyclingMap.FindAction("Interact", true);
         _splitBundle = _recyclingMap.FindAction("SplitBundle", true);
-        _uiClick = _uiMap.FindAction("Click", true);
+        _uiSubmit = _uiMap.FindAction("Submit", true);
         _uiCancel = _uiMap.FindAction("Cancel", true);
         _uiSortExclude = _uiMap.FindAction("SortExclude", true);
 
-        InputSystem.onActionChange += CheckDeviceType;
         SetInputMode(InputMode.Player);
     }
 
@@ -108,26 +120,46 @@ public class InputManager
         _uiMap.Enable();
         _playerMap.Disable();
         _recyclingMap.Disable();
+        ConfigureUiPointerInput();
         if (mode == InputMode.Player)
         {
             (_useRecyclingControls ? _recyclingMap : _playerMap).Enable();
             Cursor.lockState = _useRecyclingControls ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = _useRecyclingControls;
+            Cursor.visible = false;
             Time.timeScale = 1f;
         }
         else
         {
             Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            Cursor.visible = !_useRecyclingControls;
             Time.timeScale = 0f;
         }
     }
 
-    /// <summary>공용 액션이 수행된 입력 장치를 확인하고 게임패드 사용 상태를 갱신한다.</summary>
-    private void CheckDeviceType(object actionObject, InputActionChange change)
+    /// <summary>분리수거 모드에선 UI 포인터를 제거해 방향키/Submit으로만 버튼을 조작한다.</summary>
+    private void ConfigureUiPointerInput()
     {
-        if (change != InputActionChange.ActionPerformed) return;
-        if (actionObject is InputAction action && action.actionMap?.asset == _actions)
-            GamePadConnected = action.activeControl?.device is Gamepad;
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null) return;
+        InputSystemUIInputModule module = eventSystem.GetComponent<InputSystemUIInputModule>();
+        if (module == null) return;
+
+        if (_uiInputModule != module)
+        {
+            _uiInputModule = module;
+            _savedPoint = module.point;
+            _savedLeftClick = module.leftClick;
+            _savedRightClick = module.rightClick;
+            _savedMiddleClick = module.middleClick;
+            _savedScrollWheel = module.scrollWheel;
+            _savedBackgroundDeselect = module.deselectOnBackgroundClick;
+        }
+
+        module.point = _useRecyclingControls ? null : _savedPoint;
+        module.leftClick = _useRecyclingControls ? null : _savedLeftClick;
+        module.rightClick = _useRecyclingControls ? null : _savedRightClick;
+        module.middleClick = _useRecyclingControls ? null : _savedMiddleClick;
+        module.scrollWheel = _useRecyclingControls ? null : _savedScrollWheel;
+        module.deselectOnBackgroundClick = !_useRecyclingControls && _savedBackgroundDeselect;
     }
 }

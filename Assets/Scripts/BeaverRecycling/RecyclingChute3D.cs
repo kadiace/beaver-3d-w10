@@ -123,7 +123,8 @@ namespace BeaverRecycling
 
             _cover.SetActive(false);
             string suffix = selected && hasBundle
-                ? "\nE 투입  " + (preview.Score >= 0 ? "+" : "") + preview.Score + "점"
+                ? "\n" + (Managers.Input.GamePadConnected ? "South" : "X") + " 투입  " +
+                  (preview.Score >= 0 ? "+" : "") + preview.Score + "점"
                 : "";
             _label.text = RecyclingRules.Name(_category) + suffix;
             _label.color = selected && hasBundle && preview.Wrong > 0
