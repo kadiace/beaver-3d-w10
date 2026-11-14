@@ -22,6 +22,14 @@ namespace BeaverRecycling
 
         public RecyclingCategory Category => _category;
         public Vector3 IntakePosition => _intakePoint.position;
+        public Bounds DockBounds
+        {
+            get
+            {
+                if (_dock == null) _dock = transform.Find("Dock").GetComponent<Renderer>();
+                return _dock.bounds;
+            }
+        }
 
         void OnDestroy()
         {
@@ -41,9 +49,8 @@ namespace BeaverRecycling
         public bool CoversMajority(int day, IReadOnlyList<RecyclingItem> items)
         {
             if (!IsAvailable(day) || items.Count == 0) return false;
-            if (_dock == null) _dock = transform.Find("Dock").GetComponent<Renderer>();
             if (_sortingBox == null) _sortingBox = transform.Find("Sorting box").GetComponent<Renderer>();
-            Bounds dockBounds = _dock.bounds;
+            Bounds dockBounds = DockBounds;
             Bounds boxBounds = _sortingBox.bounds;
             Rect dock = Rect.MinMaxRect(dockBounds.min.x, dockBounds.min.z, dockBounds.max.x, dockBounds.max.z);
             Rect box = Rect.MinMaxRect(boxBounds.min.x, boxBounds.min.z, boxBounds.max.x, boxBounds.max.z);
