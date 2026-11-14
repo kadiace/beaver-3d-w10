@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace BeaverRecycling
 {
@@ -16,6 +15,7 @@ namespace BeaverRecycling
         private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
+        private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
@@ -75,17 +75,13 @@ namespace BeaverRecycling
         private readonly int[] _startLevels = new int[3];
         private Collider[] _overlapBuffer = new Collider[64];
         private RaycastHit[] _bridgeHitBuffer = new RaycastHit[64];
-        private RecyclingItem _tracked;
         private DayPhase _phase;
         private DayPhase _beforePause;
         private DayPhase _beforeSorting;
         private Vector2 _movement;
-        private Vector2 _dragDistance;
         private Vector3 _cameraTarget;
-        private bool _cameraGesture;
-        private bool _cameraDragged;
-        private bool _followBeaver = true;
         private bool _passed;
+        private bool _displayedGamepadConnected;
         private int _day = 1;
         private int _wood;
         private int _dayStartWood;
@@ -131,6 +127,7 @@ namespace BeaverRecycling
             _day = Mathf.Clamp(_editorStartDay, 1, _targets.Length);
 #endif
             Managers.Input.UseRecyclingControls(true);
+            _displayedGamepadConnected = Managers.Input.GamePadConnected;
             _hud.Initialize(this);
             _camera.orthographic = true;
             _camera.orthographicSize = 13.5f;
@@ -140,9 +137,19 @@ namespace BeaverRecycling
 
         void Update()
         {
+            // Update the currently visible modal on plug/unplug, including while the game is paused.
+            bool gamepadConnected = Managers.Input.GamePadConnected;
+            if (_displayedGamepadConnected != gamepadConnected)
+            {
+                _displayedGamepadConnected = gamepadConnected;
+                if (_phase == DayPhase.Preparation || _phase == DayPhase.Paused ||
+                    _phase == DayPhase.Result || _phase == DayPhase.Clear)
+                    UpdateModal();
+            }
             if (Managers.Input.CancelPressed)
             {
                 TogglePause();
+                RefreshChutes();
                 return;
             }
             if (IsWorking)
@@ -150,11 +157,6 @@ namespace BeaverRecycling
                 bool stunned = Time.time < _beaverStunnedUntil;
                 _beaver.SetStunned(stunned);
                 _movement = stunned ? Vector2.zero : Managers.Input.MoveInput;
-                if (!stunned && _movement.sqrMagnitude > 0.001f)
-                {
-                    _tracked = null;
-                    _followBeaver = true;
-                }
                 if (!stunned && Managers.Input.InteractPressed) HandleInteract();
                 if (!stunned && Managers.Input.SplitBundlePressed && _held.Count > 0) ReleaseBundle(true);
                 _elapsed += Time.deltaTime;
@@ -183,33 +185,39 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (!IsWorking) return;
+            if (_held.Count > 0 &&
+                (_held[0].Body.position - _beaver.CarryPoint.position).sqrMagnitude <= 0.0001f)
+            {
+                Physics.SyncTransforms();
+                CollectContacts();
+            }
             float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
+            float speed = (_baseSpeed + 0.5f * _levels[1]) * slowdown;
+            if (_held.Count == 0) speed *= EMPTY_HANDED_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
-            _beaver.Move(_movement, (_baseSpeed + 0.5f * _levels[1]) * slowdown, Time.fixedDeltaTime);
+            _beaver.Move(_movement, speed, Time.fixedDeltaTime);
             if (_held.Count == 0) return;
             Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
             Vector3 beaverPosition = _beaver.transform.position;
+            Vector3 anchorPosition = beaverPosition + rotationDelta *
+                (_held[0].Body.position - previousBeaverPosition);
+            Vector3 carryOffset = _beaver.CarryPoint.position - anchorPosition;
+            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
             foreach (RecyclingItem member in _held)
             {
-                member.Body.position = beaverPosition + rotationDelta * (member.Body.position - previousBeaverPosition);
-                member.Body.rotation = rotationDelta * member.Body.rotation;
+                Vector3 targetPosition = beaverPosition + rotationDelta *
+                    (member.Body.position - previousBeaverPosition) + carryOffset;
+                Quaternion targetRotation = rotationDelta * member.Body.rotation;
+                member.Body.MovePosition(targetPosition);
+                member.Body.MoveRotation(targetRotation);
+                member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity, targetPosition);
             }
-            Vector3 delta = _beaver.CarryPoint.position - _held[0].Body.position;
-            foreach (RecyclingItem member in _held) member.Body.position += delta;
-            Physics.SyncTransforms();
-            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
-            foreach (RecyclingItem member in _held) member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity);
-            CollectContacts();
         }
 
         void LateUpdate()
         {
-            if (IsWorking) ReadCameraInput();
-            if (_tracked != null && !_tracked.IsResolved) _cameraTarget = Vector3.Lerp(_cameraTarget,
-                new Vector3(_tracked.transform.position.x, 0f, _tracked.transform.position.z),
-                1f - Mathf.Exp(-8f * Time.unscaledDeltaTime));
-            else if (_followBeaver) _cameraTarget = Vector3.Lerp(_cameraTarget,
+            _cameraTarget = Vector3.Lerp(_cameraTarget,
                 new Vector3(_beaver.transform.position.x, 0f, _beaver.transform.position.z + 2f),
                 1f - Mathf.Exp(-6f * Time.unscaledDeltaTime));
             _cameraTarget.x = Mathf.Clamp(_cameraTarget.x, -9f, 9f);
@@ -364,7 +372,7 @@ namespace BeaverRecycling
             return closest;
         }
 
-        /// <summary>현재 운반 상태와 투입구 위치에 따라 E 입력을 집기·내려놓기·투입으로 처리한다.</summary>
+        /// <summary>현재 운반 상태와 투입구 위치에 따라 X/South 입력을 집기·내려놓기·투입으로 처리한다.</summary>
         private void HandleInteract()
         {
             if (_held.Count == 0)
@@ -386,7 +394,6 @@ namespace BeaverRecycling
             if (distance > Reach) { _hud.Message("가까이 이동해서 집으세요"); return; }
             List<RecyclingItem> group = RecyclingItem.Collect(item);
             if (group.Count > Capacity) { _hud.Message("운반 한도 " + Capacity + "개 · 현재 묶음 " + group.Count + "개"); return; }
-            _tracked = null;
             _held.Add(item);
             foreach (RecyclingItem member in group) if (member != item) _held.Add(member);
             foreach (RecyclingItem member in _held) member.SetHeld(true);
@@ -980,32 +987,33 @@ namespace BeaverRecycling
             return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
-        /// <summary>비버 위치에서 사용 가능한 가장 가까운 투입구를 반환한다.</summary>
-        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position);
+        /// <summary>비버 위치와 운반 묶음의 상단 겹침을 기준으로 사용할 투입구를 반환한다.</summary>
+        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position, _held);
 
-        /// <summary>주어진 월드 위치와 수평거리 기준으로 사용 가능한 가장 가까운 투입구를 반환한다.</summary>
-        private RecyclingChute3D FindChute(Vector3 position)
+        /// <summary>묶음 바닥면이 절반 넘게 올라간 투입구 중 주어진 위치에서 가장 가까운 곳을 반환한다.</summary>
+        private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
         {
             RecyclingChute3D nearest = null;
             float distance = float.PositiveInfinity;
             foreach (RecyclingChute3D chute in _chutes)
             {
-                if (!chute.CanUse(_day, position)) continue;
+                if (!chute.CoversMajority(_day, items)) continue;
                 float next = (chute.transform.position - position).sqrMagnitude;
-                if (next < distance) { nearest = chute; distance = next; }
+                if (next >= distance) continue;
+                nearest = chute;
+                distance = next;
             }
             return nearest;
         }
 
-        /// <summary>관성 이동을 마친 기물이 투입구 범위에 있으면 연결 묶음 전체를 일반 투입처럼 정산한다.</summary>
+        /// <summary>던진 기물 묶음의 바닥면이 투입구 상단에 절반 넘게 걸치면 전체를 일반 투입처럼 정산한다.</summary>
         public bool TrySubmitThrownItem(RecyclingItem item)
         {
             if (!IsWorking || item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) return false;
-            RecyclingChute3D chute = FindChute(item.Body.position);
-            if (chute == null) return false;
-
             List<RecyclingItem> bundle = RecyclingItem.Collect(item);
             if (bundle.Any(member => member.IsHeld || member.IsResolved || !_items.Contains(member))) return false;
+            RecyclingChute3D chute = FindChute(item.Body.position, bundle);
+            if (chute == null) return false;
             SubmitItems(chute, bundle);
             return true;
         }
@@ -1196,19 +1204,17 @@ namespace BeaverRecycling
             _bombs.Remove(bomb);
         }
 
-        /// <summary>풀에 반환된 기물을 받아 생성 목록·운반·카메라 추적에서 제거한다.</summary>
+        /// <summary>풀에 반환된 기물을 받아 생성 목록과 운반 상태에서 제거한다.</summary>
         public void ForgetItem(RecyclingItem item)
         {
             _items.Remove(item);
             _held.Remove(item);
-            if (_tracked == item) _tracked = null;
         }
 
         /// <summary>하루 종료 또는 재시도에서 모든 생성 기물과 운반 상태를 풀에 반환한다.</summary>
         private void ClearWorld()
         {
             _held.Clear();
-            _tracked = null;
             foreach (RecyclingItem item in _items.ToArray()) if (item != null) item.ReturnNow();
             _items.Clear();
             foreach (BombExplosion3D bomb in _bombs.ToArray()) bomb.ReturnNow();
@@ -1238,7 +1244,6 @@ namespace BeaverRecycling
             _elapsed = 0f;
             _nextSpawn = 0.5f;
             _phase = DayPhase.Supply;
-            _cameraGesture = _cameraDragged = false;
             SetUiMode(false);
             _hud.HideModal();
         }
@@ -1327,7 +1332,7 @@ namespace BeaverRecycling
         {
             Managers.Input.SetInputMode(ui ? InputMode.UI : InputMode.Player);
             Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            Cursor.visible = false;
         }
 
         /// <summary>선택된 업그레이드 인덱스를 받아 목재가 충분하면 한 단계 구매하고 상점 수치를 갱신한다.</summary>
@@ -1345,11 +1350,28 @@ namespace BeaverRecycling
         /// <summary>현재 진행 상태와 통계를 사용하여 준비·결과·상점·일시정지 패널을 갱신한다.</summary>
         private void UpdateModal()
         {
+            string movementKey = _displayedGamepadConnected ? "왼쪽 스틱" : "방향키";
+            string interactKey = _displayedGamepadConnected ? "South" : "X";
+            string splitKey = _displayedGamepadConnected ? "West" : "Z";
+            string menuKey = _displayedGamepadConnected ? "Menu" : "ESC";
             if (_phase == DayPhase.Preparation)
-                _hud.ShowModal(_day + "일차 · 출근 준비", "오늘의 목표 " + _targets[_day - 1] + "점\n" +
-                    RecyclingRules.DayCategories(_day) + "\n\n방향키 이동 · E 집기/놓기\n투입구에서 놓으면 분류 · Q 묶음 분리\n\n나무 폭포 통과 +3점·목재\n쓰레기 유실 0회 +10점·+3목재\n오분류 0회 +10점·+3목재\n목표 초과 10점당 +1목재", "출근", "", false);
+            {
+                // 새로 해금되는 분류만 표시한다. 4일차부터는 추가되는 분류가 없다.
+                string newCategories = _day == 1 ? "플라스틱 / 금속" :
+                    _day == 2 ? "유리" : _day == 3 ? "비닐" : "";
+                string categoryLine = string.IsNullOrEmpty(newCategories)
+                    ? "" : "\n새 분류 추가 - " + newCategories;
+                _hud.ShowModal(_day + "일차 · 출근 준비",
+                    "오늘의 목표 " + _targets[_day - 1] + "점" + categoryLine + "\n\n" +
+                    movementKey + " 이동 · " + interactKey + " 집기/놓기 · " + splitKey + " 분리\n" +
+                    menuKey + " 메뉴 · " + (_displayedGamepadConnected ? "South 확인" : "Space / Enter 확인") +
+                    "\n\n투입구에서 놓으면 분류 · 나무 폭포 통과 +3점·목재\n" +
+                    "유실 없음 +10점·+3목재 · 오분류 없음 +10점·+3목재\n목표 초과 10점당 +1목재",
+                    "출근", "", false);
+            }
             else if (_phase == DayPhase.Paused)
-                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\nQ로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
+                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\n" +
+                    splitKey + "로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
@@ -1390,13 +1412,25 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>현재 점수와 운반 묶음의 재질 개수를 짧은 HUD 문구로 전달한다.</summary>
+        /// <summary>운반 묶음의 내용과 네 투입구 중 가장 높은 즉시 제출 예상 점수를 HUD에 표시한다.</summary>
         private void RefreshHud()
         {
             string carried = "빈손 · 같은 재질을 모아 투입구에 제출하세요";
             if (_held.Count > 0)
+            {
                 carried = "운반 " + _held.Count + "/" + Capacity + "  ·  " + string.Join("  ",
                     _held.GroupBy(p => p.Definition.Category).Select(g => RecyclingRules.Name(g.Key) + " " + g.Count()));
+
+                // Use the same scoring rules as a direct submission, without excluding items in the sorting mini-game.
+                int bestScore = int.MinValue;
+                foreach (RecyclingChute3D chute in _chutes)
+                {
+                    if (chute == null) continue;
+                    bestScore = Mathf.Max(bestScore, RecyclingRules.Evaluate(_held, chute.Category).Score);
+                }
+                if (bestScore != int.MinValue)
+                    carried += "  ·  최고 예상 " + (bestScore >= 0 ? "+" : "") + bestScore + "점";
+            }
             string phase = _phase == DayPhase.Supply ? "공급" : _phase == DayPhase.Closing ? "마감 정리" : "준비 / 정산";
             float remaining = _phase == DayPhase.Supply ? _supplySeconds - _elapsed : _supplySeconds + _closingSeconds - _elapsed;
             _hud.Refresh(_day, phase, remaining, _dayScore, _targets[_day - 1], _wood, carried, IsWorking);
@@ -1424,70 +1458,22 @@ namespace BeaverRecycling
             }
             RecyclingItem pickupTarget = _held.Count == 0 ? FindPickupTarget() : null;
             if (pickupTarget != null) pickupTarget.SetOutline(2u);
-            RecyclingItem hovered = _tracked != null && !_tracked.IsResolved ? _tracked : pickupTarget;
+            RecyclingItem hovered = pickupTarget;
             if (hovered == null) { _hud.Hint("", Vector2.zero); return; }
-            bool mixed = _held.Count > 0 && hovered.Definition.Category != _held[0].Definition.Category;
-            if (hovered != pickupTarget) hovered.SetOutline(mixed ? 8u : 2u);
             string hint = hovered.Definition.Name + " · " + RecyclingRules.Name(hovered.Definition.Category) +
-                (hovered.Definition.IsWood ? "\n폭포로 보내 목재를 얻으세요" : mixed ? "\n다른 재질이 섞여요" : "");
+                (hovered.Definition.IsWood ? "\n폭포로 보내 목재를 얻으세요" : "");
             Vector2 screen = _camera.WorldToScreenPoint(hovered.transform.position);
             _hud.Hint(hint, screen);
         }
 
         /// <summary>
-        /// Resets camera tracking to follow the beaver at the start of a day.
-        /// Uses the beaver transform and updates the tracked item and camera target.
+        /// Initializes camera follow to the beaver at the start of a day.
+        /// Uses the beaver transform to initialize the camera target.
         /// </summary>
         private void ResetCameraTarget()
         {
-            _tracked = null;
-            _followBeaver = true;
             _cameraTarget = new Vector3(_beaver.transform.position.x, 0f, _beaver.transform.position.z + 2f);
         }
 
-        /// <summary>
-        /// Casts through the current pointer and returns the registered recycling item under it.
-        /// Uses the camera and pointer position, and returns the hit item or null.
-        /// </summary>
-        private RecyclingItem PickAtCursor()
-        {
-            if (!Managers.Input.HasPointer) return null;
-            Ray ray = _camera.ScreenPointToRay(Managers.Input.PointerPosition);
-            if (!Physics.Raycast(ray, out RaycastHit hit, _camera.farClipPlane,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return null;
-            RecyclingItem item = hit.collider.GetComponentInParent<RecyclingItem>();
-            return item != null && !item.IsResolved && _items.Contains(item) ? item : null;
-        }
-        /// <summary>
-        /// Reads right-click and pointer input and updates the tracked item.
-        /// </summary>
-        private void ReadCameraInput()
-        {
-            bool overUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-            if (Managers.Input.SecondaryPressed)
-            {
-                _cameraGesture = !overUi;
-                _cameraDragged = false;
-                _dragDistance = Vector2.zero;
-            }
-            if (_cameraGesture && (Managers.Input.SecondaryHeld || Managers.Input.SecondaryReleased))
-            {
-                Vector2 delta = Managers.Input.SecondaryPressed ? Vector2.zero : Managers.Input.PointerDelta;
-                if (!_cameraDragged)
-                {
-                    _dragDistance += delta;
-                    _cameraDragged = _dragDistance.sqrMagnitude >= 36f;
-                }
-            }
-            if (Managers.Input.SecondaryReleased)
-            {
-                if (_cameraGesture && !_cameraDragged && !overUi)
-                {
-                    _tracked = PickAtCursor();
-                    _followBeaver = _tracked == null;
-                }
-                _cameraGesture = false;
-            }
-        }
     }
 }

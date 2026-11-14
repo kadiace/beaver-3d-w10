@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace BeaverRecycling
@@ -14,6 +15,7 @@ namespace BeaverRecycling
         [SerializeField] private Text _score;
         [SerializeField] private Text _wood;
         [SerializeField] private Text _carry;
+        [SerializeField] private Text _controls;
         [SerializeField] private Text _message;
         [SerializeField] private Text _hover;
         [SerializeField] private Text _toast;
@@ -34,6 +36,21 @@ namespace BeaverRecycling
         [SerializeField] private RecyclingSortingWindow3D _sortingWindowPrefab;
         private float _messageUntil;
         private float _toastUntil;
+        private bool _displayedGamepadConnected;
+        private Button[] _modalButtons;
+        private Outline[] _focusOutlines;
+
+        /// <summary>게임패드 연결/해제 시 인게임 HUD 키 안내를 현재 장치에 맞게 갱신한다.</summary>
+        private void RefreshControls(bool force = false)
+        {
+            if (_controls == null) return;
+            bool gamepadConnected = Managers.Input.GamePadConnected;
+            if (!force && _displayedGamepadConnected == gamepadConnected) return;
+            _displayedGamepadConnected = gamepadConnected;
+            _controls.text = gamepadConnected
+                ? "왼쪽 스틱: 이동   South: 집기/놓기   West: 분리   Menu: 메뉴"
+                : "방향키: 이동   X: 집기/놓기   Z: 분리   ESC: 메뉴";
+        }
 
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
         public void Initialize(RecyclingGame3D game)
@@ -49,6 +66,64 @@ namespace BeaverRecycling
             _hover.transform.parent.gameObject.SetActive(false);
             _toast.transform.parent.gameObject.SetActive(false);
             _message.text = "";
+            RefreshControls(true);
+            SetupModalFocus();
+        }
+
+        /// <summary>모달 버튼에 게임패드 내비게이션과 선택 시 강조할 굵은 외곽선을 준비한다.</summary>
+        private void SetupModalFocus()
+        {
+            _modalButtons = new Button[_upgradeButtons.Length + 2];
+            _modalButtons[0] = _primary;
+            _modalButtons[1] = _secondary;
+            Array.Copy(_upgradeButtons, 0, _modalButtons, 2, _upgradeButtons.Length);
+            _focusOutlines = new Outline[_modalButtons.Length];
+
+            foreach (Button button in _modalButtons)
+            {
+                Navigation navigation = button.navigation;
+                navigation.mode = Navigation.Mode.Automatic;
+                button.navigation = navigation;
+            }
+
+            for (int i = 0; i < _modalButtons.Length; i++)
+            {
+                Outline outline = _modalButtons[i].gameObject.AddComponent<Outline>();
+                outline.effectColor = new Color(1f, 0.94f, 0.25f, 1f);
+                outline.effectDistance = new Vector2(6f, -6f);
+                outline.useGraphicAlpha = false;
+                outline.enabled = false;
+                _focusOutlines[i] = outline;
+            }
+
+            // During gameplay the pad south button means pickup, not UI submission.
+            // In recycling mode, Escape/Menu opens the modal; the pointer is disabled.
+            Navigation pauseNavigation = _pauseButton.navigation;
+            pauseNavigation.mode = Navigation.Mode.None;
+            _pauseButton.navigation = pauseNavigation;
+        }
+
+        /// <summary>현재 모달에서 선택 가능한 버튼에 포커스를 유지하고 없으면 기본 버튼을 선택한다.</summary>
+        private void FocusModal()
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null || !_modal.activeInHierarchy) return;
+            if (IsValidModalSelection(eventSystem.currentSelectedGameObject)) return;
+            foreach (Button button in _modalButtons)
+            {
+                if (!button.gameObject.activeInHierarchy || !button.IsInteractable()) continue;
+                eventSystem.SetSelectedGameObject(button.gameObject);
+                return;
+            }
+        }
+
+        private bool IsValidModalSelection(GameObject selected)
+        {
+            if (selected == null || _modalButtons == null) return false;
+            foreach (Button button in _modalButtons)
+                if (button.gameObject == selected && button.gameObject.activeInHierarchy && button.IsInteractable())
+                    return true;
+            return false;
         }
 
         /// <summary>일차·시간·점수·목재·운반 정보를 받아 최소 HUD 수치를 갱신한다.</summary>
@@ -65,6 +140,7 @@ namespace BeaverRecycling
         public void ShowModal(string title, string body, string primary, string secondary, bool upgrades)
         {
             _modal.SetActive(true);
+            _pauseButton.interactable = false;
             _modalTitle.text = title;
             _modalBody.text = body;
             _primaryText.text = primary;
@@ -74,10 +150,17 @@ namespace BeaverRecycling
             RectTransform primaryRect = (RectTransform)_primary.transform;
             primaryRect.anchoredPosition = new Vector2(string.IsNullOrEmpty(secondary) ? 0f : -190f, primaryRect.anchoredPosition.y);
             _hover.transform.parent.gameObject.SetActive(false);
+            FocusModal();
         }
 
         /// <summary>출근 또는 재개 시 고정 모달 패널을 닫는다.</summary>
-        public void HideModal() => _modal.SetActive(false);
+        public void HideModal()
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem != null && IsValidModalSelection(eventSystem.currentSelectedGameObject))
+                eventSystem.SetSelectedGameObject(null);
+            _modal.SetActive(false);
+        }
 
         /// <summary>제출 아이템과 투입구 종류를 받아 중앙 분류 창을 표시하고 제외 후 정산 결과를 알린다.</summary>
         public void ShowSorting(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute,
@@ -90,7 +173,7 @@ namespace BeaverRecycling
                 Destroy(window.gameObject);
                 completed(submission, includedCount);
             });
-            UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
             _hover.transform.parent.gameObject.SetActive(false);
         }
 
@@ -99,6 +182,7 @@ namespace BeaverRecycling
         {
             _upgradeTexts[index].text = description;
             _upgradeButtons[index].interactable = available;
+            FocusModal();
         }
 
         /// <summary>짧은 조작 결과를 받아 HUD에 제한 시간 동안 표시한다.</summary>
@@ -141,8 +225,16 @@ namespace BeaverRecycling
 
         void Update()
         {
+            RefreshControls();
             if (Time.unscaledTime > _messageUntil) _message.text = "";
             if (Time.unscaledTime > _toastUntil) _toast.transform.parent.gameObject.SetActive(false);
+            if (_focusOutlines == null) return;
+            if (_modal.activeInHierarchy) FocusModal();
+            GameObject selected = _modal.activeInHierarchy && EventSystem.current != null
+                ? EventSystem.current.currentSelectedGameObject : null;
+            for (int i = 0; i < _focusOutlines.Length; i++)
+                _focusOutlines[i].enabled = selected != null &&
+                    _modalButtons[i].gameObject == selected && _modalButtons[i].IsInteractable();
         }
     }
 }
