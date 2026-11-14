@@ -249,7 +249,7 @@ namespace BeaverRecycling
         void Update()
         {
             if (_game == null || !_game.IsWorking || _held || _resolved) return;
-            if (transform.position.z <= _game.WaterfallZ) _game.ResolveExit(this, true, true);
+            if (_collider.bounds.min.z <= _game.ObjectBoundaryExitZ) _game.ResolveExit(this, true, true);
             else if (transform.position.y < _game.FallbackY || Mathf.Abs(transform.position.x) > 25f)
                 _game.ResolveExit(this, false, true);
         }
