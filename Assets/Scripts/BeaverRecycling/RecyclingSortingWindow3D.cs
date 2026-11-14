@@ -13,6 +13,8 @@ namespace BeaverRecycling
         private const float RESULT_SECONDS = 1.3f;
         private const float LINE_REACH = 22f;
         private const float ITEM_SCALE = 0.25f;
+        private const float INITIAL_ROLL_SPEED = 45f;
+        private const float ROLL_DAMPING = 0.2f;
 
         private static SimulationMode2D _previousSimulationMode;
         private static int _activeSimulationWindows;
@@ -39,7 +41,7 @@ namespace BeaverRecycling
 
         private readonly List<RectTransform> _sprites = new List<RectTransform>();
         private readonly List<float> _radii = new List<float>();
-        private readonly List<RectTransform> _visuals = new List<RectTransform>();
+        private readonly List<PolygonCollider2D> _colliders = new List<PolygonCollider2D>();
         private readonly List<GameObject> _borders = new List<GameObject>();
         private Action<RecyclingSubmission, int> _completed;
         private RecyclingDefinition[] _definitions;
@@ -108,8 +110,6 @@ namespace BeaverRecycling
                 Physics2D.Simulate(PHYSICS_STEP);
                 _physicsAccumulator -= PHYSICS_STEP;
             }
-            for (int i = 0; i < _visuals.Count; i++)
-                _visuals[i].rotation = Quaternion.identity;
             if (!_finished)
             {
                 RefreshTarget();
@@ -210,17 +210,36 @@ namespace BeaverRecycling
             visual.rectTransform.anchoredPosition = Vector2.zero;
             visual.gameObject.SetActive(true);
             image.enabled = false;
-            _visuals.Add(visual.rectTransform);
             _borders.Add(CreateSelectionBorder(visual.rectTransform));
-            CircleCollider2D circle = image.gameObject.AddComponent<CircleCollider2D>();
-            circle.radius = radius;
+            PolygonCollider2D collider = image.gameObject.AddComponent<PolygonCollider2D>();
+            ConfigureSpriteCollider(collider, sprite);
+            _colliders.Add(collider);
             Rigidbody2D body = image.gameObject.AddComponent<Rigidbody2D>();
             body.bodyType = RigidbodyType2D.Dynamic;
             body.gravityScale = _fallGravityScale;
+            body.angularDamping = ROLL_DAMPING;
+            body.angularVelocity = UnityEngine.Random.value < 0.5f
+                ? -INITIAL_ROLL_SPEED : INITIAL_ROLL_SPEED;
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
             body.linearVelocity = Vector2.zero;
             Physics2D.SyncTransforms();
             return true;
+        }
+
+        /// <summary>스프라이트의 물리 외곽선을 UI 이미지의 픽셀 크기에 맞는 충돌 경로로 변환한다.</summary>
+        private static void ConfigureSpriteCollider(PolygonCollider2D collider, Sprite sprite)
+        {
+            if (!collider.CreateFromSprite(sprite, 0.3f, 200, true, true))
+                throw new InvalidOperationException("Missing sprite physics shape: " + sprite.name);
+
+            float scale = sprite.pixelsPerUnit * ITEM_SCALE;
+            for (int i = 0; i < collider.pathCount; i++)
+            {
+                Vector2[] points = collider.GetPath(i);
+                for (int point = 0; point < points.Length; point++)
+                    points[point] *= scale;
+                collider.SetPath(i, points);
+            }
         }
 
         /// <summary>이미지의 바깥 크기를 늘리지 않는 흰색 선택 테두리를 이미지 안쪽에 만든다.</summary>
@@ -309,10 +328,23 @@ namespace BeaverRecycling
             for (int i = 0; i < _spawnedCount; i++)
             {
                 if (_excluded[i]) continue;
-                Vector2 position = _playfield.InverseTransformPoint(_sprites[i].position);
-                float radius = _radii[i];
-                if (position.y + radius > mouthY ||
-                    position.x - radius < leftX || position.x + radius > rightX)
+                PolygonCollider2D collider = _colliders[i];
+                float minX = float.PositiveInfinity;
+                float maxX = float.NegativeInfinity;
+                float maxY = float.NegativeInfinity;
+                for (int path = 0; path < collider.pathCount; path++)
+                {
+                    Vector2[] points = collider.GetPath(path);
+                    foreach (Vector2 point in points)
+                    {
+                        Vector2 position = _playfield.InverseTransformPoint(
+                            collider.transform.TransformPoint(point + collider.offset));
+                        minX = Mathf.Min(minX, position.x);
+                        maxX = Mathf.Max(maxX, position.x);
+                        maxY = Mathf.Max(maxY, position.y);
+                    }
+                }
+                if (maxY > mouthY || minX < leftX || maxX > rightX)
                     return false;
             }
             return true;
