@@ -17,6 +17,7 @@ namespace BeaverRecycling
         private const int FIRST_BOMB_DAY = 4;
         private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
+        private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
         private const int SPLIT_SEARCH_RINGS = 48;
@@ -1070,17 +1071,17 @@ namespace BeaverRecycling
             return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
-        /// <summary>비버 위치와 운반 묶음의 상단 겹침을 기준으로 사용할 투입구를 반환한다.</summary>
+        /// <summary>비버가 들고 있는 묶음을 동일한 카메라 투영 조건으로 제출할 투입구를 찾는다.</summary>
         private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position, _held);
 
-        /// <summary>묶음 바닥면이 절반 넘게 올라간 투입구 중 주어진 위치에서 가장 가까운 곳을 반환한다.</summary>
+        /// <summary>던지기와 직접 제출 모두 카메라에서 본 기물 면적의 50% 이상 겹치는 투입구를 사용한다.</summary>
         private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
         {
             RecyclingChute3D nearest = null;
             float distance = float.PositiveInfinity;
             foreach (RecyclingChute3D chute in _chutes)
             {
-                if (!chute.CoversMajority(_day, items)) continue;
+                if (!CoversProjectedMajority(chute, items)) continue;
                 float next = (chute.transform.position - position).sqrMagnitude;
                 if (next >= distance) continue;
                 nearest = chute;
@@ -1089,7 +1090,32 @@ namespace BeaverRecycling
             return nearest;
         }
 
-        /// <summary>던진 기물 묶음의 바닥면이 투입구 상단에 절반 넘게 걸치면 전체를 일반 투입처럼 정산한다.</summary>
+        /// <summary>카메라 화면에 투영된 기물 묶음 면적 중 Dock 또는 Sorting box와 겹치는 면적을 계산한다.</summary>
+        private bool CoversProjectedMajority(RecyclingChute3D chute, IReadOnlyList<RecyclingItem> items)
+        {
+            if (_camera == null || chute == null || !chute.IsAvailable(_day) || items.Count == 0) return false;
+
+            List<Vector2> dock = ProjectBoundsToViewport(chute.DockBounds);
+            List<Vector2> box = ProjectBoundsToViewport(chute.SortingBoxBounds);
+            // The two chute regions can overlap on screen. Count their union, not their sum.
+            List<Vector2> both = IntersectConvexPolygons(dock, box);
+            float totalArea = 0f;
+            float coveredArea = 0f;
+            foreach (RecyclingItem item in items)
+            {
+                List<Vector2> footprint = ProjectBoundsToViewport(item.Collider.bounds);
+                float area = PolygonArea(footprint);
+                if (area <= 0f) continue;
+
+                totalArea += area;
+                coveredArea += PolygonArea(IntersectConvexPolygons(footprint, dock)) +
+                    PolygonArea(IntersectConvexPolygons(footprint, box)) -
+                    PolygonArea(IntersectConvexPolygons(footprint, both));
+            }
+            return totalArea > 0f && coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO;
+        }
+
+        /// <summary>관성 비행 허용 시간 내 던진 묶음도 직접 제출과 동일한 화면 겹침 판정으로 정산한다.</summary>
         public bool TrySubmitThrownItem(RecyclingItem item)
         {
             if (!IsWorking || item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) return false;
