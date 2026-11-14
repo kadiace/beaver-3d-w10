@@ -51,7 +51,7 @@ namespace BeaverRecycling
             _displayedGamepadConnected = gamepadConnected;
             _controls.text = gamepadConnected
                 ? "왼쪽 스틱: 이동   South: 집기/놓기   West: 분리   Menu: 메뉴"
-                : "방향키: 이동   X: 집기/놓기   Z: 분리   ESC: 메뉴";
+                : "방향키: 이동   Z: 집기/놓기   X: 분리   ESC: 메뉴";
         }
 
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>

@@ -3,6 +3,7 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.UI;
 
 public class InputManager
@@ -71,9 +72,9 @@ public class InputManager
     public bool SecondaryHeld => _secondaryClick.IsPressed();
     public float CameraZoom => _cameraZoom.ReadValue<Vector2>().y;
     public bool InteractPressed => _interact.WasPressedThisFrame() ||
-        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame);
+        (_useRecyclingControls && WasBoundKeyboardButtonPressed(_interact));
     public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame() ||
-        (_useRecyclingControls && Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame);
+        (_useRecyclingControls && WasBoundKeyboardButtonPressed(_splitBundle));
     public bool CancelPressed => (_inputMode == InputMode.Player
         ? _cancel.WasPressedThisFrame() : _uiCancel.WasPressedThisFrame()) ||
         (_useRecyclingControls && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame);
@@ -91,6 +92,23 @@ public class InputManager
     // Physical availability, not whichever device was used most recently.
     // Querying Gamepad.all also reflects hot-plugging while a modal pauses Time.timeScale.
     public bool GamePadConnected => Gamepad.all.Count > 0;
+
+    /// <summary>액션의 키보드 바인딩을 읽어 현재 프레임에 해당 버튼이 눌렸는지 반환한다.</summary>
+    private static bool WasBoundKeyboardButtonPressed(InputAction action)
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null) return false;
+
+        const string keyboardPath = "<Keyboard>/";
+        foreach (InputBinding binding in action.bindings)
+        {
+            string path = binding.effectivePath;
+            if (string.IsNullOrEmpty(path) || !path.StartsWith(keyboardPath, StringComparison.OrdinalIgnoreCase)) continue;
+            ButtonControl button = keyboard.TryGetChildControl<ButtonControl>(path.Substring(keyboardPath.Length));
+            if (button != null && button.wasPressedThisFrame) return true;
+        }
+        return false;
+    }
 
     /// <summary>프로젝트 공용 Input Actions에서 게임과 UI 액션을 찾아 보관하고 입력 모드를 초기화한다.</summary>
     public void Init()
