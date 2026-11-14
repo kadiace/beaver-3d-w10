@@ -139,6 +139,7 @@ namespace BeaverRecycling
             if (Managers.Input.CancelPressed)
             {
                 TogglePause();
+                RefreshChutes();
                 return;
             }
             if (IsWorking)
