@@ -9806,6 +9806,7 @@ MonoBehaviour:
   - {fileID: 3100000403}
   - {fileID: 3100000412}
   - {fileID: 3100000421}
+  _sortingWindowPrefab: {fileID: 1882581532890070210, guid: 7636190ceddd44141ac60c09c00a187e, type: 3}
 --- !u!1 &3100000501
 GameObject:
   m_ObjectHideFlags: 0

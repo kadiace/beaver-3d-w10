@@ -678,6 +678,15 @@
                                          "initialStateCheck":  false
                                      },
                                      {
+                                         "name":  "SortExclude",
+                                         "type":  "Button",
+                                         "id":  "3f7e4f02-412e-48d1-bc6b-72bc1535eb91",
+                                         "expectedControlType":  "Button",
+                                         "processors":  "",
+                                         "interactions":  "",
+                                         "initialStateCheck":  false
+                                     },
+                                     {
                                          "name":  "Cancel",
                                          "type":  "Button",
                                          "id":  "15cef263-9014-4fd5-94d9-4e4a6234a6ef",
@@ -751,6 +760,17 @@
                                      }
                                  ],
                      "bindings":  [
+                                      {
+                                          "name":  "",
+                                          "id":  "eb4c2078-3e1a-4425-a635-797381e03c80",
+                                          "path":  "\u003cKeyboard\u003e/space",
+                                          "interactions":  "",
+                                          "processors":  "",
+                                          "groups":  "Keyboard\u0026Mouse",
+                                          "action":  "SortExclude",
+                                          "isComposite":  false,
+                                          "isPartOfComposite":  false
+                                      },
                                       {
                                           "name":  "Gamepad",
                                           "id":  "809f371f-c5e2-4e7a-83a1-d867598f40dd",

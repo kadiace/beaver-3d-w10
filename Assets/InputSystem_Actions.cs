@@ -785,6 +785,16 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""priority"": 0
                 },
                 {
+                    ""name"": ""SortExclude"",
+                    ""type"": ""Button"",
+                    ""id"": ""3f7e4f02-412e-48d1-bc6b-72bc1535eb91"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false,
+                    ""priority"": 0
+                },
+                {
                     ""name"": ""Cancel"",
                     ""type"": ""Button"",
                     ""id"": ""15cef263-9014-4fd5-94d9-4e4a6234a6ef"",
@@ -866,6 +876,17 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                 }
             ],
             ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""eb4c2078-3e1a-4425-a635-797381e03c80"",
+                    ""path"": ""<Keyboard>/space"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""SortExclude"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
                 {
                     ""name"": ""Gamepad"",
                     ""id"": ""809f371f-c5e2-4e7a-83a1-d867598f40dd"",
@@ -1670,6 +1691,7 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
         m_UI_Submit = m_UI.FindAction("Submit", throwIfNotFound: true);
+        m_UI_SortExclude = m_UI.FindAction("SortExclude", throwIfNotFound: true);
         m_UI_Cancel = m_UI.FindAction("Cancel", throwIfNotFound: true);
         m_UI_Point = m_UI.FindAction("Point", throwIfNotFound: true);
         m_UI_Click = m_UI.FindAction("Click", throwIfNotFound: true);
@@ -2056,6 +2078,7 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
     private List<IUIActions> m_UIActionsCallbackInterfaces = new List<IUIActions>();
     private readonly InputAction m_UI_Navigate;
     private readonly InputAction m_UI_Submit;
+    private readonly InputAction m_UI_SortExclude;
     private readonly InputAction m_UI_Cancel;
     private readonly InputAction m_UI_Point;
     private readonly InputAction m_UI_Click;
@@ -2083,6 +2106,10 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "UI/Submit".
         /// </summary>
         public InputAction @Submit => m_Wrapper.m_UI_Submit;
+        /// <summary>
+        /// Provides access to the underlying input action "UI/SortExclude".
+        /// </summary>
+        public InputAction @SortExclude => m_Wrapper.m_UI_SortExclude;
         /// <summary>
         /// Provides access to the underlying input action "UI/Cancel".
         /// </summary>
@@ -2147,6 +2174,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @Submit.started += instance.OnSubmit;
             @Submit.performed += instance.OnSubmit;
             @Submit.canceled += instance.OnSubmit;
+            @SortExclude.started += instance.OnSortExclude;
+            @SortExclude.performed += instance.OnSortExclude;
+            @SortExclude.canceled += instance.OnSortExclude;
             @Cancel.started += instance.OnCancel;
             @Cancel.performed += instance.OnCancel;
             @Cancel.canceled += instance.OnCancel;
@@ -2188,6 +2218,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @Submit.started -= instance.OnSubmit;
             @Submit.performed -= instance.OnSubmit;
             @Submit.canceled -= instance.OnSubmit;
+            @SortExclude.started -= instance.OnSortExclude;
+            @SortExclude.performed -= instance.OnSortExclude;
+            @SortExclude.canceled -= instance.OnSortExclude;
             @Cancel.started -= instance.OnCancel;
             @Cancel.performed -= instance.OnCancel;
             @Cancel.canceled -= instance.OnCancel;
@@ -2649,6 +2682,13 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnSubmit(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SortExclude" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSortExclude(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "Cancel" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>

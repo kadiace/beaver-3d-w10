@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -27,6 +30,8 @@ namespace BeaverRecycling
         [SerializeField] private GameObject _upgradeGroup;
         [SerializeField] private Button[] _upgradeButtons;
         [SerializeField] private Text[] _upgradeTexts;
+        [Header("Sorting window")]
+        [SerializeField] private RecyclingSortingWindow3D _sortingWindowPrefab;
         private float _messageUntil;
         private float _toastUntil;
 
@@ -73,6 +78,21 @@ namespace BeaverRecycling
 
         /// <summary>출근 또는 재개 시 고정 모달 패널을 닫는다.</summary>
         public void HideModal() => _modal.SetActive(false);
+
+        /// <summary>제출 아이템과 투입구 종류를 받아 중앙 분류 창을 표시하고 제외 후 정산 결과를 알린다.</summary>
+        public void ShowSorting(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute,
+            Action<RecyclingSubmission, int> completed)
+        {
+            RecyclingSortingWindow3D window = Instantiate(_sortingWindowPrefab, _root);
+            window.transform.SetAsLastSibling();
+            window.Play(definitions, chute, (submission, includedCount) =>
+            {
+                Destroy(window.gameObject);
+                completed(submission, includedCount);
+            });
+            UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+            _hover.transform.parent.gameObject.SetActive(false);
+        }
 
         /// <summary>업그레이드 인덱스와 설명·구매 가능 상태를 받아 해당 구매 버튼을 갱신한다.</summary>
         public void SetUpgrade(int index, string description, bool available)

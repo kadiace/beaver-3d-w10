@@ -9,7 +9,7 @@ namespace BeaverRecycling
 {
     public sealed class RecyclingGame3D : MonoBehaviour
     {
-        private enum DayPhase { Preparation, Supply, Closing, Result, Paused, Clear }
+        private enum DayPhase { Preparation, Supply, Closing, Result, Paused, Sorting, Clear }
         private const int NO_TRASH_LOSS_SCORE_BONUS = 10;
         private const int NO_TRASH_LOSS_WOOD_BONUS = 3;
         private const int NO_MISCLASSIFICATION_SCORE_BONUS = 10;
@@ -67,6 +67,7 @@ namespace BeaverRecycling
         private RecyclingItem _tracked;
         private DayPhase _phase;
         private DayPhase _beforePause;
+        private DayPhase _beforeSorting;
         private Vector2 _movement;
         private Vector2 _dragDistance;
         private Vector3 _cameraTarget;
@@ -492,18 +493,32 @@ namespace BeaverRecycling
             return nearest;
         }
 
-        /// <summary>선택된 투입구와 운반 묶음을 확정하고 같은 규칙의 점수·통계·제출 연출을 적용한다.</summary>
+        /// <summary>투입 순간의 아이템 정의와 점수를 확정하고 월드를 멈춘 뒤 분류 창을 연다.</summary>
         private void Submit(RecyclingChute3D chute)
         {
-            RecyclingSubmission submission = RecyclingRules.Evaluate(_held, chute.Category);
             var submitted = new List<RecyclingItem>(_held);
+            RecyclingDefinition[] definitions = submitted.Select(item => item.Definition).ToArray();
+            Vector3 intakePosition = chute.IntakePosition;
             _held.Clear();
+            foreach (RecyclingItem item in submitted) item.Resolve(intakePosition, false);
+            _beforeSorting = _phase;
+            _phase = DayPhase.Sorting;
+            _movement = Vector2.zero;
+            SetUiMode(true);
+            _hud.ShowSorting(definitions, chute.Category,
+                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition));
+        }
+
+        /// <summary>분류 창 종료 후 제출 점수와 통계를 한 번 적용하고 이전 작업 단계로 돌아간다.</summary>
+        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        {
             _dayScore += submission.Score;
             _correct += submission.Correct;
             _wrong += submission.Wrong;
-            if (submission.Correct == submitted.Count) _bestBundle = Mathf.Max(_bestBundle, submitted.Count);
-            foreach (RecyclingItem item in submitted) item.Resolve(chute.IntakePosition, true);
-            _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", chute.IntakePosition,
+            if (submission.Correct == submittedCount) _bestBundle = Mathf.Max(_bestBundle, submittedCount);
+            _phase = _beforeSorting;
+            SetUiMode(false);
+            _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", intakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }
 
