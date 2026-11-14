@@ -1402,7 +1402,7 @@
                                       {
                                           "name":  "",
                                           "id":  "de8dda64-c3a9-9948-0e72-b3fcdd9e815f",
-                                          "path":  "\u003cKeyboard\u003e/z",
+                                          "path":  "\u003cKeyboard\u003e/x",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  "Keyboard\u0026Mouse",
@@ -1424,7 +1424,7 @@
                                       {
                                           "name":  "",
                                           "id":  "f99064be-1cf2-ac89-cbf2-6b0db2810845",
-                                          "path":  "\u003cKeyboard\u003e/x",
+                                          "path":  "\u003cKeyboard\u003e/z",
                                           "interactions":  "",
                                           "processors":  "",
                                           "groups":  "Keyboard\u0026Mouse",
