@@ -205,6 +205,7 @@ namespace BeaverRecycling
                 (_held[0].Body.position - previousBeaverPosition);
             Vector3 carryOffset = _beaver.CarryPoint.position - anchorPosition;
             Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
+            CollectImminentContacts(previousBeaverPosition, beaverPosition, rotationDelta, carryOffset);
             foreach (RecyclingItem member in _held)
             {
                 Vector3 targetPosition = beaverPosition + rotationDelta *
@@ -445,9 +446,56 @@ namespace BeaverRecycling
                     out Vector3 contactOffset, out float overlapRatio)) continue;
                 List<RecyclingItem> incoming = GetAttachableBundle(other);
                 if (incoming == null) continue;
-                AttachBundle(held, other, incoming, contactOffset, overlapRatio, false);
+                AttachBundle(held, other, incoming, contactOffset, overlapRatio, "ISO");
             }
             CollectBridgeContacts();
+        }
+
+        /// <summary>이번 물리 프레임의 운반 목표 위치에서 충돌할 기물을 미리 묶음에 결합한다.</summary>
+        private void CollectImminentContacts(Vector3 previousBeaverPosition, Vector3 beaverPosition,
+            Quaternion rotationDelta, Vector3 carryOffset)
+        {
+            int carriedCount = _held.Count;
+            Quaternion inverseRotation = Quaternion.Inverse(rotationDelta);
+            foreach (RecyclingItem other in _items)
+            {
+                if (!other.CanJoin) continue;
+                for (int i = 0; i < carriedCount; i++)
+                {
+                    RecyclingItem held = _held[i];
+                    Vector3 targetPosition = beaverPosition + rotationDelta *
+                        (held.Body.position - previousBeaverPosition) + carryOffset;
+                    Quaternion targetRotation = rotationDelta * held.Body.rotation;
+                    if (!WillCollide(held.Collider, targetPosition, targetRotation,
+                        other.Collider, other.Body.position, other.Body.rotation)) continue;
+
+                    List<RecyclingItem> incoming = GetAttachableBundle(other);
+                    if (incoming == null) break;
+                    Vector3 offset = previousBeaverPosition + inverseRotation *
+                        (other.Body.position - beaverPosition - carryOffset) - other.Body.position;
+                    AttachBundle(held, other, incoming, offset, 0f, "predicted");
+                    break;
+                }
+            }
+        }
+
+        /// <summary>예상 운반 자세와 새 기물 사이의 관통 또는 물리 접촉 여유 거리 진입 여부를 반환한다.</summary>
+        private static bool WillCollide(Collider held, Vector3 heldPosition, Quaternion heldRotation,
+            Collider other, Vector3 otherPosition, Quaternion otherRotation)
+        {
+            if (Physics.ComputePenetration(held, heldPosition, heldRotation,
+                other, otherPosition, otherRotation, out _, out _)) return true;
+
+            Vector3 otherCenter = otherPosition + other.bounds.center - other.transform.position;
+            Vector3 heldPoint = Physics.ClosestPoint(otherCenter, held, heldPosition, heldRotation);
+            Vector3 otherPoint = Physics.ClosestPoint(heldPoint, other, otherPosition, otherRotation);
+            for (int i = 0; i < 8; i++)
+            {
+                heldPoint = Physics.ClosestPoint(otherPoint, held, heldPosition, heldRotation);
+                otherPoint = Physics.ClosestPoint(heldPoint, other, otherPosition, otherRotation);
+            }
+            float contactDistance = held.contactOffset + other.contactOffset;
+            return (heldPoint - otherPoint).sqrMagnitude <= contactDistance * contactDistance;
         }
 
         /// <summary>추가할 기물의 연결 묶음을 검사하고, 운반 가능하면 묶음을 반환한다.</summary>
@@ -464,9 +512,9 @@ namespace BeaverRecycling
             return null;
         }
 
-        /// <summary>운반 기물과 새 기물, 연결 묶음과 이동량을 받아 묶음을 이동하고 조인트를 생성한다.</summary>
+        /// <summary>운반 기물, 새 묶음, 이동량과 판정 출처를 받아 묶음을 옮기고 조인트를 생성한다.</summary>
         private void AttachBundle(RecyclingItem held, RecyclingItem other, List<RecyclingItem> incoming,
-            Vector3 contactOffset, float overlapRatio, bool bridge)
+            Vector3 contactOffset, float overlapRatio, string source)
         {
             Vector3 heldBefore = held.Body.position;
             Vector3 joiningBefore = other.Body.position;
@@ -489,7 +537,7 @@ namespace BeaverRecycling
             foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
 
             Debug.Log(
-                $"[RecyclingAttach] {(bridge ? "bridge" : "ISO")} overlap={overlapRatio * 100f:F2}% " +
+                $"[RecyclingAttach] {source} overlap={overlapRatio * 100f:F2}% " +
                 $"held={held.name}#{held.GetInstanceID()} pos={heldBefore.ToString("F3")} " +
                 $"incoming={other.name}#{other.GetInstanceID()} " +
                 $"before={joiningBefore.ToString("F3")} after={joiningAfter.ToString("F3")} " +
@@ -549,7 +597,7 @@ namespace BeaverRecycling
                 }
 
                 if (best == null) return;
-                AttachBundle(held, best, bestBundle, bestOffset, 0f, true);
+                AttachBundle(held, best, bestBundle, bestOffset, 0f, "bridge");
             }
         }
 
