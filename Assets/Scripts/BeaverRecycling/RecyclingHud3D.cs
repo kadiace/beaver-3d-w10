@@ -15,6 +15,7 @@ namespace BeaverRecycling
         [SerializeField] private Text _score;
         [SerializeField] private Text _wood;
         [SerializeField] private Text _carry;
+        [SerializeField] private Text _controls;
         [SerializeField] private Text _message;
         [SerializeField] private Text _hover;
         [SerializeField] private Text _toast;
@@ -35,8 +36,21 @@ namespace BeaverRecycling
         [SerializeField] private RecyclingSortingWindow3D _sortingWindowPrefab;
         private float _messageUntil;
         private float _toastUntil;
+        private bool _displayedGamepadConnected;
         private Button[] _modalButtons;
         private Outline[] _focusOutlines;
+
+        /// <summary>게임패드 연결/해제 시 인게임 HUD 키 안내를 현재 장치에 맞게 갱신한다.</summary>
+        private void RefreshControls(bool force = false)
+        {
+            if (_controls == null) return;
+            bool gamepadConnected = Managers.Input.GamePadConnected;
+            if (!force && _displayedGamepadConnected == gamepadConnected) return;
+            _displayedGamepadConnected = gamepadConnected;
+            _controls.text = gamepadConnected
+                ? "왼쪽 스틱: 이동   South: 집기/놓기   West: 분리   Menu: 메뉴"
+                : "방향키/WASD: 이동   E: 집기/놓기   Q: 분리   ESC: 메뉴";
+        }
 
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
         public void Initialize(RecyclingGame3D game)
@@ -52,6 +66,7 @@ namespace BeaverRecycling
             _hover.transform.parent.gameObject.SetActive(false);
             _toast.transform.parent.gameObject.SetActive(false);
             _message.text = "";
+            RefreshControls(true);
             SetupModalFocus();
         }
 
@@ -210,6 +225,7 @@ namespace BeaverRecycling
 
         void Update()
         {
+            RefreshControls();
             if (Time.unscaledTime > _messageUntil) _message.text = "";
             if (Time.unscaledTime > _toastUntil) _toast.transform.parent.gameObject.SetActive(false);
             if (_focusOutlines == null) return;
