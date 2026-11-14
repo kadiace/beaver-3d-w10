@@ -190,16 +190,20 @@ namespace BeaverRecycling
             if (_held.Count == 0) return;
             Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
             Vector3 beaverPosition = _beaver.transform.position;
+            Vector3 anchorPosition = beaverPosition + rotationDelta *
+                (_held[0].Body.position - previousBeaverPosition);
+            Vector3 carryOffset = _beaver.CarryPoint.position - anchorPosition;
+            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
             foreach (RecyclingItem member in _held)
             {
-                member.Body.position = beaverPosition + rotationDelta * (member.Body.position - previousBeaverPosition);
-                member.Body.rotation = rotationDelta * member.Body.rotation;
+                Vector3 targetPosition = beaverPosition + rotationDelta *
+                    (member.Body.position - previousBeaverPosition) + carryOffset;
+                Quaternion targetRotation = rotationDelta * member.Body.rotation;
+                member.Body.MovePosition(targetPosition);
+                member.Body.MoveRotation(targetRotation);
+                member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity, targetPosition);
             }
-            Vector3 delta = _beaver.CarryPoint.position - _held[0].Body.position;
-            foreach (RecyclingItem member in _held) member.Body.position += delta;
             Physics.SyncTransforms();
-            Vector3 beaverLinearVelocity = (beaverPosition - previousBeaverPosition) / Time.fixedDeltaTime;
-            foreach (RecyclingItem member in _held) member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity);
             CollectContacts();
         }
 
