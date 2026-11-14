@@ -258,10 +258,9 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (_game == null || !_game.IsWorking || _held || _resolved) return;
-            // Check the real item position once, just as its release inertia fully becomes creek flow.
+            // Keep checking the released item after its initial momentum until it reaches a chute.
             if (_pendingThrownSubmission && Time.fixedTime >= _releaseMomentumUntil)
             {
-                _pendingThrownSubmission = false;
                 if (_game.TrySubmitThrownItem(this)) return;
             }
             if (_lastFlowTime == Time.fixedTime) return;

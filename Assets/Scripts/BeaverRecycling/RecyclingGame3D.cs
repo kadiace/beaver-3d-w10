@@ -139,6 +139,7 @@ namespace BeaverRecycling
             if (Managers.Input.CancelPressed)
             {
                 TogglePause();
+                RefreshChutes();
                 return;
             }
             if (IsWorking)
@@ -828,32 +829,33 @@ namespace BeaverRecycling
             return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
-        /// <summary>비버 위치에서 사용 가능한 가장 가까운 투입구를 반환한다.</summary>
-        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position);
+        /// <summary>비버 위치와 운반 묶음의 상단 겹침을 기준으로 사용할 투입구를 반환한다.</summary>
+        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position, _held);
 
-        /// <summary>주어진 월드 위치와 수평거리 기준으로 사용 가능한 가장 가까운 투입구를 반환한다.</summary>
-        private RecyclingChute3D FindChute(Vector3 position)
+        /// <summary>묶음 바닥면이 절반 넘게 올라간 투입구 중 주어진 위치에서 가장 가까운 곳을 반환한다.</summary>
+        private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
         {
             RecyclingChute3D nearest = null;
             float distance = float.PositiveInfinity;
             foreach (RecyclingChute3D chute in _chutes)
             {
-                if (!chute.CanUse(_day, position)) continue;
+                if (!chute.CoversMajority(_day, items)) continue;
                 float next = (chute.transform.position - position).sqrMagnitude;
-                if (next < distance) { nearest = chute; distance = next; }
+                if (next >= distance) continue;
+                nearest = chute;
+                distance = next;
             }
             return nearest;
         }
 
-        /// <summary>관성 이동을 마친 기물이 투입구 범위에 있으면 연결 묶음 전체를 일반 투입처럼 정산한다.</summary>
+        /// <summary>던진 기물 묶음의 바닥면이 투입구 상단에 절반 넘게 걸치면 전체를 일반 투입처럼 정산한다.</summary>
         public bool TrySubmitThrownItem(RecyclingItem item)
         {
             if (!IsWorking || item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) return false;
-            RecyclingChute3D chute = FindChute(item.Body.position);
-            if (chute == null) return false;
-
             List<RecyclingItem> bundle = RecyclingItem.Collect(item);
             if (bundle.Any(member => member.IsHeld || member.IsResolved || !_items.Contains(member))) return false;
+            RecyclingChute3D chute = FindChute(item.Body.position, bundle);
+            if (chute == null) return false;
             SubmitItems(chute, bundle);
             return true;
         }
