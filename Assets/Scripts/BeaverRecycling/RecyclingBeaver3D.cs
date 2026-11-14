@@ -5,8 +5,8 @@ namespace BeaverRecycling
     public sealed class RecyclingBeaver3D : MonoBehaviour
     {
         [Header("Movement")]
-        [SerializeField] private Vector2 _minimum = new Vector2(-11.2f, 17f);
-        [SerializeField] private Vector2 _maximum = new Vector2(11.2f, 43f);
+        [SerializeField] private Vector2 _minimum = new Vector2(-12f, 17f);
+        [SerializeField] private Vector2 _maximum = new Vector2(12f, 43f);
         [SerializeField] private Transform _carryPoint;
         [SerializeField] private Transform _visual;
         [SerializeField, Min(0f)] private float _knockbackSpinSpeed = 720f;
