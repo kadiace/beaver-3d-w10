@@ -356,7 +356,7 @@ namespace BeaverRecycling
             return closest;
         }
 
-        /// <summary>현재 운반 상태와 투입구 위치에 따라 E 입력을 집기·내려놓기·투입으로 처리한다.</summary>
+        /// <summary>현재 운반 상태와 투입구 위치에 따라 X/South 입력을 집기·내려놓기·투입으로 처리한다.</summary>
         private void HandleInteract()
         {
             if (_held.Count == 0)
@@ -1186,8 +1186,8 @@ namespace BeaverRecycling
         private void UpdateModal()
         {
             string movementKey = _displayedGamepadConnected ? "왼쪽 스틱" : "방향키";
-            string interactKey = _displayedGamepadConnected ? "South" : "E";
-            string splitKey = _displayedGamepadConnected ? "West" : "Q";
+            string interactKey = _displayedGamepadConnected ? "South" : "X";
+            string splitKey = _displayedGamepadConnected ? "West" : "Z";
             string menuKey = _displayedGamepadConnected ? "Menu" : "ESC";
             if (_phase == DayPhase.Preparation)
                 _hud.ShowModal(_day + "일차 · 출근 준비", "오늘의 목표 " + _targets[_day - 1] + "점\n" +

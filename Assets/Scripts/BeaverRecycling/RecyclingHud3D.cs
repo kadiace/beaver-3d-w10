@@ -49,7 +49,7 @@ namespace BeaverRecycling
             _displayedGamepadConnected = gamepadConnected;
             _controls.text = gamepadConnected
                 ? "왼쪽 스틱: 이동   South: 집기/놓기   West: 분리   Menu: 메뉴"
-                : "방향키: 이동   E: 집기/놓기   Q: 분리   ESC: 메뉴";
+                : "방향키: 이동   X: 집기/놓기   Z: 분리   ESC: 메뉴";
         }
 
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
@@ -143,11 +143,9 @@ namespace BeaverRecycling
             _pauseButton.interactable = false;
             _modalTitle.text = title;
             _modalBody.text = body;
-            // Selected actions use the same submit button for keyboard and gamepad.
-            string submitHint = Managers.Input.GamePadConnected ? " [South]" : " [Enter]";
-            _primaryText.text = primary + submitHint;
+            _primaryText.text = primary;
             _secondary.gameObject.SetActive(!string.IsNullOrEmpty(secondary));
-            _secondaryText.text = string.IsNullOrEmpty(secondary) ? "" : secondary + submitHint;
+            _secondaryText.text = secondary;
             _upgradeGroup.SetActive(upgrades);
             RectTransform primaryRect = (RectTransform)_primary.transform;
             primaryRect.anchoredPosition = new Vector2(string.IsNullOrEmpty(secondary) ? 0f : -190f, primaryRect.anchoredPosition.y);
