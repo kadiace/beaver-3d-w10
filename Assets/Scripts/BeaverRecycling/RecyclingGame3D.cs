@@ -221,6 +221,7 @@ namespace BeaverRecycling
 
         void LateUpdate()
         {
+            _beaver.SetCarriedItemCount(_held.Count);
             _cameraTarget = Vector3.Lerp(_cameraTarget,
                 new Vector3(_beaver.transform.position.x, 0f, _beaver.transform.position.z + 2f),
                 1f - Mathf.Exp(-6f * Time.unscaledDeltaTime));

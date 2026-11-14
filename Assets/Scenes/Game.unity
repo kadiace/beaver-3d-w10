@@ -2804,6 +2804,8 @@ MonoBehaviour:
   _carryPoint: {fileID: 3100000090}
   _visual: {fileID: 3100000004}
   _knockbackSpinSpeed: 720
+  _leftEye: {fileID: 3100000044}
+  _rightEye: {fileID: 3100000060}
   _stunStar: {fileID: 3100000502}
   _stunStarOrbitRadius: 0.55
   _stunStarOrbitSpeed: 180
