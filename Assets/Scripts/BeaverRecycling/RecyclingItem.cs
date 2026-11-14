@@ -257,10 +257,14 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (_game == null || !_game.IsWorking || _held || _resolved) return;
-            // Keep checking the released item after its initial momentum until it reaches a chute.
-            if (_pendingThrownSubmission && Time.fixedTime >= _releaseMomentumUntil)
+            // Only allow thrown chute submissions while momentum fades into creek flow.
+            // Before the fade the item is still in free flight; after it, river drift cannot submit.
+            if (_pendingThrownSubmission)
             {
-                if (_game.TrySubmitThrownItem(this)) return;
+                if (Time.fixedTime >= _releaseMomentumUntil)
+                    _pendingThrownSubmission = false;
+                else if (Time.fixedTime >= _releaseMomentumUntil - RELEASE_MOMENTUM_FADE_SECONDS &&
+                    _game.TrySubmitThrownItem(this)) return;
             }
             if (_lastFlowTime == Time.fixedTime) return;
             List<RecyclingItem> group = Collect(this);
