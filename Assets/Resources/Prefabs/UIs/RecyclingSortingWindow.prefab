@@ -18,7 +18,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4659686501897307639
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1008,6 +1008,11 @@ MonoBehaviour:
   _spriteTemplate: {fileID: 120089711058699953}
   _status: {fileID: 2478874037076244210}
   _score: {fileID: 2750966390325317347}
+  _maximumDropInterval: 0.21333334
+  _dropIntervalVariance: 0.35
+  _maximumHorizontalOffset: 90
+  _horizontalOffsetVariance: 0.8
+  _fallGravityScale: 50
 --- !u!1 &8851761292020984324
 GameObject:
   m_ObjectHideFlags: 0

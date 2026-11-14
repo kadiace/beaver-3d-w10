@@ -493,14 +493,23 @@ namespace BeaverRecycling
             return nearest;
         }
 
-        /// <summary>투입 순간의 아이템 정의와 점수를 확정하고 월드를 멈춘 뒤 분류 창을 연다.</summary>
+        /// <summary>운반 묶음을 제출하고, 다른 재질이 섞였을 때만 분류 미니게임을 연다.</summary>
         private void Submit(RecyclingChute3D chute)
         {
             var submitted = new List<RecyclingItem>(_held);
             RecyclingDefinition[] definitions = submitted.Select(item => item.Definition).ToArray();
+            bool needsSorting = definitions.Any(definition => definition.Category != chute.Category);
             Vector3 intakePosition = chute.IntakePosition;
             _held.Clear();
             foreach (RecyclingItem item in submitted) item.Resolve(intakePosition, false);
+
+            if (!needsSorting)
+            {
+                ApplySubmission(RecyclingRules.EvaluateDefinitions(definitions, chute.Category),
+                    definitions.Length, intakePosition);
+                return;
+            }
+
             _beforeSorting = _phase;
             _phase = DayPhase.Sorting;
             _movement = Vector2.zero;
@@ -509,15 +518,21 @@ namespace BeaverRecycling
                 (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition));
         }
 
-        /// <summary>분류 창 종료 후 제출 점수와 통계를 한 번 적용하고 이전 작업 단계로 돌아간다.</summary>
+        /// <summary>미니게임이 끝나면 작업 단계로 복귀하고 최종 제출 결과를 적용한다.</summary>
         private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        {
+            _phase = _beforeSorting;
+            SetUiMode(false);
+            ApplySubmission(submission, submittedCount, intakePosition);
+        }
+
+        /// <summary>즉시 제출과 미니게임 제출에 동일한 점수 및 기록 처리를 적용한다.</summary>
+        private void ApplySubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
         {
             _dayScore += submission.Score;
             _correct += submission.Correct;
             _wrong += submission.Wrong;
             if (submission.Correct == submittedCount) _bestBundle = Mathf.Max(_bestBundle, submittedCount);
-            _phase = _beforeSorting;
-            SetUiMode(false);
             _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", intakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }

@@ -8,8 +8,6 @@ namespace BeaverRecycling
 {
     public sealed class RecyclingSortingWindow3D : MonoBehaviour
     {
-        private const float FEED_INTERVAL = 0.32f / 1.5f;
-        private const float FEED_SPEED = 285f;
         private const float PHYSICS_STEP = 0.02f;
         private const float FINISH_DELAY = 3f;
         private const float RESULT_SECONDS = 1.3f;
@@ -27,6 +25,17 @@ namespace BeaverRecycling
         [SerializeField] private Text _status;
         [SerializeField] private Text _score;
 
+        [Header("Falling items")]
+        [SerializeField, Min(0.02f), Tooltip("Maximum time between item drops, in seconds.")]
+        private float _maximumDropInterval = 0.32f / 1.5f;
+        [SerializeField, Range(0f, 1f), Tooltip("0: fixed maximum interval. 1: random interval from a physics step up to the maximum.")]
+        private float _dropIntervalVariance = 0.35f;
+        [SerializeField, Min(0f), Tooltip("Maximum horizontal offset from the top center, in playfield units.")]
+        private float _maximumHorizontalOffset = 90f;
+        [SerializeField, Range(0f, 1f), Tooltip("0: drop at center. 1: spread across the full horizontal range.")]
+        private float _horizontalOffsetVariance = 0.8f;
+        [SerializeField, Min(0.1f)] private float _fallGravityScale = 50f;
+
         private readonly List<RectTransform> _sprites = new List<RectTransform>();
         private readonly List<float> _radii = new List<float>();
         private readonly List<RectTransform> _visuals = new List<RectTransform>();
@@ -42,11 +51,12 @@ namespace BeaverRecycling
         private float _physicsAccumulator;
         private float _finishedAt;
         private float _lastSpawnedAt;
+        private float _nextSpawnAt;
         private int _spawnedCount;
         private int _includedCount;
         private int _selectedIndex = -1;
 
-        /// <summary>제출 아이템을 섞고 Feed Board에서 굴러갈 물리 시뮬레이션을 시작한다.</summary>
+        /// <summary>제출 아이템을 섞고 상단 중앙에서 중력으로 떨어지는 물리 시뮬레이션을 시작한다.</summary>
         public void Play(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute,
             Action<RecyclingSubmission, int> completed)
         {
@@ -59,12 +69,14 @@ namespace BeaverRecycling
             _elapsed = 0f;
             _physicsAccumulator = 0f;
             _lastSpawnedAt = 0f;
+            _nextSpawnAt = 0f;
             _spawnedCount = 0;
             _selectedIndex = -1;
             _finished = false;
             _score.gameObject.SetActive(false);
             _status.text = "스페이스 · 빨간 선의 아이템 제외";
             _spriteTemplate.gameObject.SetActive(false);
+            _feedBoard.gameObject.SetActive(false);
             if (!_simulationOwned)
             {
                 if (_activeSimulationWindows == 0) _previousSimulationMode = Physics2D.simulationMode;
@@ -79,8 +91,11 @@ namespace BeaverRecycling
             if (_completed == null) return;
             float deltaTime = Time.unscaledDeltaTime;
             _elapsed += deltaTime;
-            while (_spawnedCount < _definitions.Length && _elapsed >= _spawnedCount * FEED_INTERVAL)
+            while (_spawnedCount < _definitions.Length && _elapsed >= _nextSpawnAt)
+            {
                 if (!TrySpawnNext()) break;
+                _nextSpawnAt = _elapsed + NextDropInterval();
+            }
             _physicsAccumulator += deltaTime;
             while (_physicsAccumulator >= PHYSICS_STEP)
             {
@@ -123,31 +138,49 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>투입 위치가 비어 있으면 다음 아이템을 보드 오른쪽에 생성하고 초기 속도를 준다.</summary>
+        /// <summary>지정된 최대 낙하 간격 안에서 분산 정도에 따라 다음 생성 시간을 정한다.</summary>
+        private float NextDropInterval()
+        {
+            float maximum = Mathf.Max(PHYSICS_STEP, _maximumDropInterval);
+            float minimum = Mathf.Lerp(maximum, PHYSICS_STEP, _dropIntervalVariance);
+            return UnityEngine.Random.Range(minimum, maximum);
+        }
+
+        /// <summary>상단 중앙의 좌우 범위에서 기존 기물과 겹치지 않는 위치를 찾아 중력 낙하를 시작한다.</summary>
         private bool TrySpawnNext()
         {
             RecyclingDefinition definition = _definitions[_spawnedCount];
             Sprite sprite = Resources.Load<Sprite>("Sprites/Voxels/" + definition.Id);
             Vector2 size = sprite.rect.size * ITEM_SCALE;
             float radius = Mathf.Max(size.x, size.y) * 0.5f;
-            float spawnX = 60f;
-            for (int attempt = 0; attempt < _sprites.Count; attempt++)
+            const float padding = 3f;
+            float spawnY = _playfield.rect.yMax - radius - padding;
+            float allowedOffset = Mathf.Max(0f, _playfield.rect.width * 0.5f - radius - padding);
+            float horizontalRange = Mathf.Min(allowedOffset, _maximumHorizontalOffset) * _horizontalOffsetVariance;
+            Vector2 spawnPosition = default;
+            bool clear = false;
+
+            // If the previous item is still near the entry, defer this drop instead of spawning overlapped bodies.
+            for (int attempt = 0; attempt < 20; attempt++)
             {
-                Vector2 position = _feedBoard.TransformPoint(new Vector3(spawnX, radius + 5f, 0f));
-                bool moved = false;
+                float spawnX = UnityEngine.Random.Range(-horizontalRange, horizontalRange);
+                Vector2 candidate = new Vector2(spawnX, spawnY);
+                bool overlaps = false;
                 for (int i = 0; i < _sprites.Count; i++)
                 {
                     if (_excluded[i]) continue;
-                    float separation = (radius + _radii[i] + 2f) * _playfield.lossyScale.x;
-                    if (Vector2.Distance(position, _sprites[i].position) >= separation) continue;
-                    Vector2 shifted = (Vector2)_sprites[i].position + (Vector2)_feedBoard.right * separation;
-                    spawnX = Mathf.Max(spawnX, _feedBoard.InverseTransformPoint(shifted).x);
-                    moved = true;
+                    Vector2 existing = _playfield.InverseTransformPoint(_sprites[i].position);
+                    float separation = radius + _radii[i] + 2f;
+                    if ((candidate - existing).sqrMagnitude >= separation * separation) continue;
+                    overlaps = true;
+                    break;
                 }
-                if (!moved) break;
+                if (overlaps) continue;
+                spawnPosition = candidate;
+                clear = true;
+                break;
             }
-            if (spawnX > _feedBoard.rect.width * 0.5f -
-                radius / Mathf.Abs(_feedBoard.localScale.x)) return false;
+            if (!clear) return false;
 
             _spawnedCount++;
             _lastSpawnedAt = _elapsed;
@@ -158,7 +191,7 @@ namespace BeaverRecycling
             image.gameObject.SetActive(true);
             RectTransform rect = image.rectTransform;
             rect.sizeDelta = size;
-            rect.position = _feedBoard.TransformPoint(new Vector3(spawnX, radius + 5f, 0f));
+            rect.anchoredPosition = spawnPosition;
             rect.rotation = Quaternion.identity;
             _sprites.Add(rect);
             _radii.Add(radius);
@@ -176,9 +209,9 @@ namespace BeaverRecycling
             circle.radius = radius;
             Rigidbody2D body = image.gameObject.AddComponent<Rigidbody2D>();
             body.bodyType = RigidbodyType2D.Dynamic;
-            body.gravityScale = 50f;
+            body.gravityScale = _fallGravityScale;
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            body.linearVelocity = _feedBoard.TransformVector(new Vector3(-FEED_SPEED, 0f, 0f));
+            body.linearVelocity = Vector2.zero;
             Physics2D.SyncTransforms();
             return true;
         }
