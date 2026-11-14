@@ -235,40 +235,20 @@ namespace BeaverRecycling
         public bool IsInsideRiver(Vector3 position) => position.x >= _riverMinimum.x && position.x <= _riverMaximum.x &&
             position.z >= _riverMinimum.y && position.z <= _riverMaximum.y;
 
-        /// <summary>기물의 XZ Collider 바운드가 강 또는 처트의 허용 구역 안에 완전히 놓이는지 반환한다.</summary>
-        private bool IsInsideObjectArea(Bounds bounds)
-        {
-            if (bounds.min.z < _riverMinimum.y || bounds.max.z > _riverMaximum.y) return false;
-            if (bounds.min.x >= _riverMinimum.x && bounds.max.x <= _riverMaximum.x) return true;
-
-            foreach (RecyclingChute3D chute in _chutes)
-            {
-                Bounds dock = chute.DockBounds;
-                if (bounds.min.z < dock.min.z || bounds.max.z > dock.max.z) continue;
-                float minimumX = Mathf.Min(_riverMinimum.x, dock.min.x);
-                float maximumX = Mathf.Max(_riverMaximum.x, dock.max.x);
-                if (bounds.min.x >= minimumX && bounds.max.x <= maximumX) return true;
-            }
-            return false;
-        }
-
-        /// <summary>운반 종료 직전, 오브젝트 경계를 벗어난 묶음을 비버의 이동 영역 내 가장 가까운 위치로 옮긴다.</summary>
+        /// <summary>연결 해제 직전 묶음이 비버 이동 영역을 벗어나면 Collider 전체를 가장 가까운 내부 위치로 보정한다.</summary>
         private bool CorrectReleasedBundlePosition()
         {
             if (_held.Count == 0) return false;
 
             Bounds bundleBounds = _held[0].Collider.bounds;
-            bool outside = !IsInsideObjectArea(bundleBounds);
             for (int i = 1; i < _held.Count; i++)
-            {
-                Bounds itemBounds = _held[i].Collider.bounds;
-                bundleBounds.Encapsulate(itemBounds);
-                outside |= !IsInsideObjectArea(itemBounds);
-            }
-            if (!outside) return false;
+                bundleBounds.Encapsulate(_held[i].Collider.bounds);
 
             Vector2 minimum = _beaver.MovementMinimum;
             Vector2 maximum = _beaver.MovementMaximum;
+            bool outside = bundleBounds.min.x < minimum.x || bundleBounds.max.x > maximum.x ||
+                bundleBounds.min.z < minimum.y || bundleBounds.max.z > maximum.y;
+            if (!outside) return false;
             float minX = minimum.x + bundleBounds.extents.x;
             float maxX = maximum.x - bundleBounds.extents.x;
             float minZ = minimum.y + bundleBounds.extents.z;
