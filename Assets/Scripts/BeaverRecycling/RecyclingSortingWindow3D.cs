@@ -77,7 +77,7 @@ namespace BeaverRecycling
             _selectedIndex = -1;
             _finished = false;
             _score.gameObject.SetActive(false);
-            _status.text = RecyclingRules.Name(chute) + " 분류 · 스페이스 · 빨간 선의 아이템 제외";
+            _status.text = RecyclingRules.Name(chute) + " 분류 · 스페이스/South · 빨간 선의 아이템 제외";
             Color chuteColor = RecyclingRules.Color(chute);
             foreach (Image wall in _chuteWalls)
                 if (wall != null) wall.color = chuteColor;
