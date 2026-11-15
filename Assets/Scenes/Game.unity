@@ -2809,10 +2809,10 @@ MonoBehaviour:
   _leftEye: {fileID: 3100000042}
   _rightEye: {fileID: 3100000058}
   _eyeGlowMaterial: {fileID: 2100000, guid: fb6e0c8b47d746c6a5b07bbfa120e3d4, type: 2}
-  _eyeTrailBaseDuration: 0.08
-  _eyeTrailDurationPerItem: 0.035
-  _eyeGlowIntensityPerItem: 0.26
-  _eyeTrailWidthPerItem: 0.006
+  _eyeTrailBaseDuration: 0.18
+  _eyeTrailDurationPerItem: 0.05
+  _eyeGlowIntensityPerItem: 0.32
+  _eyeTrailWidthPerItem: 0.01
   _stunStar: {fileID: 3100000502}
   _stunStarOrbitRadius: 0.55
   _stunStarOrbitSpeed: 180

@@ -15,22 +15,29 @@ namespace BeaverRecycling
         [SerializeField] private Transform _leftEye;
         [SerializeField] private Transform _rightEye;
         [SerializeField] private Material _eyeGlowMaterial;
-        [SerializeField, Min(0f)] private float _eyeTrailBaseDuration = 0.08f;
-        [SerializeField, Min(0f)] private float _eyeTrailDurationPerItem = 0.035f;
-        [SerializeField, Min(0f)] private float _eyeGlowIntensityPerItem = 0.26f;
-        [SerializeField, Min(0f)] private float _eyeTrailWidthPerItem = 0.006f;
-        private const float EYE_GLOW_DIAMETER = 0.075f;
-        private const float EYE_SURFACE_OFFSET = 0.055f;
-        private const float EYE_TRAIL_BASE_WIDTH = 0.045f;
+        [SerializeField, Min(0f)] private float _eyeTrailBaseDuration = 0.18f;
+        [SerializeField, Min(0f)] private float _eyeTrailDurationPerItem = 0.05f;
+        [SerializeField, Min(0f)] private float _eyeGlowIntensityPerItem = 0.32f;
+        [SerializeField, Min(0f)] private float _eyeTrailWidthPerItem = 0.01f;
+        private const float EYE_CORE_DIAMETER = 0.2f;
+        private const float EYE_HALO_DIAMETER = 0.46f;
+        private const float EYE_CAMERA_OFFSET = 0.12f;
+        private const float EYE_TRAIL_BASE_WIDTH = 0.15f;
         private const int MAX_EYE_EFFECT_ITEMS = 12;
         private static readonly int EyeGlowColorId = Shader.PropertyToID("_GlowColor");
         private static readonly int UseVertexColorId = Shader.PropertyToID("_UseVertexColor");
-        private static readonly Color EyeGlowBaseColor = new Color(0.34f, 0.85f, 1f, 1f);
+        private static readonly int UseRadialFalloffId = Shader.PropertyToID("_UseRadialFalloff");
+        // Warm amber contrasts with the blue river even when Bloom is disabled.
+        private static readonly Color EyeGlowBaseColor = new Color(1f, 0.65f, 0.14f, 1f);
         private MaterialPropertyBlock _eyeGlowProperties;
+        private MaterialPropertyBlock _eyeHaloProperties;
         private MaterialPropertyBlock _eyeTrailProperties;
         private Transform[] _eyeAnchors;
         private Transform[] _eyeEffectHeads;
+        private Transform[] _eyeGlowBillboards;
+        private Transform[] _eyeHaloBillboards;
         private MeshRenderer[] _eyeGlowMeshes;
+        private MeshRenderer[] _eyeHaloMeshes;
         private TrailRenderer[] _eyeTrails;
         private int _lastEyeEffectCount = -1;
         private Vector3 _previousPosition;
@@ -63,6 +70,7 @@ namespace BeaverRecycling
         void Awake()
         {
             _eyeGlowProperties = new MaterialPropertyBlock();
+            _eyeHaloProperties = new MaterialPropertyBlock();
             _eyeTrailProperties = new MaterialPropertyBlock();
             _startingPosition = transform.position;
             _stunStarCenterLocalPosition = _stunStar.localPosition;
@@ -143,46 +151,41 @@ namespace BeaverRecycling
         }
 
 
-        /// <summary>씬에 배치된 양쪽 눈을 따라 발광 코어와 애프터이미지 트레일을 생성한다.</summary>
+        /// <summary>씬에 있는 양쪽 눈에 카메라를 향하는 발광 코어, 후광과 이동 잔상을 생성한다.</summary>
         private void CreateEyeTrails()
         {
             if (_leftEye == null || _rightEye == null || _eyeGlowMaterial == null) return;
 
             _eyeAnchors = new[] { _leftEye, _rightEye };
             _eyeEffectHeads = new Transform[_eyeAnchors.Length];
+            _eyeGlowBillboards = new Transform[_eyeAnchors.Length];
+            _eyeHaloBillboards = new Transform[_eyeAnchors.Length];
             _eyeGlowMeshes = new MeshRenderer[_eyeAnchors.Length];
+            _eyeHaloMeshes = new MeshRenderer[_eyeAnchors.Length];
             _eyeTrails = new TrailRenderer[_eyeAnchors.Length];
 
             for (int i = 0; i < _eyeAnchors.Length; i++)
             {
-                // Keep the trail origin at unit scale so its width is measured in world units.
                 GameObject head = new GameObject(i == 0 ? "Left Eye Glow + Trail" : "Right Eye Glow + Trail");
                 head.layer = gameObject.layer;
                 head.transform.SetParent(_visual, false);
                 _eyeEffectHeads[i] = head.transform;
 
-                GameObject glow = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                glow.name = "Glow Core";
-                glow.layer = gameObject.layer;
-                glow.transform.SetParent(head.transform, false);
-                glow.transform.localScale = Vector3.one * EYE_GLOW_DIAMETER;
-                Collider collider = glow.GetComponent<Collider>();
-                if (collider != null) Destroy(collider);
-
-                MeshRenderer core = glow.GetComponent<MeshRenderer>();
-                core.sharedMaterial = _eyeGlowMaterial;
-                core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                core.receiveShadows = false;
-                _eyeGlowMeshes[i] = core;
+                // Soft-edged, camera-facing quads remain legible at the game's orthographic zoom.
+                _eyeGlowBillboards[i] = CreateEyeBillboard(head.transform, "Glow Core",
+                    EYE_CORE_DIAMETER, out _eyeGlowMeshes[i]);
+                _eyeHaloBillboards[i] = CreateEyeBillboard(head.transform, "Glow Halo",
+                    EYE_HALO_DIAMETER, out _eyeHaloMeshes[i]);
 
                 TrailRenderer trail = head.AddComponent<TrailRenderer>();
                 trail.sharedMaterial = _eyeGlowMaterial;
                 trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 trail.receiveShadows = false;
                 trail.alignment = LineAlignment.View;
-                trail.minVertexDistance = 0.025f;
-                trail.numCornerVertices = 3;
-                trail.numCapVertices = 3;
+                trail.emitting = true;
+                trail.minVertexDistance = 0.012f;
+                trail.numCornerVertices = 4;
+                trail.numCapVertices = 4;
                 trail.startWidth = EYE_TRAIL_BASE_WIDTH;
                 trail.endWidth = 0f;
                 trail.time = _eyeTrailBaseDuration;
@@ -191,11 +194,11 @@ namespace BeaverRecycling
                     colorKeys = new[]
                     {
                         new GradientColorKey(Color.white, 0f),
-                        new GradientColorKey(new Color(0.4f, 0.8f, 1f), 1f)
+                        new GradientColorKey(new Color(1f, 0.75f, 0.25f), 1f)
                     },
                     alphaKeys = new[]
                     {
-                        new GradientAlphaKey(0.9f, 0f),
+                        new GradientAlphaKey(1f, 0f),
                         new GradientAlphaKey(0f, 1f)
                     }
                 };
@@ -206,16 +209,41 @@ namespace BeaverRecycling
             foreach (TrailRenderer trail in _eyeTrails) trail.Clear();
         }
 
-        /// <summary>비버 비주얼의 보간된 움직임과 회전을 따라 각 눈의 발광 중심을 옮긴다.</summary>
+        /// <summary>빛번짐 효과를 가진 쿼드를 눈 이펙트 중심에 설치한다. 물리 충돌은 생성하지 않는다.</summary>
+        private Transform CreateEyeBillboard(Transform parent, string name, float diameter,
+            out MeshRenderer renderer)
+        {
+            GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            quad.name = name;
+            quad.layer = gameObject.layer;
+            quad.transform.SetParent(parent, false);
+            quad.transform.localScale = Vector3.one * diameter;
+
+            Collider collider = quad.GetComponent<Collider>();
+            if (collider != null) Destroy(collider);
+
+            renderer = quad.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = _eyeGlowMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            return quad.transform;
+        }
+
+        /// <summary>보간된 눈 위치로 트레일 시작점을 옮기고 빛나는 눈의 평면을 카메라에 정렬한다.</summary>
         private void UpdateEyeTrailPositions()
         {
             if (_eyeEffectHeads == null) return;
             for (int i = 0; i < _eyeEffectHeads.Length; i++)
-                _eyeEffectHeads[i].position = _eyeAnchors[i].position +
-                    _eyeAnchors[i].forward * EYE_SURFACE_OFFSET;
+            {
+                // The camera-facing lift preserves the eye's screen position without burying it in the face.
+                _eyeEffectHeads[i].position = _eyeAnchors[i].position -
+                    _stunCamera.forward * EYE_CAMERA_OFFSET;
+                _eyeGlowBillboards[i].rotation = _stunCamera.rotation;
+                _eyeHaloBillboards[i].rotation = _stunCamera.rotation;
+            }
         }
 
-        /// <summary>물고 있는 기물 수에 따라 눈의 발광 강도, 트레일 수명과 굵기를 조절한다.</summary>
+        /// <summary>운반 물체가 많아질수록 눈과 후광은 더 밝게, 잔상은 더 길고 굵게 만든다.</summary>
         public void SetCarriedItemCount(int count)
         {
             int effectCount = Mathf.Clamp(count, 0, MAX_EYE_EFFECT_ITEMS);
@@ -224,11 +252,21 @@ namespace BeaverRecycling
             if (_eyeTrails == null) return;
 
             float duration = _eyeTrailBaseDuration + _eyeTrailDurationPerItem * effectCount;
-            float intensity = 1.05f + _eyeGlowIntensityPerItem * effectCount;
-            _eyeGlowProperties.SetColor(EyeGlowColorId, EyeGlowBaseColor * intensity);
+            float intensity = 1.6f + _eyeGlowIntensityPerItem * effectCount;
+            Color coreColor = EyeGlowBaseColor * intensity;
+            coreColor.a = 1f;
+            Color haloColor = EyeGlowBaseColor * (intensity * 0.8f);
+            haloColor.a = 0.28f;
+
+            _eyeGlowProperties.SetColor(EyeGlowColorId, coreColor);
             _eyeGlowProperties.SetFloat(UseVertexColorId, 0f);
-            _eyeTrailProperties.SetColor(EyeGlowColorId, EyeGlowBaseColor * intensity);
+            _eyeGlowProperties.SetFloat(UseRadialFalloffId, 1f);
+            _eyeHaloProperties.SetColor(EyeGlowColorId, haloColor);
+            _eyeHaloProperties.SetFloat(UseVertexColorId, 0f);
+            _eyeHaloProperties.SetFloat(UseRadialFalloffId, 1f);
+            _eyeTrailProperties.SetColor(EyeGlowColorId, coreColor);
             _eyeTrailProperties.SetFloat(UseVertexColorId, 1f);
+            _eyeTrailProperties.SetFloat(UseRadialFalloffId, 0f);
 
             for (int i = 0; i < _eyeTrails.Length; i++)
             {
@@ -236,6 +274,7 @@ namespace BeaverRecycling
                 _eyeTrails[i].startWidth = EYE_TRAIL_BASE_WIDTH + _eyeTrailWidthPerItem * effectCount;
                 _eyeTrails[i].SetPropertyBlock(_eyeTrailProperties);
                 _eyeGlowMeshes[i].SetPropertyBlock(_eyeGlowProperties);
+                _eyeHaloMeshes[i].SetPropertyBlock(_eyeHaloProperties);
             }
         }
 

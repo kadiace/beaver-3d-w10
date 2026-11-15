@@ -15,7 +15,6 @@ namespace BeaverRecycling
         private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
-        private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
@@ -204,11 +203,8 @@ namespace BeaverRecycling
                 CollectContacts();
             }
             _beaver.SetCarriedItemCount(_held.Count);
-            // Keep the existing empty-handed sprint, but reward carrying additional items
-            // rather than slowing down once a bundle contains four or more objects.
-            float multiplier = _held.Count == 0
-                ? EMPTY_HANDED_SPEED_MULTIPLIER
-                : Mathf.Min(_maxCarriedSpeedMultiplier, 1f + _carrySpeedBonusPerItem * _held.Count);
+            // Empty-handed is the slowest state. Every additional carried item increases speed.
+            float multiplier = Mathf.Min(_maxCarriedSpeedMultiplier, 1f + _carrySpeedBonusPerItem * _held.Count);
             float speed = (_baseSpeed + 0.5f * _levels[1]) * multiplier;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
