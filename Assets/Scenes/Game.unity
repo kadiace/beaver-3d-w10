@@ -770,8 +770,8 @@ MonoBehaviour:
   _waterY: -1.95
   _spawnHalfWidth: 8.5
   _baseSpeed: 4.5
-  _carrySpeedBonusPerItem: 0.05
-  _maxCarriedSpeedMultiplier: 1.6
+  _carrySpeedBonusPerItem: 0.16666667
+  _maxCarriedSpeedMultiplier: 2
   _baseReach: 1.8
   _baseCapacity: 6
   _splitScatterDistance: 0.6

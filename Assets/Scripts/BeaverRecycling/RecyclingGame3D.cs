@@ -55,8 +55,8 @@ namespace BeaverRecycling
 
         [Header("Beaver")]
         [SerializeField, Min(0.1f)] private float _baseSpeed = 4.5f;
-        [SerializeField, Range(0f, 0.2f)] private float _carrySpeedBonusPerItem = 0.05f;
-        [SerializeField, Min(1f)] private float _maxCarriedSpeedMultiplier = 1.6f;
+        [SerializeField, Range(0f, 0.2f)] private float _carrySpeedBonusPerItem = 1f / 6f;
+        [SerializeField, Min(1f)] private float _maxCarriedSpeedMultiplier = 2f;
         [SerializeField, Min(0.1f)] private float _baseReach = 1.8f;
         [SerializeField, Min(1)] private int _baseCapacity = 6;
 
