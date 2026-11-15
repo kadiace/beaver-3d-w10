@@ -151,10 +151,16 @@ namespace BeaverRecycling
 
             for (int i = 0; i < _eyeAnchors.Length; i++)
             {
+                // Keep the trail origin at unit scale so its width is measured in world units.
+                GameObject head = new GameObject(i == 0 ? "Left Eye Glow + Trail" : "Right Eye Glow + Trail");
+                head.layer = gameObject.layer;
+                head.transform.SetParent(_visual, false);
+                _eyeEffectHeads[i] = head.transform;
+
                 GameObject glow = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                glow.name = i == 0 ? "Left Eye Glow + Trail" : "Right Eye Glow + Trail";
+                glow.name = "Glow Core";
                 glow.layer = gameObject.layer;
-                glow.transform.SetParent(_visual, false);
+                glow.transform.SetParent(head.transform, false);
                 glow.transform.localScale = Vector3.one * EYE_GLOW_DIAMETER;
                 Collider collider = glow.GetComponent<Collider>();
                 if (collider != null) Destroy(collider);
@@ -164,9 +170,8 @@ namespace BeaverRecycling
                 core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 core.receiveShadows = false;
                 _eyeGlowMeshes[i] = core;
-                _eyeEffectHeads[i] = glow.transform;
 
-                TrailRenderer trail = glow.AddComponent<TrailRenderer>();
+                TrailRenderer trail = head.AddComponent<TrailRenderer>();
                 trail.sharedMaterial = _eyeGlowMaterial;
                 trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 trail.receiveShadows = false;
