@@ -20,6 +20,8 @@ namespace BeaverRecycling
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
+        private const float REJECTED_CHUTE_CLEARANCE = 2.5f;
+        private const float REJECTED_SCATTER_IMPULSE_SECONDS = 0.35f;
         private const int SPLIT_SEARCH_RINGS = 48;
         private const int SPLIT_SEARCH_DIRECTIONS = 16;
         private static readonly int[] UPGRADE_COSTS = { 2, 4, 7 };
@@ -56,6 +58,11 @@ namespace BeaverRecycling
         [SerializeField, Min(0.1f)] private float _baseSpeed = 4.5f;
         [SerializeField, Min(0.1f)] private float _baseReach = 1.8f;
         [SerializeField, Min(1)] private int _baseCapacity = 6;
+
+        [Header("Sorting rejects")]
+        [SerializeField, Min(0f)] private float _rejectedScatterRadius = 1.5f;
+        [SerializeField, Min(0f)] private float _rejectedSpawnHeight = 1.5f;
+        [SerializeField, Min(0f)] private float _rejectedScatterSpeed = 2f;
 
         [Header("Bundle")]
         [SerializeField, Min(0f)] private float _splitScatterDistance = 0.35f;
@@ -334,7 +341,7 @@ namespace BeaverRecycling
             _movement = Vector2.zero;
             _hud.HideModal();
             SetUiMode(true);
-            _hud.ShowSorting(sample, chosenChute, (submission, includedCount) =>
+            _hud.ShowSorting(sample, chosenChute, (submission, includedCount, rejectedDefinitions) =>
             {
                 // These items are synthetic: do not modify actual inventory, score or day statistics.
                 _phase = previousPhase;
@@ -1155,15 +1162,61 @@ namespace BeaverRecycling
             _movement = Vector2.zero;
             SetUiMode(true);
             _hud.ShowSorting(definitions, chute.Category,
-                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition));
+                (submission, includedCount, rejectedDefinitions) =>
+                    CompleteSubmission(submission, includedCount, chute, rejectedDefinitions));
         }
 
         /// <summary>미니게임이 끝나면 작업 단계로 복귀하고 최종 제출 결과를 적용한다.</summary>
-        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount,
+            RecyclingChute3D chute, IReadOnlyList<RecyclingDefinition> rejectedDefinitions)
         {
             _phase = _beforeSorting;
             SetUiMode(false);
-            ApplySubmission(submission, submittedCount, intakePosition);
+            ApplySubmission(submission, submittedCount, chute.IntakePosition);
+            ScatterRejectedItems(chute, rejectedDefinitions);
+        }
+
+        /// <summary>분류 창에서 제외한 기물만 원래 프리팹으로 복원하여 투입구 안쪽 강물에 흩뿌린다.</summary>
+        private void ScatterRejectedItems(RecyclingChute3D chute, IReadOnlyList<RecyclingDefinition> rejectedDefinitions)
+        {
+            if (rejectedDefinitions == null || rejectedDefinitions.Count == 0) return;
+
+            Bounds dock = chute.DockBounds;
+            float riverCenterX = (_riverMinimum.x + _riverMaximum.x) * 0.5f;
+            float inward = dock.center.x < riverCenterX ? 1f : -1f;
+            Vector3 center = dock.center + Vector3.right * (inward * REJECTED_CHUTE_CLEARANCE);
+            center.y = _waterY + _rejectedSpawnHeight;
+
+            _splitPlacedBounds.Clear();
+            for (int i = 0; i < rejectedDefinitions.Count; i++)
+            {
+                RecyclingDefinition definition = rejectedDefinitions[i];
+                if (definition == null || definition.Prefab == null) continue;
+
+                float angle = i * 2.39996323f + UnityEngine.Random.Range(-0.25f, 0.25f);
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 desired = center + direction *
+                    (_rejectedScatterRadius * UnityEngine.Random.Range(0.45f, 1f));
+                Quaternion rotation = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
+                GameObject instance = Managers.Resource.Instantiate(
+                    "Prefabs/Recycling/" + definition.Prefab.name, position: desired, rotation: rotation);
+                RecyclingItem item = instance.GetComponent<RecyclingItem>();
+                instance.name = definition.Name;
+                item.Initialize(this, definition);
+
+                Bounds bounds = item.Collider.bounds;
+                Vector3 position = FindSplitPosition(item, bounds, desired);
+                bounds.center += position - item.Body.position;
+                _splitPlacedBounds.Add(bounds);
+                item.Body.position = position;
+                item.transform.SetPositionAndRotation(position, rotation);
+                item.Body.linearVelocity = Vector3.up;
+                item.ApplyKnockback(direction * _rejectedScatterSpeed, REJECTED_SCATTER_IMPULSE_SECONDS);
+                item.BlockAttachment(0.5f);
+                _items.Add(item);
+            }
+            _splitPlacedBounds.Clear();
+            Physics.SyncTransforms();
         }
 
         /// <summary>즉시 제출과 미니게임 제출에 동일한 점수 및 기록 처리를 적용한다.</summary>
