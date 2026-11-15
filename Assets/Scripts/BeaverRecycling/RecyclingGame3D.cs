@@ -1241,9 +1241,12 @@ namespace BeaverRecycling
             _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", intakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
 
-            // Each incorrectly sorted object costs one life in addition to its existing score penalty.
-            if (submission.Wrong <= 0) return;
-            _lives = Mathf.Max(0, _lives - submission.Wrong);
+            // Health penalizes every item actually deposited into the wrong chute.
+            // Wood is ignored by the existing score rules, but is still an invalid chute item.
+            // Sorting-game exclusions are not included in submittedCount.
+            int incorrectlyDeposited = Mathf.Max(0, submittedCount - submission.Correct);
+            if (incorrectlyDeposited == 0) return;
+            _lives = Mathf.Max(0, _lives - incorrectlyDeposited);
             _hud.RefreshLives(_lives);
             if (_lives == 0) EndAfterLivesDepleted();
         }
