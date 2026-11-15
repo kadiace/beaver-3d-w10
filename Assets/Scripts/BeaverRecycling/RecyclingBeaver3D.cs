@@ -24,8 +24,10 @@ namespace BeaverRecycling
         private const float EYE_TRAIL_BASE_WIDTH = 0.045f;
         private const int MAX_EYE_EFFECT_ITEMS = 12;
         private static readonly int EyeGlowColorId = Shader.PropertyToID("_GlowColor");
+        private static readonly int UseVertexColorId = Shader.PropertyToID("_UseVertexColor");
         private static readonly Color EyeGlowBaseColor = new Color(0.34f, 0.85f, 1f, 1f);
         private readonly MaterialPropertyBlock _eyeGlowProperties = new MaterialPropertyBlock();
+        private readonly MaterialPropertyBlock _eyeTrailProperties = new MaterialPropertyBlock();
         private Transform[] _eyeAnchors;
         private Transform[] _eyeEffectHeads;
         private MeshRenderer[] _eyeGlowMeshes;
@@ -222,12 +224,15 @@ namespace BeaverRecycling
             float duration = _eyeTrailBaseDuration + _eyeTrailDurationPerItem * effectCount;
             float intensity = 1.05f + _eyeGlowIntensityPerItem * effectCount;
             _eyeGlowProperties.SetColor(EyeGlowColorId, EyeGlowBaseColor * intensity);
+            _eyeGlowProperties.SetFloat(UseVertexColorId, 0f);
+            _eyeTrailProperties.SetColor(EyeGlowColorId, EyeGlowBaseColor * intensity);
+            _eyeTrailProperties.SetFloat(UseVertexColorId, 1f);
 
             for (int i = 0; i < _eyeTrails.Length; i++)
             {
                 _eyeTrails[i].time = duration;
                 _eyeTrails[i].startWidth = EYE_TRAIL_BASE_WIDTH + _eyeTrailWidthPerItem * effectCount;
-                _eyeTrails[i].SetPropertyBlock(_eyeGlowProperties);
+                _eyeTrails[i].SetPropertyBlock(_eyeTrailProperties);
                 _eyeGlowMeshes[i].SetPropertyBlock(_eyeGlowProperties);
             }
         }

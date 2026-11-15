@@ -3,6 +3,7 @@ Shader "BeaverRecycling/EyeGlow"
     Properties
     {
         [HDR] _GlowColor ("Glow Color", Color) = (0.34, 0.85, 1, 1)
+        _UseVertexColor ("Use Vertex Color", Float) = 1
     }
     SubShader
     {
@@ -22,6 +23,7 @@ Shader "BeaverRecycling/EyeGlow"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _GlowColor;
+                half _UseVertexColor;
             CBUFFER_END
 
             struct Attributes
@@ -46,7 +48,7 @@ Shader "BeaverRecycling/EyeGlow"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                return input.color * _GlowColor;
+                return lerp(half4(1, 1, 1, 1), input.color, _UseVertexColor) * _GlowColor;
             }
             ENDHLSL
         }
