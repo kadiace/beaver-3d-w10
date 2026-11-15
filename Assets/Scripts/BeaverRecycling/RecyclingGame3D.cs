@@ -15,6 +15,7 @@ namespace BeaverRecycling
         private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
+        private const int MAX_LIVES = 5;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
@@ -100,6 +101,7 @@ namespace BeaverRecycling
         private int _totalScore;
         private int _correct;
         private int _wrong;
+        private int _lives = MAX_LIVES;
         private int _lost;
         private int _bestBundle;
         private int _dayWood;
@@ -1183,7 +1185,7 @@ namespace BeaverRecycling
             _phase = _beforeSorting;
             SetUiMode(false);
             ApplySubmission(submission, submittedCount, chute.IntakePosition);
-            ScatterRejectedItems(chute, rejectedDefinitions);
+            if (_lives > 0) ScatterRejectedItems(chute, rejectedDefinitions);
         }
 
         /// <summary>분류 창에서 제외한 기물만 원래 프리팹으로 복원하여 투입구 안쪽 강물에 흩뿌린다.</summary>
@@ -1238,6 +1240,25 @@ namespace BeaverRecycling
             if (submission.Correct == submittedCount) _bestBundle = Mathf.Max(_bestBundle, submittedCount);
             _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", intakePosition,
                 _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
+
+            // Each incorrectly sorted object costs one life in addition to its existing score penalty.
+            if (submission.Wrong <= 0) return;
+            _lives = Mathf.Max(0, _lives - submission.Wrong);
+            _hud.RefreshLives(_lives);
+            if (_lives == 0) EndAfterLivesDepleted();
+        }
+
+        /// <summary>목숨이 모두 소진되면 정산 보너스 없이 현재 점수를 유지한 채 게임을 종료한다.</summary>
+        private void EndAfterLivesDepleted()
+        {
+            ClearWorld();
+            _passed = false;
+            _phase = DayPhase.Result;
+            _movement = Vector2.zero;
+            _beaver.SetStunned(false);
+            SetUiMode(true);
+            UpdateModal();
+            RefreshHud();
         }
 
         /// <summary>이탈한 기물과 폭포 여부를 받아 쓰레기 감점 또는 목재 점수·자원 보상을 한 번 적용하고 제거한다.</summary>
@@ -1465,7 +1486,13 @@ namespace BeaverRecycling
                 case DayPhase.Paused:
                     _phase = _beforePause; SetUiMode(false); _hud.HideModal(); break;
                 case DayPhase.Result:
-                    if (_passed) { _day++; PrepareDay(); }
+                    if (_passed)
+                    {
+                        _lives = Mathf.Min(MAX_LIVES, _lives + 1);
+                        _day++;
+                        PrepareDay();
+                    }
+                    else if (_lives == 0) RestartRun();
                     else
                     {
                         _wood = _dayStartWood;
@@ -1484,6 +1511,7 @@ namespace BeaverRecycling
         private void RestartRun()
         {
             _wood = _totalScore = 0;
+            _lives = MAX_LIVES;
             _day = 1;
             Array.Clear(_levels, 0, _levels.Length);
             PrepareDay();
@@ -1537,6 +1565,7 @@ namespace BeaverRecycling
                     ? "" : "\n새 분류 추가 - " + newCategories;
                 _hud.ShowModal(_day + "일차 · 출근 준비",
                     "오늘의 목표 " + _targets[_day - 1] + "점" + categoryLine + "\n\n" +
+                    "목숨 최대 " + MAX_LIVES + "개 · 오분류 1개당 -1 · 다음 일차 +1\n" +
                     movementKey + " 빈손 이동 / 운반 중 방향 전환 (자동 전진)\n" +
                     interactKey + " 집기 / 놓기 / 투입구에서 놓으면 분류\n" +
                     splitKey + " 묶음 분리\n" +
@@ -1562,7 +1591,10 @@ namespace BeaverRecycling
                     body += "\n유실 없음 보너스 +" + NO_TRASH_LOSS_SCORE_BONUS + "점 · +" + NO_TRASH_LOSS_WOOD_BONUS + " 목재";
                 if (_wrong == 0)
                     body += "\n오분류 없음 보너스 +" + NO_MISCLASSIFICATION_SCORE_BONUS + "점 · +" + NO_MISCLASSIFICATION_WOOD_BONUS + " 목재";
-                if (_phase == DayPhase.Clear)
+                if (_lives == 0)
+                    _hud.ShowModal("목숨 소진", body + "\n\n오분류로 하트 5개가 모두 소진됐습니다.",
+                        "처음부터", "", false);
+                else if (_phase == DayPhase.Clear)
                     _hud.ShowModal("5일 근무 완료!", body + "\n\n누적 " + _totalScore + "점 · 목재 " + _wood,
                         "처음부터", "", false);
                 else if (!_passed)
@@ -1610,6 +1642,7 @@ namespace BeaverRecycling
             string phase = _phase == DayPhase.Supply ? "공급" : _phase == DayPhase.Closing ? "마감 정리" : "준비 / 정산";
             float remaining = _phase == DayPhase.Supply ? _supplySeconds - _elapsed : _supplySeconds + _closingSeconds - _elapsed;
             _hud.Refresh(_day, phase, remaining, _dayScore, _targets[_day - 1], _wood, carried, IsWorking);
+            _hud.RefreshLives(_lives);
         }
 
         /// <summary>현재 제출 대상과 동일한 계산 결과를 월드 투입구 표지에 반영한다.</summary>

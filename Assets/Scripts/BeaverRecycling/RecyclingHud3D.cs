@@ -22,6 +22,13 @@ namespace BeaverRecycling
         [SerializeField] private Text _hover;
         [SerializeField] private Text _toast;
         [SerializeField] private Button _pauseButton;
+        private const int HEART_COUNT = 5;
+        private static readonly Color HeartFilled = new Color(1f, 0.28f, 0.39f, 1f);
+        private static readonly Color HeartEmpty = new Color(0.3f, 0.16f, 0.21f, 0.9f);
+        private readonly Image[] _lifeHearts = new Image[HEART_COUNT];
+        private Sprite _heartSprite;
+        private Texture2D _heartTexture;
+        private int _shownLives = -1;
 
         [Header("Result and upgrades")]
         [SerializeField] private GameObject _modal;
@@ -68,8 +75,94 @@ namespace BeaverRecycling
             _hover.transform.parent.gameObject.SetActive(false);
             _toast.transform.parent.gameObject.SetActive(false);
             _message.text = "";
+            CreatePixelHearts();
+            RefreshLives(HEART_COUNT);
             RefreshControls(true);
             SetupModalFocus();
+        }
+
+
+        /// <summary>캔버스 좌측 상단에 13x11 도트 하트 5개를 배치한다. UI와 텍스처는 최초 1회 생성한다.</summary>
+        private void CreatePixelHearts()
+        {
+            // Every lit texel is a crisp square; no font, emoji or texture filtering involved.
+            string[] rows =
+            {
+                "0011100011100",
+                "0111110111110",
+                "1111111111111",
+                "1111111111111",
+                "1111111111111",
+                "0111111111110",
+                "0011111111100",
+                "0001111111000",
+                "0000111110000",
+                "0000011100000",
+                "0000001000000"
+            };
+            int width = rows[0].Length;
+            int height = rows.Length;
+            _heartTexture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Recycling Pixel Heart",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            Color32[] pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    pixels[y * width + x] = rows[height - y - 1][x] == '1'
+                        ? new Color32(255, 255, 255, 255) : new Color32(0, 0, 0, 0);
+            _heartTexture.SetPixels32(pixels);
+            _heartTexture.Apply(false, true);
+            _heartSprite = Sprite.Create(_heartTexture, new Rect(0, 0, width, height),
+                new Vector2(0.5f, 0.5f), 100f);
+
+            GameObject holder = new GameObject("Pixel Hearts", typeof(RectTransform));
+            RectTransform holderRect = (RectTransform)holder.transform;
+            holderRect.SetParent(_root, false);
+            holderRect.anchorMin = holderRect.anchorMax = new Vector2(0f, 1f);
+            holderRect.pivot = new Vector2(0f, 1f);
+            holderRect.anchoredPosition = new Vector2(30f, -30f);
+            holderRect.sizeDelta = new Vector2(215f, 33f);
+
+            for (int i = 0; i < HEART_COUNT; i++)
+            {
+                GameObject icon = new GameObject("Heart " + (i + 1), typeof(RectTransform),
+                    typeof(CanvasRenderer), typeof(Image));
+                RectTransform rect = (RectTransform)icon.transform;
+                rect.SetParent(holderRect, false);
+                rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = new Vector2(i * 44f, 0f);
+                rect.sizeDelta = new Vector2(39f, 33f);
+
+                Image heart = icon.GetComponent<Image>();
+                heart.sprite = _heartSprite;
+                heart.raycastTarget = false;
+                Outline outline = icon.AddComponent<Outline>();
+                outline.effectColor = new Color(0.07f, 0.04f, 0.07f, 0.95f);
+                outline.effectDistance = new Vector2(2f, -2f);
+                outline.useGraphicAlpha = false;
+                _lifeHearts[i] = heart;
+            }
+        }
+
+        /// <summary>남아 있는 목숨만 붉은 도트 하트로, 잃은 목숨은 어두운 하트로 표시한다.</summary>
+        public void RefreshLives(int lives)
+        {
+            int count = Mathf.Clamp(lives, 0, HEART_COUNT);
+            if (_shownLives == count) return;
+            _shownLives = count;
+            for (int i = 0; i < HEART_COUNT; i++)
+                if (_lifeHearts[i] != null)
+                    _lifeHearts[i].color = i < count ? HeartFilled : HeartEmpty;
+        }
+
+        void OnDestroy()
+        {
+            if (_heartSprite != null) Destroy(_heartSprite);
+            if (_heartTexture != null) Destroy(_heartTexture);
         }
 
         /// <summary>모달 버튼에 게임패드 내비게이션과 선택 시 강조할 굵은 외곽선을 준비한다.</summary>
