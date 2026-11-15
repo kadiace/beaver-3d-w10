@@ -56,6 +56,8 @@ namespace BeaverRecycling
 
         [Header("Beaver")]
         [SerializeField, Min(0.1f)] private float _baseSpeed = 4.5f;
+        [SerializeField, Range(0f, 0.2f)] private float _carrySpeedBonusPerItem = 0.05f;
+        [SerializeField, Min(1f)] private float _maxCarriedSpeedMultiplier = 1.6f;
         [SerializeField, Min(0.1f)] private float _baseReach = 1.8f;
         [SerializeField, Min(1)] private int _baseCapacity = 6;
 
@@ -201,9 +203,13 @@ namespace BeaverRecycling
                 Physics.SyncTransforms();
                 CollectContacts();
             }
-            float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
-            float speed = (_baseSpeed + 0.5f * _levels[1]) * slowdown;
-            if (_held.Count == 0) speed *= EMPTY_HANDED_SPEED_MULTIPLIER;
+            _beaver.SetCarriedItemCount(_held.Count);
+            // Keep the existing empty-handed sprint, but reward carrying additional items
+            // rather than slowing down once a bundle contains four or more objects.
+            float multiplier = _held.Count == 0
+                ? EMPTY_HANDED_SPEED_MULTIPLIER
+                : Mathf.Min(_maxCarriedSpeedMultiplier, 1f + _carrySpeedBonusPerItem * _held.Count);
+            float speed = (_baseSpeed + 0.5f * _levels[1]) * multiplier;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
             _beaver.Move(_movement, speed, Time.fixedDeltaTime);
@@ -1139,6 +1145,7 @@ namespace BeaverRecycling
         {
             var submitted = new List<RecyclingItem>(_held);
             _held.Clear();
+            _beaver.SetCarriedItemCount(0);
             SubmitItems(chute, submitted);
         }
 
@@ -1377,6 +1384,7 @@ namespace BeaverRecycling
         private void ClearWorld()
         {
             _held.Clear();
+            _beaver.SetCarriedItemCount(0);
             foreach (RecyclingItem item in _items.ToArray()) if (item != null) item.ReturnNow();
             _items.Clear();
             foreach (BombExplosion3D bomb in _bombs.ToArray()) bomb.ReturnNow();

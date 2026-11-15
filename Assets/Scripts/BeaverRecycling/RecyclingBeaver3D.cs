@@ -10,6 +10,27 @@ namespace BeaverRecycling
         [SerializeField] private Transform _carryPoint;
         [SerializeField] private Transform _visual;
         [SerializeField, Min(0f)] private float _knockbackSpinSpeed = 720f;
+
+        [Header("Eye glow and motion trails")]
+        [SerializeField] private Transform _leftEye;
+        [SerializeField] private Transform _rightEye;
+        [SerializeField] private Material _eyeGlowMaterial;
+        [SerializeField, Min(0f)] private float _eyeTrailBaseDuration = 0.08f;
+        [SerializeField, Min(0f)] private float _eyeTrailDurationPerItem = 0.035f;
+        [SerializeField, Min(0f)] private float _eyeGlowIntensityPerItem = 0.26f;
+        [SerializeField, Min(0f)] private float _eyeTrailWidthPerItem = 0.006f;
+        private const float EYE_GLOW_DIAMETER = 0.075f;
+        private const float EYE_SURFACE_OFFSET = 0.055f;
+        private const float EYE_TRAIL_BASE_WIDTH = 0.045f;
+        private const int MAX_EYE_EFFECT_ITEMS = 12;
+        private static readonly int EyeGlowColorId = Shader.PropertyToID("_GlowColor");
+        private static readonly Color EyeGlowBaseColor = new Color(0.34f, 0.85f, 1f, 1f);
+        private readonly MaterialPropertyBlock _eyeGlowProperties = new MaterialPropertyBlock();
+        private Transform[] _eyeAnchors;
+        private Transform[] _eyeEffectHeads;
+        private MeshRenderer[] _eyeGlowMeshes;
+        private TrailRenderer[] _eyeTrails;
+        private int _lastEyeEffectCount = -1;
         private Vector3 _previousPosition;
         private Vector3 _currentPosition;
         private Quaternion _previousRotation;
@@ -47,12 +68,15 @@ namespace BeaverRecycling
             _previousPosition = _currentPosition = transform.position;
             _previousRotation = _currentRotation = transform.rotation;
             _lastMoveFixedTime = Time.time - Time.fixedDeltaTime;
+            CreateEyeTrails();
+            SetCarriedItemCount(0);
         }
 
         void LateUpdate()
         {
             _visual.position = VisualPosition + Vector3.up * Mathf.Lerp(_previousBobHeight, _currentBobHeight, InterpolationFactor);
             _visual.rotation = Quaternion.Slerp(_previousRotation, _currentRotation, InterpolationFactor);
+            UpdateEyeTrailPositions();
             AnimateStunStar(Time.deltaTime);
         }
 
@@ -114,6 +138,95 @@ namespace BeaverRecycling
             _stunStar.rotation = _stunCamera.rotation;
         }
 
+
+        /// <summary>씬에 배치된 양쪽 눈을 따라 발광 코어와 애프터이미지 트레일을 생성한다.</summary>
+        private void CreateEyeTrails()
+        {
+            if (_leftEye == null || _rightEye == null || _eyeGlowMaterial == null) return;
+
+            _eyeAnchors = new[] { _leftEye, _rightEye };
+            _eyeEffectHeads = new Transform[_eyeAnchors.Length];
+            _eyeGlowMeshes = new MeshRenderer[_eyeAnchors.Length];
+            _eyeTrails = new TrailRenderer[_eyeAnchors.Length];
+
+            for (int i = 0; i < _eyeAnchors.Length; i++)
+            {
+                GameObject glow = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                glow.name = i == 0 ? "Left Eye Glow + Trail" : "Right Eye Glow + Trail";
+                glow.layer = gameObject.layer;
+                glow.transform.SetParent(_visual, false);
+                glow.transform.localScale = Vector3.one * EYE_GLOW_DIAMETER;
+                Collider collider = glow.GetComponent<Collider>();
+                if (collider != null) Destroy(collider);
+
+                MeshRenderer core = glow.GetComponent<MeshRenderer>();
+                core.sharedMaterial = _eyeGlowMaterial;
+                core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                core.receiveShadows = false;
+                _eyeGlowMeshes[i] = core;
+                _eyeEffectHeads[i] = glow.transform;
+
+                TrailRenderer trail = glow.AddComponent<TrailRenderer>();
+                trail.sharedMaterial = _eyeGlowMaterial;
+                trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                trail.receiveShadows = false;
+                trail.alignment = LineAlignment.View;
+                trail.minVertexDistance = 0.025f;
+                trail.numCornerVertices = 3;
+                trail.numCapVertices = 3;
+                trail.startWidth = EYE_TRAIL_BASE_WIDTH;
+                trail.endWidth = 0f;
+                trail.time = _eyeTrailBaseDuration;
+                trail.colorGradient = new Gradient
+                {
+                    colorKeys = new[]
+                    {
+                        new GradientColorKey(Color.white, 0f),
+                        new GradientColorKey(new Color(0.4f, 0.8f, 1f), 1f)
+                    },
+                    alphaKeys = new[]
+                    {
+                        new GradientAlphaKey(0.9f, 0f),
+                        new GradientAlphaKey(0f, 1f)
+                    }
+                };
+                _eyeTrails[i] = trail;
+            }
+
+            UpdateEyeTrailPositions();
+            foreach (TrailRenderer trail in _eyeTrails) trail.Clear();
+        }
+
+        /// <summary>비버 비주얼의 보간된 움직임과 회전을 따라 각 눈의 발광 중심을 옮긴다.</summary>
+        private void UpdateEyeTrailPositions()
+        {
+            if (_eyeEffectHeads == null) return;
+            for (int i = 0; i < _eyeEffectHeads.Length; i++)
+                _eyeEffectHeads[i].position = _eyeAnchors[i].position +
+                    _eyeAnchors[i].forward * EYE_SURFACE_OFFSET;
+        }
+
+        /// <summary>물고 있는 기물 수에 따라 눈의 발광 강도, 트레일 수명과 굵기를 조절한다.</summary>
+        public void SetCarriedItemCount(int count)
+        {
+            int effectCount = Mathf.Clamp(count, 0, MAX_EYE_EFFECT_ITEMS);
+            if (effectCount == _lastEyeEffectCount) return;
+            _lastEyeEffectCount = effectCount;
+            if (_eyeTrails == null) return;
+
+            float duration = _eyeTrailBaseDuration + _eyeTrailDurationPerItem * effectCount;
+            float intensity = 1.05f + _eyeGlowIntensityPerItem * effectCount;
+            _eyeGlowProperties.SetColor(EyeGlowColorId, EyeGlowBaseColor * intensity);
+
+            for (int i = 0; i < _eyeTrails.Length; i++)
+            {
+                _eyeTrails[i].time = duration;
+                _eyeTrails[i].startWidth = EYE_TRAIL_BASE_WIDTH + _eyeTrailWidthPerItem * effectCount;
+                _eyeTrails[i].SetPropertyBlock(_eyeGlowProperties);
+                _eyeGlowMeshes[i].SetPropertyBlock(_eyeGlowProperties);
+            }
+        }
+
         /// <summary>수평 속도 변화와 지속 시간을 받아 비버의 넉백 속도와 남은 시간을 갱신한다.</summary>
         public void ApplyKnockback(Vector3 velocityChange, float duration)
         {
@@ -136,6 +249,10 @@ namespace BeaverRecycling
             _lastMoveFixedTime = Time.time - Time.fixedDeltaTime;
             _visual.localPosition = Vector3.zero;
             _visual.localRotation = Quaternion.identity;
+            SetCarriedItemCount(0);
+            UpdateEyeTrailPositions();
+            if (_eyeTrails != null)
+                foreach (TrailRenderer trail in _eyeTrails) trail.Clear();
         }
     }
 }
