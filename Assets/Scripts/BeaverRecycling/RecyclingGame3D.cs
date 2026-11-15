@@ -55,7 +55,8 @@ namespace BeaverRecycling
 
         [Header("Beaver")]
         [SerializeField, Min(0.1f)] private float _baseSpeed = 4.5f;
-        [SerializeField, Range(0f, 0.2f)] private float _carrySpeedBonusPerItem = 1f / 6f;
+        [SerializeField, Min(1f)] private float _firstCarriedSpeedMultiplier = 1.5f;
+        [SerializeField, Range(0f, 0.2f)] private float _additionalCarriedSpeedBonus = 0.1f;
         [SerializeField, Min(1f)] private float _maxCarriedSpeedMultiplier = 2f;
         [SerializeField, Min(0.1f)] private float _baseReach = 1.8f;
         [SerializeField, Min(1)] private int _baseCapacity = 6;
@@ -203,8 +204,9 @@ namespace BeaverRecycling
                 CollectContacts();
             }
             _beaver.SetCarriedItemCount(_held.Count);
-            // Empty-handed is the slowest state. Every additional carried item increases speed.
-            float multiplier = Mathf.Min(_maxCarriedSpeedMultiplier, 1f + _carrySpeedBonusPerItem * _held.Count);
+            // Empty hands: 1x. First item: 1.5x. Each additional item: +0.1x, capped at 2x.
+            float multiplier = _held.Count == 0 ? 1f : Mathf.Min(_maxCarriedSpeedMultiplier,
+                _firstCarriedSpeedMultiplier + _additionalCarriedSpeedBonus * (_held.Count - 1));
             float speed = (_baseSpeed + 0.5f * _levels[1]) * multiplier;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
@@ -444,6 +446,7 @@ namespace BeaverRecycling
             _held.Add(item);
             foreach (RecyclingItem member in group) if (member != item) _held.Add(member);
             foreach (RecyclingItem member in _held) member.SetHeld(true);
+            _beaver.SetCarriedItemCount(_held.Count);
         }
 
         /// <summary>화면 겹침과 비버 앞 보조 영역을 검사해 유효한 기물 묶음을 운반 묶음에 결합한다.</summary>
@@ -1012,6 +1015,7 @@ namespace BeaverRecycling
 
             if (scatter) Physics.SyncTransforms();
             _held.Clear();
+            _beaver.SetCarriedItemCount(0);
         }
 
         /// <summary>분리 기물과 희망 위치를 받아 강 안에서 겹침이 적은 가까운 위치를 반환한다.</summary>
@@ -1373,7 +1377,8 @@ namespace BeaverRecycling
         public void ForgetItem(RecyclingItem item)
         {
             _items.Remove(item);
-            _held.Remove(item);
+            if (_held.Remove(item))
+                _beaver.SetCarriedItemCount(_held.Count);
         }
 
         /// <summary>하루 종료 또는 재시도에서 모든 생성 기물과 운반 상태를 풀에 반환한다.</summary>

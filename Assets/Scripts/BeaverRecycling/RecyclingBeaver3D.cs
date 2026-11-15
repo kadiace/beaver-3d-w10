@@ -251,6 +251,17 @@ namespace BeaverRecycling
             _lastEyeEffectCount = effectCount;
             if (_eyeTrails == null) return;
 
+            // Empty-handed eyes have no glow, halo or lingering trail.
+            bool visible = effectCount > 0;
+            for (int i = 0; i < _eyeTrails.Length; i++)
+            {
+                _eyeGlowMeshes[i].enabled = visible;
+                _eyeHaloMeshes[i].enabled = visible;
+                _eyeTrails[i].emitting = visible;
+                if (!visible) _eyeTrails[i].Clear();
+            }
+            if (!visible) return;
+
             float duration = _eyeTrailBaseDuration + _eyeTrailDurationPerItem * effectCount;
             float intensity = 1.6f + _eyeGlowIntensityPerItem * effectCount;
             Color coreColor = EyeGlowBaseColor * intensity;
