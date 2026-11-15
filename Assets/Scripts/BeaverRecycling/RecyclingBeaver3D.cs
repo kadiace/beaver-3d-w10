@@ -26,8 +26,8 @@ namespace BeaverRecycling
         private static readonly int EyeGlowColorId = Shader.PropertyToID("_GlowColor");
         private static readonly int UseVertexColorId = Shader.PropertyToID("_UseVertexColor");
         private static readonly Color EyeGlowBaseColor = new Color(0.34f, 0.85f, 1f, 1f);
-        private readonly MaterialPropertyBlock _eyeGlowProperties = new MaterialPropertyBlock();
-        private readonly MaterialPropertyBlock _eyeTrailProperties = new MaterialPropertyBlock();
+        private MaterialPropertyBlock _eyeGlowProperties;
+        private MaterialPropertyBlock _eyeTrailProperties;
         private Transform[] _eyeAnchors;
         private Transform[] _eyeEffectHeads;
         private MeshRenderer[] _eyeGlowMeshes;
@@ -62,6 +62,8 @@ namespace BeaverRecycling
 
         void Awake()
         {
+            _eyeGlowProperties = new MaterialPropertyBlock();
+            _eyeTrailProperties = new MaterialPropertyBlock();
             _startingPosition = transform.position;
             _stunStarCenterLocalPosition = _stunStar.localPosition;
             _stunStarStartingRotation = _stunStar.localRotation;
