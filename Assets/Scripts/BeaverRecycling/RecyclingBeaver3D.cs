@@ -92,14 +92,21 @@ namespace BeaverRecycling
             AnimateStunStar(Time.deltaTime);
         }
 
-        /// <summary>이동 입력, 이동 속도, deltaTime을 사용해 작업 구역 안에서 비버의 위치·방향·걸음 표현을 갱신한다.</summary>
-        public void Move(Vector2 input, float speed, float deltaTime)
+        /// <summary>빈손에는 방향키로 이동하고, 운반 중에는 방향키로 회전하며 전방으로 자동 이동한다.</summary>
+        public void Move(Vector2 input, float speed, float deltaTime, bool autoMove)
         {
             _previousPosition = _currentPosition;
             _previousRotation = _currentRotation;
             _previousBobHeight = _currentBobHeight;
             Vector2 movement = Vector2.ClampMagnitude(input, 1f);
-            Vector3 direction = new Vector3(movement.x, 0f, movement.y);
+            Vector3 inputDirection = new Vector3(movement.x, 0f, movement.y);
+
+            // With a bundle, input selects the facing direction, not the travel velocity.
+            // Turn before applying forward motion so the beaver follows its new heading.
+            if (autoMove && inputDirection.sqrMagnitude > 0.01f && _knockbackTimeRemaining <= 0f)
+                transform.rotation = Quaternion.RotateTowards(transform.rotation,
+                    Quaternion.LookRotation(inputDirection), 540f * deltaTime);
+            Vector3 direction = autoMove ? transform.forward : inputDirection;
             float knockbackStep = Mathf.Min(deltaTime, _knockbackTimeRemaining);
             float knockbackFraction = _knockbackTimeRemaining > 0f ? knockbackStep / _knockbackTimeRemaining : 0f;
             Vector3 knockbackDisplacement = _knockbackVelocity * (knockbackStep * (1f - 0.5f * knockbackFraction));
@@ -115,14 +122,14 @@ namespace BeaverRecycling
             transform.position = position;
             if (knockbackDisplacement.sqrMagnitude > 0.000001f)
                 transform.Rotate(Vector3.up, _knockbackSpinSpeed * deltaTime, Space.World);
-            else if (direction.sqrMagnitude > 0.01f)
+            else if (!autoMove && inputDirection.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.RotateTowards(transform.rotation,
-                    Quaternion.LookRotation(direction), 540f * deltaTime);
+                    Quaternion.LookRotation(inputDirection), 540f * deltaTime);
             _currentPosition = transform.position;
             _currentRotation = transform.rotation;
             _lastMoveFixedTime = Time.fixedTime;
             _stride += deltaTime * speed * 5f;
-            _currentBobHeight = movement.sqrMagnitude > 0f ? Mathf.Abs(Mathf.Sin(_stride)) * 0.045f : 0f;
+            _currentBobHeight = direction.sqrMagnitude > 0.01f ? Mathf.Abs(Mathf.Sin(_stride)) * 0.045f : 0f;
         }
 
         /// <summary>기절 상태를 받아 머리 위 별 이펙트를 켜거나 끈다.</summary>

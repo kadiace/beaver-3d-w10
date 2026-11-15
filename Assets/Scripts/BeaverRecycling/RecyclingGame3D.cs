@@ -210,7 +210,10 @@ namespace BeaverRecycling
             float speed = (_baseSpeed + 0.5f * _levels[1]) * multiplier;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
-            _beaver.Move(_movement, speed, Time.fixedDeltaTime);
+            // Carrying turns the directional input into steering; the beaver keeps walking
+            // in its facing direction without input. Stun still interrupts auto-walking.
+            bool autoMove = _held.Count > 0 && Time.time >= _beaverStunnedUntil;
+            _beaver.Move(_movement, speed, Time.fixedDeltaTime, autoMove);
             if (_held.Count == 0) return;
             Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
             Vector3 beaverPosition = _beaver.transform.position;
@@ -1534,7 +1537,7 @@ namespace BeaverRecycling
                     ? "" : "\n새 분류 추가 - " + newCategories;
                 _hud.ShowModal(_day + "일차 · 출근 준비",
                     "오늘의 목표 " + _targets[_day - 1] + "점" + categoryLine + "\n\n" +
-                    movementKey + " 이동\n" +
+                    movementKey + " 빈손 이동 / 운반 중 방향 전환 (자동 전진)\n" +
                     interactKey + " 집기 / 놓기 / 투입구에서 놓으면 분류\n" +
                     splitKey + " 묶음 분리\n" +
                     menuKey + " 일시정지\n\n" +

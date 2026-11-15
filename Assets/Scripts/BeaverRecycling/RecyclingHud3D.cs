@@ -50,8 +50,8 @@ namespace BeaverRecycling
             if (!force && _displayedGamepadConnected == gamepadConnected) return;
             _displayedGamepadConnected = gamepadConnected;
             _controls.text = gamepadConnected
-                ? "왼쪽 스틱: 이동   South: 집기/놓기   West: 묶음 분리   Menu: 일시정지"
-                : "방향키: 이동   Z: 집기/놓기   X: 묶음 분리   ESC: 일시정지";
+                ? "왼쪽 스틱: 이동/방향 전환 (운반 중 자동 전진)   South: 집기/놓기   West: 묶음 분리   Menu: 일시정지"
+                : "방향키: 이동/방향 전환 (운반 중 자동 전진)   Z: 집기/놓기   X: 묶음 분리   ESC: 일시정지";
         }
 
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
