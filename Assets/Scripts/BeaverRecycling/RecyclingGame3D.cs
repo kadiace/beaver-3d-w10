@@ -19,7 +19,6 @@ namespace BeaverRecycling
         private const float DASH_DURATION_SECONDS = 3f;
         private const float DASH_RECOVERY_SECONDS = 3f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
-        private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
         private const int SPLIT_SEARCH_RINGS = 48;
@@ -428,7 +427,7 @@ namespace BeaverRecycling
             return closest;
         }
 
-        /// <summary>현재 운반 상태와 투입구 위치에 따라 Z/South 입력을 집기·내려놓기·투입으로 처리한다.</summary>
+        /// <summary>운반 상태와 투입구 위치에 따라 Z/패드 A 입력을 집기·내려놓기·투입으로 처리한다.</summary>
         private void HandleInteract()
         {
             if (_held.Count == 0)
@@ -1089,109 +1088,68 @@ namespace BeaverRecycling
             return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
-        /// <summary>비버가 Dock 위에 있으면 해당 투입구를 우선하고, 그 외에는 운반 묶음의 화면 겹침으로 찾는다.</summary>
-        private RecyclingChute3D FindChute()
-        {
-            Vector3 position = _beaver.transform.position;
-            RecyclingChute3D nearest = null;
-            float distance = float.PositiveInfinity;
-            foreach (RecyclingChute3D chute in _chutes)
-            {
-                if (!chute.IsAvailable(_day)) continue;
-                Bounds dock = chute.DockBounds;
-                if (position.x < dock.min.x || position.x > dock.max.x ||
-                    position.z < dock.min.z || position.z > dock.max.z) continue;
-                float next = (chute.transform.position - position).sqrMagnitude;
-                if (next >= distance) continue;
-                nearest = chute;
-                distance = next;
-            }
-            return nearest != null ? nearest : FindChute(position, _held);
-        }
+        /// <summary>운반한 묶음의 물리 질량중심이 투입구 내부에 있을 때만 해당 투입구를 반환한다.</summary>
+        private RecyclingChute3D FindChute() => FindChute(_held);
 
-        /// <summary>던지기와 Dock 밖 직접 제출에서 기물 또는 Dock 면적의 절반 이상이 겹치는 투입구를 찾는다.</summary>
-        private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
+        /// <summary>직접 제출과 던진 묶음 모두 동일한 질량가중 무게중심의 화면상 위치로 판정한다.</summary>
+        private RecyclingChute3D FindChute(IReadOnlyList<RecyclingItem> items)
         {
+            if (_camera == null || items == null || items.Count == 0) return null;
+
+            Vector3 weightedCenter = Vector3.zero;
+            float totalMass = 0f;
+            foreach (RecyclingItem item in items)
+            {
+                if (item == null || item.Body == null) continue;
+                Rigidbody body = item.Body;
+                float mass = Mathf.Max(0.0001f, body.mass);
+                weightedCenter += body.worldCenterOfMass * mass;
+                totalMass += mass;
+            }
+            if (totalMass <= 0f) return null;
+
+            Vector3 center = weightedCenter / totalMass;
+            Vector3 viewport = _camera.WorldToViewportPoint(center);
+            if (viewport.z <= 0f) return null;
+            Vector2 point = new Vector2(viewport.x, viewport.y);
+
             RecyclingChute3D nearest = null;
-            float distance = float.PositiveInfinity;
+            float nearestDistance = float.PositiveInfinity;
             foreach (RecyclingChute3D chute in _chutes)
             {
-                if (!CoversProjectedMajority(chute, items)) continue;
-                float next = (chute.transform.position - position).sqrMagnitude;
-                if (next >= distance) continue;
+                if (chute == null || !chute.IsAvailable(_day)) continue;
+                // The chute includes both the dock landing area and the sorting box.
+                bool insideDock = ContainsProjectedPoint(ProjectBoundsToViewport(chute.DockBounds), point);
+                bool insideBox = ContainsProjectedPoint(ProjectBoundsToViewport(chute.SortingBoxBounds), point);
+                if (!insideDock && !insideBox) continue;
+                float distance = (chute.transform.position - center).sqrMagnitude;
+                if (distance >= nearestDistance) continue;
                 nearest = chute;
-                distance = next;
+                nearestDistance = distance;
             }
             return nearest;
         }
 
-        /// <summary>기물 묶음 면적의 절반이 투입구에 겹치거나 Dock 면적의 절반을 덮는지 판정한다.</summary>
-        private bool CoversProjectedMajority(RecyclingChute3D chute, IReadOnlyList<RecyclingItem> items)
+        /// <summary>CCW 볼록 다각형의 경계를 포함해 화면상 점이 내부에 있는지 검사한다.</summary>
+        private static bool ContainsProjectedPoint(List<Vector2> polygon, Vector2 point)
         {
-            if (_camera == null || chute == null || !chute.IsAvailable(_day) || items.Count == 0) return false;
-
-            List<Vector2> dock = ProjectBoundsToViewport(chute.DockBounds);
-            List<Vector2> box = ProjectBoundsToViewport(chute.SortingBoxBounds);
-            // The two chute regions can overlap on screen. Count their union, not their sum.
-            List<Vector2> both = IntersectConvexPolygons(dock, box);
-            float totalArea = 0f;
-            float coveredArea = 0f;
-            var dockOverlaps = new List<List<Vector2>>(items.Count);
-            foreach (RecyclingItem item in items)
+            if (polygon.Count < 3) return false;
+            for (int i = 0; i < polygon.Count; i++)
             {
-                List<Vector2> footprint = ProjectBoundsToViewport(item.Collider.bounds);
-                float area = PolygonArea(footprint);
-                if (area <= 0f) continue;
-
-                totalArea += area;
-                List<Vector2> dockOverlap = IntersectConvexPolygons(footprint, dock);
-                float dockOverlapArea = PolygonArea(dockOverlap);
-                if (dockOverlapArea > 0f) dockOverlaps.Add(dockOverlap);
-                coveredArea += dockOverlapArea +
-                    PolygonArea(IntersectConvexPolygons(footprint, box)) -
-                    PolygonArea(IntersectConvexPolygons(footprint, both));
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[(i + 1) % polygon.Count];
+                if (Cross(a, b, point) < -0.000001f) return false;
             }
-            return totalArea > 0f &&
-                (coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO ||
-                    CoversDockMajority(dock, dockOverlaps));
+            return true;
         }
 
-        /// <summary>Dock에서 기물 묶음이 덮지 않은 영역을 차례로 빼 실제 덮인 면적이 절반 이상인지 반환한다.</summary>
-        private static bool CoversDockMajority(List<Vector2> dock, List<List<Vector2>> overlaps)
-        {
-            float dockArea = PolygonArea(dock);
-            if (dockArea <= 0f) return false;
-            var uncovered = new List<List<Vector2>> { dock };
-            foreach (List<Vector2> footprint in overlaps)
-            {
-                var remaining = new List<List<Vector2>>();
-                foreach (List<Vector2> region in uncovered)
-                {
-                    List<Vector2> inside = region;
-                    for (int i = 0; i < footprint.Count && inside.Count >= 3; i++)
-                    {
-                        Vector2 start = footprint[i];
-                        Vector2 end = footprint[(i + 1) % footprint.Count];
-                        List<Vector2> outside = ClipToHalfPlane(inside, start, end, false);
-                        if (PolygonArea(outside) > 0.00000001f) remaining.Add(outside);
-                        inside = ClipToHalfPlane(inside, start, end, true);
-                    }
-                }
-                uncovered = remaining;
-                float coveredArea = dockArea;
-                foreach (List<Vector2> region in uncovered) coveredArea -= PolygonArea(region);
-                if (coveredArea >= dockArea * CHUTE_PROJECTED_OVERLAP_RATIO) return true;
-            }
-            return false;
-        }
-
-        /// <summary>관성 비행 허용 시간 내 던진 묶음도 직접 제출과 동일한 화면 겹침 판정으로 정산한다.</summary>
+        /// <summary>던진 묶음도 제출 허용 시간 내 무게중심이 투입구에 들어오면 정산한다.</summary>
         public bool TrySubmitThrownItem(RecyclingItem item)
         {
             if (!IsWorking || item == null || item.IsHeld || item.IsResolved || !_items.Contains(item)) return false;
             List<RecyclingItem> bundle = RecyclingItem.Collect(item);
             if (bundle.Any(member => member.IsHeld || member.IsResolved || !_items.Contains(member))) return false;
-            RecyclingChute3D chute = FindChute(item.Body.position, bundle);
+            RecyclingChute3D chute = FindChute(bundle);
             if (chute == null) return false;
             SubmitItems(chute, bundle);
             return true;
