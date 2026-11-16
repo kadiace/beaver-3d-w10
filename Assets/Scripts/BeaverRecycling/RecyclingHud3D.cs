@@ -41,6 +41,10 @@ namespace BeaverRecycling
         private bool _displayedGamepadConnected;
         private Button[] _modalButtons;
         private Outline[] _focusOutlines;
+        private RectTransform _dashGauge;
+        private RectTransform _dashFill;
+        private Image _dashFillImage;
+        private Text _dashLabel;
 
         /// <summary>게임패드 연결/해제 시 인게임 HUD 키 안내를 현재 장치에 맞게 갱신한다.</summary>
         private void RefreshControls(bool force = false)
@@ -68,8 +72,89 @@ namespace BeaverRecycling
             _hover.transform.parent.gameObject.SetActive(false);
             _toast.transform.parent.gameObject.SetActive(false);
             _message.text = "";
+            CreateDashGauge();
             RefreshControls(true);
             SetupModalFocus();
+        }
+
+        /// <summary>하단 운반 HUD 바로 위에 대시 잔량 표시용 바와 상태 텍스트를 생성한다.</summary>
+        private void CreateDashGauge()
+        {
+            GameObject gaugeObject = new GameObject("Dash Gauge", typeof(RectTransform));
+            _dashGauge = gaugeObject.GetComponent<RectTransform>();
+            _dashGauge.SetParent(_root, false);
+            _dashGauge.SetSiblingIndex(_modal.transform.GetSiblingIndex());
+            _dashGauge.anchorMin = _dashGauge.anchorMax = new Vector2(0.5f, 0f);
+            _dashGauge.pivot = new Vector2(0.5f, 0.5f);
+            _dashGauge.anchoredPosition = new Vector2(0f, 160f);
+            _dashGauge.sizeDelta = new Vector2(500f, 56f);
+
+            GameObject trackObject = new GameObject("Gauge Track",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            RectTransform track = trackObject.GetComponent<RectTransform>();
+            track.SetParent(_dashGauge, false);
+            track.anchorMin = new Vector2(0f, 0f);
+            track.anchorMax = new Vector2(1f, 0f);
+            track.pivot = new Vector2(0.5f, 0f);
+            track.anchoredPosition = Vector2.zero;
+            track.sizeDelta = new Vector2(0f, 24f);
+            Image trackImage = trackObject.GetComponent<Image>();
+            trackImage.color = new Color(0.035f, 0.075f, 0.1f, 0.95f);
+            trackImage.raycastTarget = false;
+
+            GameObject insetObject = new GameObject("Gauge Inset", typeof(RectTransform));
+            RectTransform inset = insetObject.GetComponent<RectTransform>();
+            inset.SetParent(track, false);
+            inset.anchorMin = Vector2.zero;
+            inset.anchorMax = Vector2.one;
+            inset.offsetMin = new Vector2(3f, 3f);
+            inset.offsetMax = new Vector2(-3f, -3f);
+
+            GameObject fillObject = new GameObject("Gauge Fill",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            _dashFill = fillObject.GetComponent<RectTransform>();
+            _dashFill.SetParent(inset, false);
+            _dashFill.anchorMin = Vector2.zero;
+            _dashFill.anchorMax = Vector2.one;
+            _dashFill.offsetMin = Vector2.zero;
+            _dashFill.offsetMax = Vector2.zero;
+            _dashFillImage = fillObject.GetComponent<Image>();
+            _dashFillImage.raycastTarget = false;
+
+            GameObject labelObject = new GameObject("Gauge Label",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(_dashGauge, false);
+            labelRect.anchorMin = new Vector2(0f, 1f);
+            labelRect.anchorMax = Vector2.one;
+            labelRect.pivot = new Vector2(0.5f, 1f);
+            labelRect.anchoredPosition = Vector2.zero;
+            labelRect.sizeDelta = new Vector2(0f, 25f);
+            _dashLabel = labelObject.GetComponent<Text>();
+            _dashLabel.font = _controls.font;
+            _dashLabel.fontSize = 19;
+            _dashLabel.alignment = TextAnchor.MiddleCenter;
+            _dashLabel.color = new Color(0.92f, 0.97f, 1f, 1f);
+            _dashLabel.raycastTarget = false;
+        }
+
+        /// <summary>대시 잔여 시간과 작업 상태에 맞춰 HUD 상단 게이지의 길이·색상·안내 문구를 갱신한다.</summary>
+        public void SetDashGauge(float remainingSeconds, float maxSeconds, bool dashing, bool working)
+        {
+            _dashGauge.gameObject.SetActive(working);
+            if (!working) return;
+
+            float fill = Mathf.Clamp01(remainingSeconds / maxSeconds);
+            _dashFill.anchorMax = new Vector2(fill, 1f);
+            _dashFillImage.color = dashing
+                ? new Color(1f, 0.68f, 0.24f, 1f)
+                : new Color(0.35f, 0.85f, 0.9f, 1f);
+            _dashLabel.text = dashing
+                ? "SHIFT  ·  대시 " + remainingSeconds.ToString("0.0") + "초"
+                : fill >= 0.999f
+                    ? "SHIFT  ·  대시 준비"
+                    : "SHIFT  ·  충전 " + remainingSeconds.ToString("0.0") + " / " +
+                      maxSeconds.ToString("0") + "초";
         }
 
         /// <summary>모달 버튼에 게임패드 내비게이션과 선택 시 강조할 굵은 외곽선을 준비한다.</summary>

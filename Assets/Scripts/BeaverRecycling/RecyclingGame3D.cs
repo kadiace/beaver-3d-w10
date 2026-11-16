@@ -15,7 +15,9 @@ namespace BeaverRecycling
         private const int NO_MISCLASSIFICATION_WOOD_BONUS = 3;
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
-        private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
+        private const float DASH_SPEED_MULTIPLIER = 2f;
+        private const float DASH_DURATION_SECONDS = 3f;
+        private const float DASH_RECOVERY_SECONDS = 3f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
@@ -98,6 +100,8 @@ namespace BeaverRecycling
         private float _nextSpawn;
         private float _capacityNoticeAt;
         private float _beaverStunnedUntil;
+        private float _dashRemaining = DASH_DURATION_SECONDS;
+        private bool _isDashing;
 
         public bool IsWorking => _phase == DayPhase.Supply || _phase == DayPhase.Closing;
         public float WaterfallZ => _waterfallZ;
@@ -194,9 +198,10 @@ namespace BeaverRecycling
                 Physics.SyncTransforms();
                 CollectContacts();
             }
+            UpdateDash(Time.fixedDeltaTime);
             float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
             float speed = (_baseSpeed + 0.5f * _levels[1]) * slowdown;
-            if (_held.Count == 0) speed *= EMPTY_HANDED_SPEED_MULTIPLIER;
+            if (_isDashing) speed *= DASH_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
             _beaver.Move(_movement, speed, Time.fixedDeltaTime);
@@ -217,6 +222,19 @@ namespace BeaverRecycling
                 member.Body.MoveRotation(targetRotation);
                 member.RecordCarryMotion(Time.fixedDeltaTime, beaverLinearVelocity, targetPosition);
             }
+        }
+
+        /// <summary>Shift 대시 중 잔량을 소모하고, Shift를 놓았을 때 3초에 걸쳐 충전한다.</summary>
+        private void UpdateDash(float deltaTime)
+        {
+            bool dashHeld = Managers.Input.DashHeld;
+            _isDashing = dashHeld && _movement.sqrMagnitude > 0.0001f &&
+                Time.time >= _beaverStunnedUntil && _dashRemaining > 0f;
+            if (_isDashing)
+                _dashRemaining = Mathf.Max(0f, _dashRemaining - deltaTime);
+            else if (!dashHeld)
+                _dashRemaining = Mathf.Min(DASH_DURATION_SECONDS,
+                    _dashRemaining + deltaTime * (DASH_DURATION_SECONDS / DASH_RECOVERY_SECONDS));
         }
 
         void LateUpdate()
@@ -1338,6 +1356,8 @@ namespace BeaverRecycling
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
             _beaverStunnedUntil = 0f;
+            _dashRemaining = DASH_DURATION_SECONDS;
+            _isDashing = false;
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
             _movement = Vector2.zero;
@@ -1439,6 +1459,7 @@ namespace BeaverRecycling
         /// <summary>UI 활성 여부를 받아 InputManager의 맵·시간 상태와 포인터 표시를 설정한다.</summary>
         private void SetUiMode(bool ui)
         {
+            if (ui) _isDashing = false;
             Managers.Input.SetInputMode(ui ? InputMode.UI : InputMode.Player);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = false;
@@ -1545,6 +1566,7 @@ namespace BeaverRecycling
             string phase = _phase == DayPhase.Supply ? "공급" : _phase == DayPhase.Closing ? "마감 정리" : "준비 / 정산";
             float remaining = _phase == DayPhase.Supply ? _supplySeconds - _elapsed : _supplySeconds + _closingSeconds - _elapsed;
             _hud.Refresh(_day, phase, remaining, _dayScore, _targets[_day - 1], _wood, carried, IsWorking);
+            _hud.SetDashGauge(_dashRemaining, DASH_DURATION_SECONDS, _isDashing, IsWorking);
         }
 
         /// <summary>현재 제출 대상과 동일한 계산 결과를 월드 투입구 표지에 반영한다.</summary>
