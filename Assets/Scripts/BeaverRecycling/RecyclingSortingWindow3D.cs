@@ -8,11 +8,12 @@ namespace BeaverRecycling
 {
     public sealed class RecyclingSortingWindow3D : MonoBehaviour
     {
+        // Native UI 1344x1008 at scale 1; local playfield units replace the old 2.8x scale.
         private const float PHYSICS_STEP = 0.02f;
         private const float FALLBACK_FINISH_DELAY = 3f;
         private const float RESULT_SECONDS = 1.3f;
-        private const float LINE_REACH = 22f;
-        private const float ITEM_SCALE = 0.25f;
+        private const float LINE_REACH = 61.6f;
+        private const float ITEM_SCALE = 0.7f;
         private const float INITIAL_ROLL_SPEED = 45f;
         private const float ROLL_DAMPING = 0.2f;
 
@@ -38,7 +39,7 @@ namespace BeaverRecycling
         [SerializeField, Range(0f, 1f), Tooltip("0: fixed maximum interval. 1: random interval from a physics step up to the maximum.")]
         private float _dropIntervalVariance = 0.35f;
         [SerializeField, Min(0f), Tooltip("Maximum horizontal offset from the top center, in playfield units.")]
-        private float _maximumHorizontalOffset = 90f;
+        private float _maximumHorizontalOffset = 252f;
         [SerializeField, Range(0f, 1f), Tooltip("0: drop at center. 1: spread across the full horizontal range.")]
         private float _horizontalOffsetVariance = 0.8f;
         [SerializeField, Min(0.1f)] private float _fallGravityScale = 50f;
@@ -177,7 +178,7 @@ namespace BeaverRecycling
             Sprite sprite = Resources.Load<Sprite>("Sprites/Voxels/" + definition.Id);
             Vector2 size = sprite.rect.size * ITEM_SCALE;
             float radius = Mathf.Max(size.x, size.y) * 0.5f;
-            const float padding = 3f;
+            const float padding = 8.4f;
             float spawnY = _playfield.rect.yMax - radius - padding;
             float allowedOffset = Mathf.Max(0f, _playfield.rect.width * 0.5f - radius - padding);
             float horizontalRange = Mathf.Min(allowedOffset, _maximumHorizontalOffset) * _horizontalOffsetVariance;
@@ -194,7 +195,7 @@ namespace BeaverRecycling
                 {
                     if (_excluded[i]) continue;
                     Vector2 existing = _playfield.InverseTransformPoint(_sprites[i].position);
-                    float separation = radius + _radii[i] + 2f;
+                    float separation = radius + _radii[i] + 5.6f;
                     if ((candidate - existing).sqrMagnitude >= separation * separation) continue;
                     overlaps = true;
                     break;
@@ -270,13 +271,13 @@ namespace BeaverRecycling
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             CreateBorderEdge(rect, "Top", new Vector2(0f, 1f), Vector2.one,
-                new Vector2(0f, 2f), new Vector2(0f, -1f));
+                new Vector2(0f, 5.6f), new Vector2(0f, -2.8f));
             CreateBorderEdge(rect, "Bottom", Vector2.zero, new Vector2(1f, 0f),
-                new Vector2(0f, 2f), new Vector2(0f, 1f));
+                new Vector2(0f, 5.6f), new Vector2(0f, 2.8f));
             CreateBorderEdge(rect, "Left", Vector2.zero, new Vector2(0f, 1f),
-                new Vector2(2f, 0f), new Vector2(1f, 0f));
+                new Vector2(5.6f, 0f), new Vector2(2.8f, 0f));
             CreateBorderEdge(rect, "Right", new Vector2(1f, 0f), Vector2.one,
-                new Vector2(2f, 0f), new Vector2(-1f, 0f));
+                new Vector2(5.6f, 0f), new Vector2(-2.8f, 0f));
             border.SetActive(false);
             return border;
         }
