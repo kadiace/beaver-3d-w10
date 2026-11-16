@@ -1549,12 +1549,12 @@ namespace BeaverRecycling
             if (_wood < cost) return;
             _wood -= cost;
             _levels[index]++;
-            UpdateModal();
+            UpdateModal(index);
             RefreshHud();
         }
 
         /// <summary>현재 진행 상태와 통계를 사용하여 준비·결과·상점·일시정지 패널을 갱신한다.</summary>
-        private void UpdateModal()
+        private void UpdateModal(int purchasedUpgrade = -1)
         {
             string movementKey = _displayedGamepadConnected ? "왼쪽 스틱" : "방향키";
             string interactKey = _displayedGamepadConnected ? "South" : "Z";
@@ -1618,6 +1618,7 @@ namespace BeaverRecycling
                             (level == 3 ? "최대 단계" : UPGRADE_COSTS[level] + " 목재");
                         _hud.SetUpgrade(i, description, level < 3 && _wood >= UPGRADE_COSTS[Mathf.Min(level, 2)]);
                     }
+                    _hud.FocusAvailableUpgrade(purchasedUpgrade);
                 }
             }
         }

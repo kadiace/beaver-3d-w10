@@ -334,7 +334,52 @@ namespace BeaverRecycling
         {
             _upgradeTexts[index].text = description;
             _upgradeButtons[index].interactable = available;
-            FocusModal();
+        }
+
+        /// <summary>구매한 강화 주변에서 구매 가능한 버튼을 선택하고, 남은 강화가 없으면 다음 날 버튼을 선택한다.</summary>
+        public void FocusAvailableUpgrade(int purchasedIndex = -1)
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null || !_upgradeGroup.activeInHierarchy) return;
+
+            if (purchasedIndex >= 0 && _upgradeButtons[purchasedIndex].IsInteractable())
+            {
+                eventSystem.SetSelectedGameObject(_upgradeButtons[purchasedIndex].gameObject);
+                return;
+            }
+
+            if (purchasedIndex < 0)
+            {
+                GameObject selected = eventSystem.currentSelectedGameObject;
+                foreach (Button button in _upgradeButtons)
+                    if (button.gameObject == selected && button.IsInteractable()) return;
+            }
+
+            for (int distance = 1; purchasedIndex >= 0 && distance < _upgradeButtons.Length; distance++)
+            {
+                int right = purchasedIndex + distance;
+                if (right < _upgradeButtons.Length && _upgradeButtons[right].IsInteractable())
+                {
+                    eventSystem.SetSelectedGameObject(_upgradeButtons[right].gameObject);
+                    return;
+                }
+
+                int left = purchasedIndex - distance;
+                if (left >= 0 && _upgradeButtons[left].IsInteractable())
+                {
+                    eventSystem.SetSelectedGameObject(_upgradeButtons[left].gameObject);
+                    return;
+                }
+            }
+
+            foreach (Button button in _upgradeButtons)
+            {
+                if (!button.IsInteractable()) continue;
+                eventSystem.SetSelectedGameObject(button.gameObject);
+                return;
+            }
+
+            eventSystem.SetSelectedGameObject(_primary.gameObject);
         }
 
         /// <summary>짧은 조작 결과를 받아 HUD에 제한 시간 동안 표시한다.</summary>
