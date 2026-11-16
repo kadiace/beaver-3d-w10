@@ -75,6 +75,7 @@ namespace BeaverRecycling
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
+        private readonly Dictionary<RecyclingItem, int> _releasedCarriedCounts = new Dictionary<RecyclingItem, int>();
         private readonly List<Bounds> _splitPlacedBounds = new List<Bounds>();
         private readonly int[] _levels = new int[3];
         private readonly int[] _startLevels = new int[3];
@@ -1053,9 +1054,12 @@ namespace BeaverRecycling
                 center /= _held.Count;
             }
 
+            int releasedCount = _held.Count;
             for (int i = 0; i < _held.Count; i++)
             {
                 RecyclingItem item = _held[i];
+                if (!split) _releasedCarriedCounts[item] = releasedCount;
+                else _releasedCarriedCounts.Remove(item);
                 item.SetHeld(false);
                 if (!split) continue;
 
@@ -1257,7 +1261,10 @@ namespace BeaverRecycling
             if (bundle.Any(member => member.IsHeld || member.IsResolved || !_items.Contains(member))) return false;
             RecyclingChute3D chute = FindChute(item.Body.position, bundle);
             if (chute == null) return false;
-            SubmitItems(chute, bundle, _held.Count);
+            int carriedCountBeforeSubmission = _held.Count;
+            if (_releasedCarriedCounts.TryGetValue(item, out int releasedCount))
+                carriedCountBeforeSubmission = Mathf.Max(carriedCountBeforeSubmission, releasedCount);
+            SubmitItems(chute, bundle, carriedCountBeforeSubmission);
             return true;
         }
 
@@ -1458,6 +1465,7 @@ namespace BeaverRecycling
         {
             _items.Remove(item);
             _held.Remove(item);
+            _releasedCarriedCounts.Remove(item);
         }
 
         /// <summary>하루 종료 또는 재시도에서 모든 생성 기물과 운반 상태를 풀에 반환한다.</summary>
@@ -1465,6 +1473,7 @@ namespace BeaverRecycling
         {
             SetDifferentCategoryCollisionsIgnored(false);
             _held.Clear();
+            _releasedCarriedCounts.Clear();
             foreach (RecyclingItem item in _items.ToArray()) if (item != null) item.ReturnNow();
             _items.Clear();
             foreach (BombExplosion3D bomb in _bombs.ToArray()) bomb.ReturnNow();
