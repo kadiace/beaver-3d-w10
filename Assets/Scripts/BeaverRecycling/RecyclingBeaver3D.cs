@@ -15,6 +15,7 @@ namespace BeaverRecycling
         [SerializeField] private Transform _carryPoint;
         [SerializeField] private Transform _visual;
         [SerializeField, Min(0f)] private float _knockbackSpinSpeed = 720f;
+        private MeshRenderer _bodyRenderer;
         private Vector3 _previousPosition;
         private Vector3 _currentPosition;
         private Quaternion _previousRotation;
@@ -56,6 +57,7 @@ namespace BeaverRecycling
         private float _stride;
 
         public Transform CarryPoint => _carryPoint;
+        public Bounds BodyBounds => _bodyRenderer.bounds;
         public Vector2 MovementMinimum => _minimum;
         public Vector2 MovementMaximum => _maximum;
         public Vector3 VisualPosition => Vector3.Lerp(_previousPosition, _currentPosition, InterpolationFactor);
@@ -63,6 +65,7 @@ namespace BeaverRecycling
 
         void Awake()
         {
+            _bodyRenderer = _visual.Find("Body").GetComponent<MeshRenderer>();
             _startingPosition = transform.position;
             _stunStarCenterLocalPosition = _stunStar.localPosition;
             _stunStarStartingRotation = _stunStar.localRotation;

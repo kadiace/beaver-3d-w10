@@ -16,7 +16,7 @@ namespace BeaverRecycling
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
         private const float CARRYING_SPEED_MULTIPLIER = 1.7f;
-        private const float DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER = 0.5f;
+        private const float DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER = 0.1f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
@@ -530,12 +530,15 @@ namespace BeaverRecycling
             return null;
         }
 
-        /// <summary>카메라 화면에서 들고 있는 기물과 다른 분류 기물이 30% 이상 겹치는지 반환한다.</summary>
+        /// <summary>카메라 화면에서 비버 몸통 또는 운반 기물과 다른 분류 기물이 30% 이상 겹치는지 반환한다.</summary>
         private bool HasDifferentCategoryProjectedOverlap()
         {
             if (_held.Count == 0) return false;
             RecyclingCategory heldCategory = _held[0].Definition.Category;
-            var heldPolygons = new List<List<Vector2>>(_held.Count);
+            var heldPolygons = new List<List<Vector2>>(_held.Count + 1)
+            {
+                ProjectBoundsToViewport(_beaver.BodyBounds)
+            };
             foreach (RecyclingItem held in _held)
                 heldPolygons.Add(ProjectBoundsToViewport(held.Collider.bounds));
 
