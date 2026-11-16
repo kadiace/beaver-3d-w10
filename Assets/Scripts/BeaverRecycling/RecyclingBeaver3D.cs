@@ -160,8 +160,22 @@ namespace BeaverRecycling
         /// <summary>씬에 있는 양쪽 눈에 카메라를 향하는 발광 코어, 후광과 이동 잔상을 생성한다.</summary>
         private void CreateEyeTrails()
         {
+            if (_eyeTrails != null) return;
+            // Recover eye/material bindings when a scene or local Inspector has stale references.
+            if (_leftEye == null || _rightEye == null)
+            {
+                foreach (Transform part in _visual.GetComponentsInChildren<Transform>(true))
+                {
+                    if (part.name != "Eye") continue;
+                    if (part.localPosition.x < 0f && _leftEye == null) _leftEye = part;
+                    else if (part.localPosition.x > 0f && _rightEye == null) _rightEye = part;
+                }
+            }
+            if (_eyeGlowMaterial == null)
+                _eyeGlowMaterial = Resources.Load<Material>("Materials/Recycling/EyeGlow");
             if (_leftEye == null || _rightEye == null || _eyeGlowMaterial == null) return;
 
+            _lastEyeEffectCount = -1;
             _eyeAnchors = new[] { _leftEye, _rightEye };
             _eyeEffectHeads = new Transform[_eyeAnchors.Length];
             _eyeGlowBillboards = new Transform[_eyeAnchors.Length];
@@ -188,7 +202,8 @@ namespace BeaverRecycling
                 trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 trail.receiveShadows = false;
                 trail.alignment = LineAlignment.View;
-                trail.emitting = true;
+                trail.emitting = false;
+                trail.sortingOrder = 60;
                 trail.minVertexDistance = 0.012f;
                 trail.numCornerVertices = 4;
                 trail.numCapVertices = 4;
@@ -232,6 +247,7 @@ namespace BeaverRecycling
             renderer.sharedMaterial = _eyeGlowMaterial;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
+            renderer.sortingOrder = 61;
             return quad.transform;
         }
 
@@ -252,13 +268,25 @@ namespace BeaverRecycling
         /// <summary>운반 물체가 많아질수록 눈과 후광은 더 밝게, 잔상은 더 길고 굵게 만든다.</summary>
         public void SetCarriedItemCount(int count)
         {
-            int effectCount = Mathf.Clamp(count, 0, MAX_EYE_EFFECT_ITEMS);
-            if (effectCount == _lastEyeEffectCount) return;
-            _lastEyeEffectCount = effectCount;
+            if (_eyeTrails == null) CreateEyeTrails();
             if (_eyeTrails == null) return;
 
-            // Empty-handed eyes have no glow, halo or lingering trail.
+            int effectCount = Mathf.Clamp(count, 0, MAX_EYE_EFFECT_ITEMS);
             bool visible = effectCount > 0;
+            // Always restore the renderer state even if the count did not change.
+            // This also recovers if a pooled/disabled object interrupted the VFX state.
+            bool renderersMatch = true;
+            for (int i = 0; i < _eyeTrails.Length; i++)
+                if (_eyeGlowMeshes[i].enabled != visible || _eyeHaloMeshes[i].enabled != visible ||
+                    _eyeTrails[i].emitting != visible)
+                {
+                    renderersMatch = false;
+                    break;
+                }
+            if (effectCount == _lastEyeEffectCount && renderersMatch) return;
+            _lastEyeEffectCount = effectCount;
+
+            // Empty-handed eyes have no glow, halo or lingering trail.
             for (int i = 0; i < _eyeTrails.Length; i++)
             {
                 _eyeGlowMeshes[i].enabled = visible;
