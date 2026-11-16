@@ -55,7 +55,7 @@ namespace BeaverRecycling
             if (!force && _displayedGamepadConnected == gamepadConnected) return;
             _displayedGamepadConnected = gamepadConnected;
             _controls.text = gamepadConnected
-                ? "스틱 이동 · South 집기/놓기 · East 묶음 분리 · West 대시 · Menu 일시정지"
+                ? "스틱 이동 · A 집기/놓기 · B 묶음 분리 · X 대시 · Menu 일시정지"
                 : "방향키 이동 · Z 집기/놓기 · X 묶음 분리 · Shift 대시 · ESC 일시정지";
         }
 
@@ -155,7 +155,7 @@ namespace BeaverRecycling
             _dashFillImage.color = dashing
                 ? new Color(1f, 0.68f, 0.24f, 1f)
                 : new Color(0.35f, 0.85f, 0.9f, 1f);
-            string dashKey = Managers.Input.GamePadConnected ? "WEST" : "SHIFT";
+            string dashKey = Managers.Input.GamePadConnected ? "X" : "SHIFT";
             _dashLabel.text = dashing
                 ? dashKey + "  ·  대시 " + remainingSeconds.ToString("0.0") + "초"
                 : fill >= 0.999f

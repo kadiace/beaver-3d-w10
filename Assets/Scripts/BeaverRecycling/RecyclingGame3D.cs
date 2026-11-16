@@ -223,7 +223,7 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>Shift/West 대시 중 잔량을 소모하고, 버튼을 놓았을 때 3초에 걸쳐 충전한다.</summary>
+        /// <summary>Shift/패드 X 대시 중 잔량을 소모하고, 버튼을 놓았을 때 3초에 걸쳐 충전한다.</summary>
         private void UpdateDash(float deltaTime)
         {
             bool dashHeld = Managers.Input.DashHeld;
@@ -1515,9 +1515,9 @@ namespace BeaverRecycling
         private void UpdateModal(int purchasedUpgrade = -1)
         {
             string movementKey = _displayedGamepadConnected ? "왼쪽 스틱" : "방향키";
-            string interactKey = _displayedGamepadConnected ? "South" : "Z";
-            string splitKey = _displayedGamepadConnected ? "East" : "X";
-            string dashKey = _displayedGamepadConnected ? "West" : "Shift";
+            string interactKey = _displayedGamepadConnected ? "A" : "Z";
+            string splitKey = _displayedGamepadConnected ? "B" : "X";
+            string dashKey = _displayedGamepadConnected ? "X" : "Shift";
             string menuKey = _displayedGamepadConnected ? "Menu" : "ESC";
             if (_phase == DayPhase.Preparation)
             {
