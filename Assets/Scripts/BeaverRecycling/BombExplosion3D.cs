@@ -92,8 +92,23 @@ namespace BeaverRecycling
         void OnTriggerEnter(Collider other)
         {
             if (_game == null || !_game.IsWorking) return;
-            if (other.GetComponentInParent<RecyclingBeaver3D>() == null) return;
+            if (!IsExplosionContact(other)) return;
             _game.ExplodeBomb(this);
+        }
+
+        void OnCollisionEnter(Collision collision)
+        {
+            if (_game == null || !_game.IsWorking) return;
+            if (!IsExplosionContact(collision.collider)) return;
+            _game.ExplodeBomb(this);
+        }
+
+        /// <summary>상대 콜라이더가 비버 몸통이나 비버가 들고 있는 기물인지 반환한다.</summary>
+        private static bool IsExplosionContact(Collider other)
+        {
+            if (other.GetComponentInParent<RecyclingBeaver3D>() != null) return true;
+            RecyclingItem item = other.GetComponentInParent<RecyclingItem>();
+            return item != null && item.IsHeld;
         }
 
         void Update()
@@ -107,6 +122,11 @@ namespace BeaverRecycling
         void FixedUpdate()
         {
             if (_game == null || !_game.IsWorking || _exploded) return;
+            if (_game.HasCarriedItemOverlapping(_collider))
+            {
+                _game.ExplodeBomb(this);
+                return;
+            }
 
             bool touchesWater = _game.IsInsideRiver(_body.position) &&
                 _collider.bounds.min.y <= _game.WaterY + 0.2f;
