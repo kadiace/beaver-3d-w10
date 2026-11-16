@@ -252,8 +252,7 @@ namespace BeaverRecycling
                 ExecuteEvents.Execute(eventSystem.currentSelectedGameObject, data, ExecuteEvents.moveHandler);
             }
 
-            bool confirm = keyboard.spaceKey.wasPressedThisFrame ||
-                keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame;
+            bool confirm = keyboard.zKey.wasPressedThisFrame;
             if (confirm && !(submitAction != null && submitAction.activeControl != null &&
                 submitAction.activeControl.device == keyboard && submitAction.WasPressedThisFrame()))
                 ExecuteEvents.Execute(eventSystem.currentSelectedGameObject,
