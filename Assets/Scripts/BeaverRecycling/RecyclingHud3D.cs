@@ -54,8 +54,8 @@ namespace BeaverRecycling
             if (!force && _displayedGamepadConnected == gamepadConnected) return;
             _displayedGamepadConnected = gamepadConnected;
             _controls.text = gamepadConnected
-                ? "왼쪽 스틱: 이동   South: 집기/놓기   West: 묶음 분리   Menu: 일시정지"
-                : "방향키: 이동   Z: 집기/놓기   X: 묶음 분리   ESC: 일시정지";
+                ? "스틱 이동 · South 집기/놓기 · East 묶음 분리 · West 대시 · Menu 일시정지"
+                : "방향키 이동 · Z 집기/놓기 · X 묶음 분리 · Shift 대시 · ESC 일시정지";
         }
 
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
@@ -149,11 +149,12 @@ namespace BeaverRecycling
             _dashFillImage.color = dashing
                 ? new Color(1f, 0.68f, 0.24f, 1f)
                 : new Color(0.35f, 0.85f, 0.9f, 1f);
+            string dashKey = Managers.Input.GamePadConnected ? "WEST" : "SHIFT";
             _dashLabel.text = dashing
-                ? "SHIFT  ·  대시 " + remainingSeconds.ToString("0.0") + "초"
+                ? dashKey + "  ·  대시 " + remainingSeconds.ToString("0.0") + "초"
                 : fill >= 0.999f
-                    ? "SHIFT  ·  대시 준비"
-                    : "SHIFT  ·  충전 " + remainingSeconds.ToString("0.0") + " / " +
+                    ? dashKey + "  ·  대시 준비"
+                    : dashKey + "  ·  충전 " + remainingSeconds.ToString("0.0") + " / " +
                       maxSeconds.ToString("0") + "초";
         }
 

@@ -224,7 +224,7 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>Shift 대시 중 잔량을 소모하고, Shift를 놓았을 때 3초에 걸쳐 충전한다.</summary>
+        /// <summary>Shift/West 대시 중 잔량을 소모하고, 버튼을 놓았을 때 3초에 걸쳐 충전한다.</summary>
         private void UpdateDash(float deltaTime)
         {
             bool dashHeld = Managers.Input.DashHeld;
@@ -1482,7 +1482,8 @@ namespace BeaverRecycling
         {
             string movementKey = _displayedGamepadConnected ? "왼쪽 스틱" : "방향키";
             string interactKey = _displayedGamepadConnected ? "South" : "Z";
-            string splitKey = _displayedGamepadConnected ? "West" : "X";
+            string splitKey = _displayedGamepadConnected ? "East" : "X";
+            string dashKey = _displayedGamepadConnected ? "West" : "Shift";
             string menuKey = _displayedGamepadConnected ? "Menu" : "ESC";
             if (_phase == DayPhase.Preparation)
             {
@@ -1496,6 +1497,7 @@ namespace BeaverRecycling
                     movementKey + " 이동\n" +
                     interactKey + " 집기 / 놓기 / 투입구에서 놓으면 분류\n" +
                     splitKey + " 묶음 분리\n" +
+                    dashKey + " 대시 (최대 3초 · 충전 3초)\n" +
                     menuKey + " 일시정지\n\n" +
                     "나무 폭포 통과 +3점·목재\n" +
                     "유실 없음 +10점·+3목재 · 오분류 없음 +10점·+3목재\n목표 초과 10점당 +1목재",

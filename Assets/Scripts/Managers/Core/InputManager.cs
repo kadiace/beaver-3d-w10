@@ -72,7 +72,9 @@ public class InputManager
     public bool SecondaryHeld => _secondaryClick.IsPressed();
     public float CameraZoom => _cameraZoom.ReadValue<Vector2>().y;
     public bool DashHeld => _inputMode == InputMode.Player && _useRecyclingControls &&
-        Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+        ((Keyboard.current != null &&
+          (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed)) ||
+         (Gamepad.current != null && Gamepad.current.buttonWest.isPressed));
     public bool InteractPressed => _interact.WasPressedThisFrame() ||
         (_useRecyclingControls && WasBoundKeyboardButtonPressed(_interact));
     public bool SplitBundlePressed => _splitBundle.WasPressedThisFrame() ||
