@@ -265,10 +265,11 @@ namespace BeaverRecycling
             float intensity = 1.6f + _eyeGlowIntensityPerItem * effectCount;
             float colorProgress = Mathf.Clamp01((effectCount - 1f) / 5f);
             Color eyeColor = Color.Lerp(EYE_GLOW_YELLOW, EYE_GLOW_RED, colorProgress);
-            Color coreColor = eyeColor * intensity;
-            coreColor.a = 1f;
-            Color haloColor = eyeColor * (intensity * 0.8f);
-            haloColor.a = 0.28f;
+            // Only the red emission grows with item count. Multiplying green by HDR intensity
+            // saturates it for 1-4 items and makes different hues look identically yellow.
+            Color coreColor = new Color(eyeColor.r * intensity, eyeColor.g, eyeColor.b, 1f);
+            Color haloColor = new Color(eyeColor.r * intensity * 0.8f,
+                eyeColor.g * 0.8f, eyeColor.b * 0.8f, 0.28f);
 
             _eyeGlowProperties.SetColor(EyeGlowColorId, coreColor);
             _eyeGlowProperties.SetFloat(UseVertexColorId, 0f);
