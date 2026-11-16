@@ -205,7 +205,10 @@ namespace BeaverRecycling
             float speed = (_baseSpeed + 0.5f * _levels[1]) * multiplier;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
-            _beaver.Move(_movement, speed, Time.fixedDeltaTime);
+            // When carrying, directional input only steers; keep advancing at the current
+            // load-based top speed even with no input. Stun suspends automatic movement.
+            bool autoMove = _held.Count > 0 && Time.time >= _beaverStunnedUntil;
+            _beaver.Move(_movement, speed, Time.fixedDeltaTime, autoMove);
             if (_held.Count == 0) return;
             Quaternion rotationDelta = _beaver.transform.rotation * Quaternion.Inverse(previousBeaverRotation);
             Vector3 beaverPosition = _beaver.transform.position;
