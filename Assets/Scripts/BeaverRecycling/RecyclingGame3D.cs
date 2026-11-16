@@ -335,7 +335,7 @@ namespace BeaverRecycling
             _movement = Vector2.zero;
             _hud.HideModal();
             SetUiMode(true);
-            _hud.ShowSorting(sample, chosenChute, (submission, includedCount) =>
+            _hud.ShowSorting(sample, chosenChute, (submission, includedCount, rejectedDefinitions) =>
             {
                 // These items are synthetic: do not modify actual inventory, score or day statistics.
                 _phase = previousPhase;
@@ -1191,15 +1191,54 @@ namespace BeaverRecycling
             _movement = Vector2.zero;
             SetUiMode(true);
             _hud.ShowSorting(definitions, chute.Category,
-                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition));
+                (submission, includedCount, rejectedDefinitions) =>
+                    CompleteSubmission(submission, includedCount, intakePosition,
+                        chute.Category, rejectedDefinitions));
         }
 
-        /// <summary>미니게임이 끝나면 작업 단계로 복귀하고 최종 제출 결과를 적용한다.</summary>
-        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        /// <summary>미니게임이 끝나면 점수를 정산하고 타 재질로 판정되어 쳐낸 물체만 비버의 입으로 돌려준다.</summary>
+        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition,
+            RecyclingCategory chuteCategory, IReadOnlyList<RecyclingDefinition> rejectedDefinitions)
         {
             _phase = _beforeSorting;
             SetUiMode(false);
             ApplySubmission(submission, submittedCount, intakePosition);
+            ReturnRejectedItemsToBeaver(chuteCategory, rejectedDefinitions);
+        }
+
+        /// <summary>타 재질로 판정되어 쳐낸 물체들을 원본 프리팹으로 복원하여 즉시 운반 상태에 추가한다.</summary>
+        private void ReturnRejectedItemsToBeaver(RecyclingCategory chuteCategory,
+            IReadOnlyList<RecyclingDefinition> rejectedDefinitions)
+        {
+            if (rejectedDefinitions == null) return;
+            int returnedCount = 0;
+            foreach (RecyclingDefinition definition in rejectedDefinitions)
+            {
+                // Same-category rejects are discarded, not restored or counted as sorted items.
+                if (definition == null || definition.Category == chuteCategory) continue;
+
+                int carryIndex = _held.Count;
+                Vector3 anchor = carryIndex > 0 ? _held[0].Body.position : _beaver.CarryPoint.position;
+                float angle = carryIndex * 2.39996323f;
+                float radius = 0.55f * Mathf.Sqrt(carryIndex);
+                Vector3 offset = _beaver.transform.rotation *
+                    new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+                Vector3 position = anchor + offset;
+                GameObject instance = Managers.Resource.Instantiate(
+                    "Prefabs/Recycling/" + definition.Prefab.name,
+                    position: position, rotation: _beaver.transform.rotation);
+                RecyclingItem item = instance.GetComponent<RecyclingItem>();
+                instance.name = definition.Name;
+                item.Initialize(this, definition);
+                item.SetHeld(true);
+                _items.Add(item);
+                _held.Add(item);
+                returnedCount++;
+            }
+
+            if (returnedCount == 0) return;
+            Physics.SyncTransforms();
+            _hud.Message("다른 재질 " + returnedCount + "개를 다시 물었습니다");
         }
 
         /// <summary>즉시 제출과 미니게임 제출에 동일한 점수 및 기록 처리를 적용한다.</summary>

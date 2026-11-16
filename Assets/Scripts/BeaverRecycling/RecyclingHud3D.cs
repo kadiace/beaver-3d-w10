@@ -205,14 +205,14 @@ namespace BeaverRecycling
 
         /// <summary>제출 아이템과 투입구 종류를 받아 중앙 분류 창을 표시하고 제외 후 정산 결과를 알린다.</summary>
         public void ShowSorting(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute,
-            Action<RecyclingSubmission, int> completed)
+            Action<RecyclingSubmission, int, IReadOnlyList<RecyclingDefinition>> completed)
         {
             RecyclingSortingWindow3D window = Instantiate(_sortingWindowPrefab, _root);
             window.transform.SetAsLastSibling();
-            window.Play(definitions, chute, (submission, includedCount) =>
+            window.Play(definitions, chute, (submission, includedCount, rejectedDefinitions) =>
             {
                 Destroy(window.gameObject);
-                completed(submission, includedCount);
+                completed(submission, includedCount, rejectedDefinitions);
             });
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
             _hover.transform.parent.gameObject.SetActive(false);

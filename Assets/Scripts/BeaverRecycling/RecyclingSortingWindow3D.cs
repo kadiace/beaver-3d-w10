@@ -47,8 +47,9 @@ namespace BeaverRecycling
         private readonly List<float> _radii = new List<float>();
         private readonly List<PolygonCollider2D> _colliders = new List<PolygonCollider2D>();
         private readonly List<GameObject> _borders = new List<GameObject>();
-        private Action<RecyclingSubmission, int> _completed;
+        private Action<RecyclingSubmission, int, IReadOnlyList<RecyclingDefinition>> _completed;
         private RecyclingDefinition[] _definitions;
+        private readonly List<RecyclingDefinition> _rejectedDefinitions = new List<RecyclingDefinition>();
         private RecyclingCategory _chute;
         private RecyclingSubmission _submission;
         private bool[] _excluded;
@@ -66,7 +67,7 @@ namespace BeaverRecycling
 
         /// <summary>제출 아이템을 섞고 상단 중앙에서 중력으로 떨어지는 물리 시뮬레이션을 시작한다.</summary>
         public void Play(IReadOnlyList<RecyclingDefinition> definitions, RecyclingCategory chute,
-            Action<RecyclingSubmission, int> completed)
+            Action<RecyclingSubmission, int, IReadOnlyList<RecyclingDefinition>> completed)
         {
             _completed = completed;
             _chute = chute;
@@ -74,6 +75,7 @@ namespace BeaverRecycling
             for (int i = 0; i < definitions.Count; i++) _definitions[i] = definitions[i];
             ShuffleDefinitions();
             _excluded = new bool[definitions.Count];
+            _rejectedDefinitions.Clear();
             _elapsed = 0f;
             _physicsAccumulator = 0f;
             _lastSpawnedAt = 0f;
@@ -128,9 +130,9 @@ namespace BeaverRecycling
                     FinishSorting();
             }
             if (!_finished || _elapsed < _finishedAt + RESULT_SECONDS) return;
-            Action<RecyclingSubmission, int> completed = _completed;
+            Action<RecyclingSubmission, int, IReadOnlyList<RecyclingDefinition>> completed = _completed;
             _completed = null;
-            completed(_submission, _includedCount);
+            completed(_submission, _includedCount, _rejectedDefinitions);
         }
 
         void OnDestroy()
@@ -385,7 +387,10 @@ namespace BeaverRecycling
             _selectedIndex = -1;
             var included = new List<RecyclingDefinition>(_definitions.Length);
             for (int i = 0; i < _definitions.Length; i++)
-                if (!_excluded[i]) included.Add(_definitions[i]);
+            {
+                if (_excluded[i]) _rejectedDefinitions.Add(_definitions[i]);
+                else included.Add(_definitions[i]);
+            }
             _includedCount = included.Count;
             _submission = RecyclingRules.EvaluateDefinitions(included, _chute);
             _score.text = (_submission.Score >= 0 ? "+" : "") + _submission.Score + "점";
