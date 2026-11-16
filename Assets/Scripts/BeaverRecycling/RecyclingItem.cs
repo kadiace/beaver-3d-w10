@@ -12,10 +12,13 @@ namespace BeaverRecycling
         private const float RELEASE_MOMENTUM_SECONDS = 0.45f;
         private const float THROWN_SUBMISSION_SECONDS = 1f;
         private const float RELEASE_MOMENTUM_FADE_SECONDS = 0.15f;
+        private const float DIVE_DURATION = 1f;
+        private const int DIVE_MARK_SEGMENTS = 32;
 
         [Header("Wood marker")]
         [SerializeField] private GameObject _woodBadge;
         private readonly Dictionary<RecyclingItem, FixedJoint> _links = new Dictionary<RecyclingItem, FixedJoint>();
+        private readonly List<Renderer> _diveOriginalRenderers = new List<Renderer>();
         private Rigidbody _body;
         private Collider _collider;
         private Renderer[] _renderers;
@@ -36,6 +39,9 @@ namespace BeaverRecycling
         private float _releaseMomentumUntil;
         private float _thrownSubmissionUntil;
         private float _lastFlowTime = float.NegativeInfinity;
+        private float _diveStartedAt = float.NegativeInfinity;
+        private GameObject _diveMark;
+        private Material _diveMarkMaterial;
 
         public Rigidbody Body => _body;
         public Collider Collider => _collider;
@@ -78,6 +84,7 @@ namespace BeaverRecycling
         void OnDisable()
         {
             StopAllCoroutines();
+            EndDive();
             DetachAll();
             if (_game != null) _game.ForgetItem(this);
             _game = null;
@@ -209,6 +216,79 @@ namespace BeaverRecycling
             _knockbackTimeRemaining = duration;
         }
 
+        /// <summary>다른 분류와 처음 겹쳤을 때 기물을 1초간 숨기고 남색 원을 표시한다.</summary>
+        public void BeginDive()
+        {
+            if (_held || _resolved || _diveStartedAt >= 0f) return;
+            _diveStartedAt = Time.time;
+            foreach (Renderer renderer in _renderers)
+            {
+                if (!renderer.enabled) continue;
+                _diveOriginalRenderers.Add(renderer);
+                renderer.enabled = false;
+            }
+            CreateDiveMark();
+        }
+
+        /// <summary>기물이 잠수한 수면에 남색 원형 흔적을 만든다.</summary>
+        private void CreateDiveMark()
+        {
+            Bounds bounds = _collider.bounds;
+            float radius = Mathf.Max(bounds.extents.x, bounds.extents.z) + 0.15f;
+            _diveMark = new GameObject("Dive mark");
+            _diveMark.layer = gameObject.layer;
+            UpdateDiveMarkPosition();
+            LineRenderer line = _diveMark.AddComponent<LineRenderer>();
+            _diveMarkMaterial = new Material(Shader.Find("RestoreCastle3D/Outline"));
+            _diveMarkMaterial.SetFloat("_Outline_Thickness", 0f);
+            _diveMarkMaterial.SetColor("_Outline_Color", new Color(0.03f, 0.06f, 0.25f));
+            line.sharedMaterial = _diveMarkMaterial;
+            line.useWorldSpace = false;
+            line.alignment = LineAlignment.View;
+            line.widthMultiplier = 0.1f;
+            line.numCornerVertices = 3;
+            line.loop = true;
+            line.positionCount = DIVE_MARK_SEGMENTS;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            for (int i = 0; i < DIVE_MARK_SEGMENTS; i++)
+            {
+                float angle = 2f * Mathf.PI * i / DIVE_MARK_SEGMENTS;
+                line.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
+            }
+        }
+
+        /// <summary>강을 따라 움직이는 기물의 XZ 위치에 남색 원형 흔적을 맞춘다.</summary>
+        private void UpdateDiveMarkPosition()
+        {
+            Vector3 center = _collider.bounds.center;
+            _diveMark.transform.position = new Vector3(center.x, _game.WaterY + 0.08f, center.z);
+        }
+
+        void LateUpdate()
+        {
+            if (_diveStartedAt < 0f) return;
+            if (Time.time - _diveStartedAt >= DIVE_DURATION)
+            {
+                EndDive();
+                return;
+            }
+            UpdateDiveMarkPosition();
+        }
+
+        /// <summary>기물의 렌더러를 다시 켜고 남색 흔적을 제거한다.</summary>
+        private void EndDive()
+        {
+            if (_diveStartedAt < 0f) return;
+            _diveStartedAt = float.NegativeInfinity;
+            foreach (Renderer renderer in _diveOriginalRenderers) renderer.enabled = true;
+            _diveOriginalRenderers.Clear();
+            Destroy(_diveMark);
+            Destroy(_diveMarkMaterial);
+            _diveMark = null;
+            _diveMarkMaterial = null;
+        }
+
         /// <summary>외곽선 렌더링 레이어를 받아 기존 기본 렌더링을 유지하며 강조 색을 바꾼다.</summary>
         public void SetOutline(uint layer)
         {
@@ -220,6 +300,7 @@ namespace BeaverRecycling
         public void Resolve(Vector3 destination, bool animate)
         {
             if (_resolved) return;
+            EndDive();
             _resolved = true;
             _held = false;
             _pendingThrownSubmission = false;

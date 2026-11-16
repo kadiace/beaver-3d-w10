@@ -16,7 +16,8 @@ namespace BeaverRecycling
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
         private const float CARRYING_SPEED_MULTIPLIER = 1.7f;
-        private const float DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER = 0.1f;
+        private const float DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER = 0.3f;
+        private const float DIFFERENT_CATEGORY_SLOW_DURATION = 0.2f;
         private const float SUBMISSION_DASH_HOLD_SECONDS = 1f;
         private const float SUBMISSION_EYE_TRAIL_FADE_SECONDS = 0.3f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
@@ -73,6 +74,8 @@ namespace BeaverRecycling
 #endif
 
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
+        private readonly HashSet<RecyclingItem> _overlappingDifferentItems = new HashSet<RecyclingItem>();
+        private readonly HashSet<RecyclingItem> _currentDifferentOverlaps = new HashSet<RecyclingItem>();
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
         private readonly Dictionary<RecyclingItem, int> _releasedCarriedCounts = new Dictionary<RecyclingItem, int>();
@@ -101,6 +104,7 @@ namespace BeaverRecycling
         private float _nextSpawn;
         private float _capacityNoticeAt;
         private float _beaverStunnedUntil;
+        private float _differentCategorySlowUntil;
         private float _submissionDashUntil = float.NegativeInfinity;
         private float _retainedDashMultiplier = 1f;
         private int _retainedEyeItemCount;
@@ -201,11 +205,12 @@ namespace BeaverRecycling
                 CollectContacts();
             }
             RefreshSubmissionDashFromCarry();
+            UpdateDifferentCategoryOverlaps();
             float speedMultiplier = CarrySpeedMultiplier(_held.Count);
             if (Time.time < _submissionDashUntil)
                 speedMultiplier = Mathf.Max(speedMultiplier, _retainedDashMultiplier);
             float speed = (_baseSpeed + 0.5f * _levels[1]) * speedMultiplier;
-            if (HasDifferentCategoryProjectedOverlap())
+            if (Time.time < _differentCategorySlowUntil)
                 speed *= DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
@@ -471,6 +476,7 @@ namespace BeaverRecycling
             _held.Add(item);
             foreach (RecyclingItem member in group) if (member != item) _held.Add(member);
             foreach (RecyclingItem member in _held) member.SetHeld(true);
+            _overlappingDifferentItems.Clear();
             SetDifferentCategoryCollisionsIgnored(true);
         }
 
@@ -554,10 +560,15 @@ namespace BeaverRecycling
             return null;
         }
 
-        /// <summary>카메라 화면에서 비버 몸통 또는 운반 기물과 다른 분류 기물이 30% 이상 겹치는지 반환한다.</summary>
-        private bool HasDifferentCategoryProjectedOverlap()
+        /// <summary>비버 몸통 또는 운반 기물과 화면에서 새로 겹친 다른 분류 기물에 감속과 잠수 효과를 시작한다.</summary>
+        private void UpdateDifferentCategoryOverlaps()
         {
-            if (_held.Count == 0) return false;
+            _currentDifferentOverlaps.Clear();
+            if (_held.Count == 0)
+            {
+                _overlappingDifferentItems.Clear();
+                return;
+            }
             RecyclingCategory heldCategory = _held[0].Definition.Category;
             var heldPolygons = new List<List<Vector2>>(_held.Count + 1)
             {
@@ -575,10 +586,19 @@ namespace BeaverRecycling
                 foreach (List<Vector2> heldPolygon in heldPolygons)
                 {
                     float overlapArea = PolygonArea(IntersectConvexPolygons(otherPolygon, heldPolygon));
-                    if (overlapArea > 0f && overlapArea / otherArea >= _minimumProjectedOverlap) return true;
+                    if (overlapArea <= 0f || overlapArea / otherArea < _minimumProjectedOverlap) continue;
+                    _currentDifferentOverlaps.Add(other);
+                    break;
                 }
             }
-            return false;
+            foreach (RecyclingItem other in _currentDifferentOverlaps)
+            {
+                if (_overlappingDifferentItems.Contains(other)) continue;
+                _differentCategorySlowUntil = Time.time + DIFFERENT_CATEGORY_SLOW_DURATION;
+                other.BeginDive();
+            }
+            _overlappingDifferentItems.Clear();
+            _overlappingDifferentItems.UnionWith(_currentDifferentOverlaps);
         }
 
         /// <summary>들고 있는 기물과 다른 분류 기물 사이의 물리 충돌 무시 상태를 설정한다.</summary>
@@ -1043,6 +1063,7 @@ namespace BeaverRecycling
         private void ReleaseBundle(bool split)
         {
             SetDifferentCategoryCollisionsIgnored(false);
+            _overlappingDifferentItems.Clear();
             CorrectReleasedBundlePosition();
             bool scatter = split && _held.Count > 1;
             Vector3 center = Vector3.zero;
@@ -1179,7 +1200,7 @@ namespace BeaverRecycling
             return nearest != null ? nearest : FindChute(position, _held);
         }
 
-        /// <summary>던지기와 Dock 밖 직접 제출에서 카메라로 본 기물 면적이 50% 이상 겹치는 투입구를 찾는다.</summary>
+        /// <summary>던지기와 Dock 밖 직접 제출에서 기물 또는 Dock 면적의 절반 이상이 겹치는 투입구를 찾는다.</summary>
         private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
         {
             RecyclingChute3D nearest = null;
@@ -1195,7 +1216,7 @@ namespace BeaverRecycling
             return nearest;
         }
 
-        /// <summary>카메라 화면에 투영된 기물 묶음 면적 중 Dock 또는 Sorting box와 겹치는 면적을 계산한다.</summary>
+        /// <summary>기물 묶음 면적의 절반이 투입구에 겹치거나 Dock 면적의 절반을 덮는지 판정한다.</summary>
         private bool CoversProjectedMajority(RecyclingChute3D chute, IReadOnlyList<RecyclingItem> items)
         {
             if (_camera == null || chute == null || !chute.IsAvailable(_day) || items.Count == 0) return false;
@@ -1206,6 +1227,7 @@ namespace BeaverRecycling
             List<Vector2> both = IntersectConvexPolygons(dock, box);
             float totalArea = 0f;
             float coveredArea = 0f;
+            var dockOverlaps = new List<List<Vector2>>(items.Count);
             foreach (RecyclingItem item in items)
             {
                 List<Vector2> footprint = ProjectBoundsToViewport(item.Collider.bounds);
@@ -1213,11 +1235,45 @@ namespace BeaverRecycling
                 if (area <= 0f) continue;
 
                 totalArea += area;
-                coveredArea += PolygonArea(IntersectConvexPolygons(footprint, dock)) +
+                List<Vector2> dockOverlap = IntersectConvexPolygons(footprint, dock);
+                float dockOverlapArea = PolygonArea(dockOverlap);
+                if (dockOverlapArea > 0f) dockOverlaps.Add(dockOverlap);
+                coveredArea += dockOverlapArea +
                     PolygonArea(IntersectConvexPolygons(footprint, box)) -
                     PolygonArea(IntersectConvexPolygons(footprint, both));
             }
-            return totalArea > 0f && coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO;
+            return totalArea > 0f &&
+                (coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO ||
+                    CoversDockMajority(dock, dockOverlaps));
+        }
+
+        /// <summary>Dock에서 기물 묶음이 덮지 않은 영역을 차례로 빼 실제 덮인 면적이 절반 이상인지 반환한다.</summary>
+        private static bool CoversDockMajority(List<Vector2> dock, List<List<Vector2>> overlaps)
+        {
+            float dockArea = PolygonArea(dock);
+            if (dockArea <= 0f) return false;
+            var uncovered = new List<List<Vector2>> { dock };
+            foreach (List<Vector2> footprint in overlaps)
+            {
+                var remaining = new List<List<Vector2>>();
+                foreach (List<Vector2> region in uncovered)
+                {
+                    List<Vector2> inside = region;
+                    for (int i = 0; i < footprint.Count && inside.Count >= 3; i++)
+                    {
+                        Vector2 start = footprint[i];
+                        Vector2 end = footprint[(i + 1) % footprint.Count];
+                        List<Vector2> outside = ClipToHalfPlane(inside, start, end, false);
+                        if (PolygonArea(outside) > 0.00000001f) remaining.Add(outside);
+                        inside = ClipToHalfPlane(inside, start, end, true);
+                    }
+                }
+                uncovered = remaining;
+                float coveredArea = dockArea;
+                foreach (List<Vector2> region in uncovered) coveredArea -= PolygonArea(region);
+                if (coveredArea >= dockArea * CHUTE_PROJECTED_OVERLAP_RATIO) return true;
+            }
+            return false;
         }
 
         /// <summary>실제 운반 개수에 따른 기본 이동속도 배율을 반환한다.</summary>
@@ -1273,6 +1329,7 @@ namespace BeaverRecycling
             var submitted = new List<RecyclingItem>(_held);
             int carriedCountBeforeSubmission = _held.Count;
             SetDifferentCategoryCollisionsIgnored(false);
+            _overlappingDifferentItems.Clear();
             _held.Clear();
             SubmitItems(chute, submitted, carriedCountBeforeSubmission);
         }
@@ -1456,6 +1513,8 @@ namespace BeaverRecycling
             _items.Remove(item);
             _held.Remove(item);
             _releasedCarriedCounts.Remove(item);
+            _overlappingDifferentItems.Remove(item);
+            _currentDifferentOverlaps.Remove(item);
         }
 
         /// <summary>하루 종료 또는 재시도에서 모든 생성 기물과 운반 상태를 풀에 반환한다.</summary>
@@ -1464,6 +1523,8 @@ namespace BeaverRecycling
             SetDifferentCategoryCollisionsIgnored(false);
             _held.Clear();
             _releasedCarriedCounts.Clear();
+            _overlappingDifferentItems.Clear();
+            _currentDifferentOverlaps.Clear();
             foreach (RecyclingItem item in _items.ToArray()) if (item != null) item.ReturnNow();
             _items.Clear();
             foreach (BombExplosion3D bomb in _bombs.ToArray()) bomb.ReturnNow();
@@ -1478,6 +1539,7 @@ namespace BeaverRecycling
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
             _beaverStunnedUntil = 0f;
+            _differentCategorySlowUntil = 0f;
             _submissionDashUntil = float.NegativeInfinity;
             _retainedDashMultiplier = 1f;
             _retainedEyeItemCount = 0;
