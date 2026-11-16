@@ -30,6 +30,8 @@ namespace BeaverRecycling
         [SerializeField] private Text _score;
         [SerializeField] private GameObject _keyboardControls;
         [SerializeField] private GameObject _gamepadControls;
+        [SerializeField] private GameObject _keyboardKeycap;
+        [SerializeField] private GameObject _gamepadKeycap;
 
         [Header("Falling items")]
         [SerializeField, Min(0f), Tooltip("Time in seconds before the first item drops.")]
@@ -149,6 +151,8 @@ namespace BeaverRecycling
             _displayedGamepadConnected = gamepadConnected;
             _keyboardControls.SetActive(!gamepadConnected);
             _gamepadControls.SetActive(gamepadConnected);
+            _keyboardKeycap.SetActive(!gamepadConnected);
+            _gamepadKeycap.SetActive(gamepadConnected);
         }
 
         /// <summary>Fisher-Yates 방식으로 제출 아이템의 투입 순서를 섞는다.</summary>

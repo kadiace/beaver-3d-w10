@@ -198,7 +198,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "South \uBC84\uD2BC\uC744 \uB20C\uB7EC \uBE68\uAC04 \uC120\uC758 \uC544\uC774\uD15C\uC744
+  m_Text: "A \uBC84\uD2BC\uC744 \uB20C\uB7EC \uBE68\uAC04 \uC120\uC758 \uC544\uC774\uD15C\uC744
     \uC81C\uC678\uBD84\uB958"
 --- !u!1 &1128106438433415617
 GameObject:
@@ -1219,6 +1219,7 @@ RectTransform:
   - {fileID: 4895062167518497992}
   - {fileID: 7200000001}
   - {fileID: 8840867222258364387}
+  - {fileID: 7200000061}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1287,6 +1288,8 @@ MonoBehaviour:
   _score: {fileID: 2750966390325317347}
   _keyboardControls: {fileID: 7200000010}
   _gamepadControls: {fileID: 7200000020}
+  _keyboardKeycap: {fileID: 3935934548656619098}
+  _gamepadKeycap: {fileID: 7200000060}
   _initialDropDelay: 0.7
   _maximumDropInterval: 0.21333334
   _dropIntervalVariance: 0.35
@@ -1415,3 +1418,83 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 351.93067, y: 14}
   m_EdgeRadius: 0
+
+--- !u!1 &7200000060
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7200000061}
+  - component: {fileID: 7200000062}
+  - component: {fileID: 7200000063}
+  m_Layer: 5
+  m_Name: Gamepad A Keycap
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &7200000061
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7200000060}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6468487228944518211}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -535, y: 100}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &7200000062
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7200000060}
+  m_CullTransparentMesh: 1
+--- !u!114 &7200000063
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7200000060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.33, g: 0.95, b: 0.42, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 12800000, guid: 68504e2729693644abceb5d74d6f1f2e, type: 3}
+    m_FontSize: 82
+    m_FontStyle: 1
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 82
+    m_Alignment: 4
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: A
