@@ -1533,8 +1533,8 @@ namespace BeaverRecycling
                     "출근", "", false);
             }
             else if (_phase == DayPhase.Paused)
-                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\n" +
-                    splitKey + "로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false, true);
+                _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재"
+                    , "계속", "처음부터", false, true);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
