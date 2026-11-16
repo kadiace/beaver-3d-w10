@@ -61,6 +61,25 @@ namespace BeaverRecycling
             }
             throw new InvalidOperationException("Recycling catalog has no active item for " + category);
         }
+
+        /// <summary>기존 분류별 확률을 유지하면서 목재와 지정 종류를 제외한 재활용품을 다시 추첨한다.</summary>
+        public RecyclingDefinition DrawOtherRecyclable(int day, string excludedId)
+        {
+            bool hasAlternative = false;
+            foreach (RecyclingDefinition definition in _items)
+            {
+                if (definition.IsWood || definition.FirstDay > day || definition.Id == excludedId) continue;
+                hasAlternative = true;
+                break;
+            }
+            if (!hasAlternative)
+                throw new InvalidOperationException("Recycling catalog has no alternative recyclable to " + excludedId);
+
+            RecyclingDefinition result;
+            do { result = Draw(day); }
+            while (result.IsWood || result.Id == excludedId);
+            return result;
+        }
     }
 
     public readonly struct RecyclingSubmission

@@ -71,6 +71,7 @@ namespace BeaverRecycling
 #endif
 
         private readonly HashSet<RecyclingItem> _items = new HashSet<RecyclingItem>();
+        private RecyclingDefinition _focusedSpawnDefinition;
         private readonly HashSet<BombExplosion3D> _bombs = new HashSet<BombExplosion3D>();
         private readonly List<RecyclingItem> _held = new List<RecyclingItem>();
         private readonly List<Bounds> _splitPlacedBounds = new List<Bounds>();
@@ -364,10 +365,13 @@ namespace BeaverRecycling
                 (_bombSpawnChance >= 1f || UnityEngine.Random.value < _bombSpawnChance)) SpawnBomb();
         }
 
-        /// <summary>강물에 떠 있는 기물만 세고, 신규 생성 뒤에도 특정 종류의 비중이 33% 이상이도록 분포를 보정한다.</summary>
+        /// <summary>목재 12%를 먼저 확정하고, 비목재 88% 안에서 한 종류에 33%를 배정한다. 폭탄은 별도 확률을 유지한다.</summary>
         private RecyclingDefinition DrawSpawnDefinition()
         {
             RecyclingDefinition candidate = _catalog.Draw(_day);
+            // Never replace a wood draw: the catalog's original 12% wood rate must stay intact.
+            if (candidate.IsWood) return candidate;
+
             var floatingCounts = new Dictionary<string, int>();
             RecyclingDefinition leadingDefinition = null;
             int leadingCount = 0;
@@ -380,14 +384,27 @@ namespace BeaverRecycling
                     continue;
 
                 RecyclingDefinition definition = item.Definition;
+                // Wood never enters either the denominator or the per-kind numerator.
+                if (definition.IsWood) continue;
+
                 floatingCounts.TryGetValue(definition.Id, out int count);
                 count++;
                 floatingCounts[definition.Id] = count;
                 totalFloating++;
-                if (count <= leadingCount) continue;
+                if (count < leadingCount ||
+                    (count == leadingCount && definition.Id != _focusedSpawnDefinition?.Id)) continue;
                 leadingCount = count;
                 leadingDefinition = definition;
             }
+
+            if (leadingDefinition != null) _focusedSpawnDefinition = leadingDefinition;
+            else if (_focusedSpawnDefinition == null) _focusedSpawnDefinition = candidate;
+
+            // Of the non-wood spawn budget, 33% goes exclusively to the focused kind.
+            // The other 67% is distributed across all other active recyclable kinds.
+            candidate = UnityEngine.Random.value < MINIMUM_FLOATING_KIND_RATIO
+                ? _focusedSpawnDefinition
+                : _catalog.DrawOtherRecyclable(_day, _focusedSpawnDefinition.Id);
 
             if (totalFloating == 0) return candidate;
             floatingCounts.TryGetValue(candidate.Id, out int candidateCount);
@@ -395,7 +412,7 @@ namespace BeaverRecycling
             if (largestAfterSpawn >= (totalFloating + 1) * MINIMUM_FLOATING_KIND_RATIO)
                 return candidate;
 
-            // If objects have just drifted away, bias the next spawn toward the current leader.
+            // Repair the currently floating mix when the regular weighted draw would drop it below 33%.
             return leadingDefinition;
         }
 
@@ -1412,6 +1429,7 @@ namespace BeaverRecycling
             _dayStartWood = _wood;
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
+            _focusedSpawnDefinition = null;
             _beaverStunnedUntil = 0f;
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
