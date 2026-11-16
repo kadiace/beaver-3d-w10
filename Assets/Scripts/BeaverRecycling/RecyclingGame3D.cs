@@ -1089,10 +1089,27 @@ namespace BeaverRecycling
             return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
-        /// <summary>비버가 들고 있는 묶음을 동일한 카메라 투영 조건으로 제출할 투입구를 찾는다.</summary>
-        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position, _held);
+        /// <summary>비버가 Dock 위에 있으면 해당 투입구를 우선하고, 그 외에는 운반 묶음의 화면 겹침으로 찾는다.</summary>
+        private RecyclingChute3D FindChute()
+        {
+            Vector3 position = _beaver.transform.position;
+            RecyclingChute3D nearest = null;
+            float distance = float.PositiveInfinity;
+            foreach (RecyclingChute3D chute in _chutes)
+            {
+                if (!chute.IsAvailable(_day)) continue;
+                Bounds dock = chute.DockBounds;
+                if (position.x < dock.min.x || position.x > dock.max.x ||
+                    position.z < dock.min.z || position.z > dock.max.z) continue;
+                float next = (chute.transform.position - position).sqrMagnitude;
+                if (next >= distance) continue;
+                nearest = chute;
+                distance = next;
+            }
+            return nearest != null ? nearest : FindChute(position, _held);
+        }
 
-        /// <summary>던지기와 직접 제출 모두 카메라에서 본 기물 면적의 50% 이상 겹치는 투입구를 사용한다.</summary>
+        /// <summary>던지기와 Dock 밖 직접 제출에서 기물 또는 Dock 면적의 절반 이상이 겹치는 투입구를 찾는다.</summary>
         private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
         {
             RecyclingChute3D nearest = null;
@@ -1108,7 +1125,7 @@ namespace BeaverRecycling
             return nearest;
         }
 
-        /// <summary>카메라 화면에 투영된 기물 묶음 면적 중 Dock 또는 Sorting box와 겹치는 면적을 계산한다.</summary>
+        /// <summary>기물 묶음 면적의 절반이 투입구에 겹치거나 Dock 면적의 절반을 덮는지 판정한다.</summary>
         private bool CoversProjectedMajority(RecyclingChute3D chute, IReadOnlyList<RecyclingItem> items)
         {
             if (_camera == null || chute == null || !chute.IsAvailable(_day) || items.Count == 0) return false;
@@ -1119,6 +1136,7 @@ namespace BeaverRecycling
             List<Vector2> both = IntersectConvexPolygons(dock, box);
             float totalArea = 0f;
             float coveredArea = 0f;
+            var dockOverlaps = new List<List<Vector2>>(items.Count);
             foreach (RecyclingItem item in items)
             {
                 List<Vector2> footprint = ProjectBoundsToViewport(item.Collider.bounds);
@@ -1126,11 +1144,45 @@ namespace BeaverRecycling
                 if (area <= 0f) continue;
 
                 totalArea += area;
-                coveredArea += PolygonArea(IntersectConvexPolygons(footprint, dock)) +
+                List<Vector2> dockOverlap = IntersectConvexPolygons(footprint, dock);
+                float dockOverlapArea = PolygonArea(dockOverlap);
+                if (dockOverlapArea > 0f) dockOverlaps.Add(dockOverlap);
+                coveredArea += dockOverlapArea +
                     PolygonArea(IntersectConvexPolygons(footprint, box)) -
                     PolygonArea(IntersectConvexPolygons(footprint, both));
             }
-            return totalArea > 0f && coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO;
+            return totalArea > 0f &&
+                (coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO ||
+                    CoversDockMajority(dock, dockOverlaps));
+        }
+
+        /// <summary>Dock에서 기물 묶음이 덮지 않은 영역을 차례로 빼 실제 덮인 면적이 절반 이상인지 반환한다.</summary>
+        private static bool CoversDockMajority(List<Vector2> dock, List<List<Vector2>> overlaps)
+        {
+            float dockArea = PolygonArea(dock);
+            if (dockArea <= 0f) return false;
+            var uncovered = new List<List<Vector2>> { dock };
+            foreach (List<Vector2> footprint in overlaps)
+            {
+                var remaining = new List<List<Vector2>>();
+                foreach (List<Vector2> region in uncovered)
+                {
+                    List<Vector2> inside = region;
+                    for (int i = 0; i < footprint.Count && inside.Count >= 3; i++)
+                    {
+                        Vector2 start = footprint[i];
+                        Vector2 end = footprint[(i + 1) % footprint.Count];
+                        List<Vector2> outside = ClipToHalfPlane(inside, start, end, false);
+                        if (PolygonArea(outside) > 0.00000001f) remaining.Add(outside);
+                        inside = ClipToHalfPlane(inside, start, end, true);
+                    }
+                }
+                uncovered = remaining;
+                float coveredArea = dockArea;
+                foreach (List<Vector2> region in uncovered) coveredArea -= PolygonArea(region);
+                if (coveredArea >= dockArea * CHUTE_PROJECTED_OVERLAP_RATIO) return true;
+            }
+            return false;
         }
 
         /// <summary>관성 비행 허용 시간 내 던진 묶음도 직접 제출과 동일한 화면 겹침 판정으로 정산한다.</summary>
