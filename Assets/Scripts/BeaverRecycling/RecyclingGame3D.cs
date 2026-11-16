@@ -83,7 +83,6 @@ namespace BeaverRecycling
         private RaycastHit[] _bridgeHitBuffer = new RaycastHit[64];
         private DayPhase _phase;
         private DayPhase _beforePause;
-        private DayPhase _beforeSorting;
         private Vector2 _movement;
         private Vector3 _cameraTarget;
         private bool _passed;
@@ -1268,7 +1267,7 @@ namespace BeaverRecycling
             return true;
         }
 
-        /// <summary>운반 묶음을 제출하고, 다른 재질이 섞였을 때만 분류 미니게임을 연다.</summary>
+        /// <summary>운반 묶음을 해당 투입구로 즉시 제출한다. 오제출은 미니게임 없이 감점만 반영한다.</summary>
         private void Submit(RecyclingChute3D chute)
         {
             var submitted = new List<RecyclingItem>(_held);
@@ -1278,37 +1277,25 @@ namespace BeaverRecycling
             SubmitItems(chute, submitted, carriedCountBeforeSubmission);
         }
 
-        /// <summary>수동 제출과 던져 넣은 묶음을 흡수하고, 다른 재질이 섞였을 때만 분류 미니게임을 연다.</summary>
+        /// <summary>제출된 기물을 즉시 흡수하고, 하나라도 분류가 다르면 오제출한 개수만큼 감점한다.</summary>
         private void SubmitItems(RecyclingChute3D chute, List<RecyclingItem> submitted, int carriedCountBeforeSubmission)
         {
             RecyclingDefinition[] definitions = submitted.Select(item => item.Definition).ToArray();
-            bool needsSorting = definitions.Any(definition => definition.Category != chute.Category);
             Vector3 intakePosition = chute.IntakePosition;
             foreach (RecyclingItem item in submitted) item.Resolve(intakePosition, false);
 
-            if (!needsSorting)
+            int wrongCount = definitions.Count(definition => definition.Category != chute.Category);
+            if (wrongCount > 0)
             {
-                ApplySubmission(RecyclingRules.EvaluateDefinitions(definitions, chute.Category),
-                    definitions.Length, intakePosition, carriedCountBeforeSubmission);
+                // A mixed submission is unsuccessful: no correct-item points or bundle bonus.
+                var penalty = new RecyclingSubmission(0, wrongCount, 0,
+                    -wrongCount * RecyclingRules.WRONG_PENALTY);
+                ApplySubmission(penalty, definitions.Length, intakePosition, carriedCountBeforeSubmission);
                 return;
             }
 
-            _beforeSorting = _phase;
-            _phase = DayPhase.Sorting;
-            _movement = Vector2.zero;
-            SetUiMode(true);
-            _hud.ShowSorting(definitions, chute.Category,
-                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition,
-                    carriedCountBeforeSubmission));
-        }
-
-        /// <summary>미니게임이 끝나면 작업 단계로 복귀하고 최종 제출 결과를 적용한다.</summary>
-        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount,
-            Vector3 intakePosition, int carriedCountBeforeSubmission)
-        {
-            _phase = _beforeSorting;
-            SetUiMode(false);
-            ApplySubmission(submission, submittedCount, intakePosition, carriedCountBeforeSubmission);
+            ApplySubmission(RecyclingRules.EvaluateDefinitions(definitions, chute.Category),
+                definitions.Length, intakePosition, carriedCountBeforeSubmission);
         }
 
         /// <summary>즉시 제출과 미니게임 제출에 동일한 점수 및 기록 처리를 적용한다.</summary>
@@ -1320,8 +1307,11 @@ namespace BeaverRecycling
             _correct += submission.Correct;
             _wrong += submission.Wrong;
             if (submission.Correct == submittedCount) _bestBundle = Mathf.Max(_bestBundle, submittedCount);
-            _hud.Event((submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)", intakePosition,
-                _camera, submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
+            string resultText = submission.Score < 0 && submission.Correct == 0
+                ? "오제출 " + submission.Score + "점"
+                : (submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)";
+            _hud.Event(resultText, intakePosition, _camera,
+                submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
         }
 
         /// <summary>이탈한 기물과 폭포 여부를 받아 쓰레기 감점 또는 목재 점수·자원 보상을 한 번 적용하고 제거한다.</summary>
