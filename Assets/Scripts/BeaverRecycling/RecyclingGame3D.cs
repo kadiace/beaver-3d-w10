@@ -1398,6 +1398,20 @@ namespace BeaverRecycling
             item.Resolve(position + Vector3.down * 3f, animate);
         }
 
+        /// <summary>폭탄 콜라이더와 실제로 겹치는 운반 기물이 있는지 반환한다.</summary>
+        public bool HasCarriedItemOverlapping(Collider bombCollider)
+        {
+            foreach (RecyclingItem item in _held)
+            {
+                Collider itemCollider = item.Collider;
+                if (!itemCollider.bounds.Intersects(bombCollider.bounds)) continue;
+                if (Physics.ComputePenetration(itemCollider, itemCollider.transform.position,
+                    itemCollider.transform.rotation, bombCollider, bombCollider.transform.position,
+                    bombCollider.transform.rotation, out _, out _)) return true;
+            }
+            return false;
+        }
+
         /// <summary>접촉한 폭탄을 한 번 폭발시키고 넉백·기절·정리를 적용한다.</summary>
         public void ExplodeBomb(BombExplosion3D bomb)
         {
