@@ -19,6 +19,7 @@ namespace BeaverRecycling
         private float _knockbackTimeRemaining;
         private float _appliedKnockbackX;
         private bool _exploded;
+        private float _stoneBounceUntil;
 
         public float ExplosionRadius => _explosionRadius;
         public float ItemKnockbackDistance => _itemKnockbackDistance;
@@ -38,6 +39,7 @@ namespace BeaverRecycling
             _knockbackVelocity = Vector3.zero;
             _knockbackTimeRemaining = 0f;
             _appliedKnockbackX = 0f;
+            _stoneBounceUntil = 0f;
         }
 
         void OnDisable()
@@ -54,6 +56,7 @@ namespace BeaverRecycling
             _knockbackVelocity = Vector3.zero;
             _knockbackTimeRemaining = 0f;
             _appliedKnockbackX = 0f;
+            _stoneBounceUntil = 0f;
             _collider.enabled = true;
             _body.isKinematic = false;
             _body.useGravity = true;
@@ -81,6 +84,21 @@ namespace BeaverRecycling
             velocityChange.y = 0f;
             _knockbackVelocity += velocityChange;
             _knockbackTimeRemaining = duration;
+        }
+
+        /// <summary>돌에 부딪힌 폭탄의 속도를 반사하고 물살 복귀를 잠시 지연한다.</summary>
+        public void ReceiveStoneBounce(Vector3 reflectedVelocity, float flowPause)
+        {
+            if (_exploded || _body.isKinematic) return;
+            Vector3 velocity = _body.linearVelocity;
+            velocity.x = reflectedVelocity.x;
+            velocity.z = reflectedVelocity.z;
+            velocity.y = Mathf.Max(velocity.y, 0.65f);
+            _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
+            _stoneBounceUntil = Mathf.Max(_stoneBounceUntil, Time.fixedTime + flowPause);
+            _body.linearVelocity = velocity;
         }
 
         /// <summary>폭발 또는 강 이탈 후 폭탄 오브젝트를 리소스 풀에 반환한다.</summary>
@@ -118,7 +136,10 @@ namespace BeaverRecycling
             _knockbackTimeRemaining -= step;
             velocity.x = (velocity.x - _appliedKnockbackX) * 0.9f + knockbackVelocity.x;
             _appliedKnockbackX = knockbackVelocity.x;
-            velocity.z = (touchesWater ? -_game.FlowSpeed : 0f) + knockbackVelocity.z;
+            // Preserve the bumper impulse before easing back into creek flow.
+            float flowBlend = Mathf.Clamp01((Time.fixedTime - _stoneBounceUntil + 0.15f) / 0.15f);
+            velocity.z = Mathf.Lerp(velocity.z, touchesWater ? -_game.FlowSpeed : 0f, flowBlend)
+                + knockbackVelocity.z;
             if (touchesWater)
             {
                 float centerY = _game.WaterY + _collider.bounds.extents.y * 0.25f;

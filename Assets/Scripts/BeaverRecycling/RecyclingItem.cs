@@ -209,6 +209,22 @@ namespace BeaverRecycling
             _knockbackTimeRemaining = duration;
         }
 
+        /// <summary>절벽 돌에 부딪힌 방향의 반사 속도를 설정하고 유속 재적용을 지연한다.</summary>
+        public void ReceiveStoneBounce(Vector3 reflectedVelocity, float flowPause)
+        {
+            if (_resolved || _held || _body.isKinematic) return;
+            Vector3 velocity = _body.linearVelocity;
+            velocity.x = reflectedVelocity.x;
+            velocity.z = reflectedVelocity.z;
+            velocity.y = Mathf.Max(velocity.y, 0.65f);
+            _knockbackVelocity = Vector3.zero;
+            _knockbackTimeRemaining = 0f;
+            _appliedKnockbackX = 0f;
+            _appliedKnockbackZ = 0f;
+            _releaseMomentumUntil = Mathf.Max(_releaseMomentumUntil, Time.fixedTime + flowPause);
+            _body.linearVelocity = velocity;
+        }
+
         /// <summary>외곽선 렌더링 레이어를 받아 기존 기본 렌더링을 유지하며 강조 색을 바꾼다.</summary>
         public void SetOutline(uint layer)
         {
