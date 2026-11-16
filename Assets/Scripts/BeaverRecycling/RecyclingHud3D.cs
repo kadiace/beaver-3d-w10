@@ -49,6 +49,20 @@ namespace BeaverRecycling
         private Button[] _modalButtons;
         private Outline[] _focusOutlines;
 
+        // Keep bottom-of-screen cues above the existing carry/control panel.
+        private const float OFFSCREEN_SLOT_WIDTH = 160f;
+        private const float OFFSCREEN_BASE_Y = 157f;
+        private const float OFFSCREEN_ROW_HEIGHT = 30f;
+        private readonly List<Text> _offscreenLabels = new List<Text>();
+        private readonly List<OffscreenGroup> _offscreenGroups = new List<OffscreenGroup>();
+
+        private struct OffscreenGroup
+        {
+            public int Column;
+            public RecyclingCategory Category;
+            public int Count;
+        }
+
         /// <summary>게임패드 연결/해제 시 인게임 HUD 키 안내를 현재 장치에 맞게 갱신한다.</summary>
         private void RefreshControls(bool force = false)
         {
@@ -345,6 +359,105 @@ namespace BeaverRecycling
             Vector3 screen = camera.WorldToScreenPoint(world);
             if (screen.z <= 0f) screen = new Vector3(Screen.width * 0.5f, 130f, 0f);
             Place((RectTransform)_toast.transform.parent, screen);
+        }
+
+
+        /// <summary>화면 아래(-Z)로 벗어난 기물을 재질별 색상과 수량으로 표시한다.</summary>
+        public void RefreshOffscreenItems(IEnumerable<RecyclingItem> items, Camera camera, float groundY, bool show)
+        {
+            _offscreenGroups.Clear();
+            if (show && camera != null && _root != null)
+            {
+                float width = Mathf.Max(1f, _root.rect.width);
+                int columns = Mathf.Max(1, Mathf.FloorToInt(width / OFFSCREEN_SLOT_WIDTH));
+                foreach (RecyclingItem item in items)
+                {
+                    if (item == null || !item.isActiveAndEnabled || item.IsResolved ||
+                        item.IsHeld || item.Definition == null) continue;
+
+                    // Project onto the river plane: falling/throwing height must not move a
+                    // downstream (-Z) indicator to the wrong edge of the screen.
+                    Vector3 position = item.Body.position;
+                    position.y = groundY;
+                    Vector3 viewport = camera.WorldToViewportPoint(position);
+                    if (viewport.z <= 0f || viewport.y >= 0f) continue;
+
+                    int column = Mathf.Clamp(Mathf.FloorToInt(viewport.x * columns), 0, columns - 1);
+                    RecyclingCategory category = item.Definition.Category;
+                    int index = -1;
+                    for (int i = 0; i < _offscreenGroups.Count; i++)
+                    {
+                        if (_offscreenGroups[i].Column != column ||
+                            _offscreenGroups[i].Category != category) continue;
+                        index = i;
+                        break;
+                    }
+                    if (index >= 0)
+                    {
+                        OffscreenGroup group = _offscreenGroups[index];
+                        group.Count++;
+                        _offscreenGroups[index] = group;
+                    }
+                    else
+                        _offscreenGroups.Add(new OffscreenGroup
+                            { Column = column, Category = category, Count = 1 });
+                }
+
+                // Same-column materials get separate rows; nearby objects of one material
+                // share a label with a count rather than hiding one another.
+                _offscreenGroups.Sort((a, b) =>
+                {
+                    int order = a.Column.CompareTo(b.Column);
+                    return order != 0 ? order : a.Category.CompareTo(b.Category);
+                });
+                int previousColumn = -1;
+                int row = 0;
+                for (int i = 0; i < _offscreenGroups.Count; i++)
+                {
+                    OffscreenGroup group = _offscreenGroups[i];
+                    row = group.Column == previousColumn ? row + 1 : 0;
+                    previousColumn = group.Column;
+                    if (i >= _offscreenLabels.Count) CreateOffscreenLabel();
+                    Text label = _offscreenLabels[i];
+                    label.text = "▼ " + RecyclingRules.Name(group.Category) +
+                        (group.Count > 1 ? " ×" + group.Count : "");
+                    // Reuse chute colors for plastic/glass/film/metal (and brown for wood).
+                    label.color = RecyclingRules.Color(group.Category);
+                    RectTransform rect = (RectTransform)label.transform;
+                    float slotWidth = width / columns;
+                    rect.sizeDelta = new Vector2(slotWidth - 4f, 27f);
+                    rect.anchoredPosition = new Vector2(
+                        (group.Column + 0.5f) * slotWidth, OFFSCREEN_BASE_Y + row * OFFSCREEN_ROW_HEIGHT);
+                    if (!label.gameObject.activeSelf) label.gameObject.SetActive(true);
+                }
+            }
+            for (int i = _offscreenGroups.Count; i < _offscreenLabels.Count; i++)
+                if (_offscreenLabels[i].gameObject.activeSelf)
+                    _offscreenLabels[i].gameObject.SetActive(false);
+        }
+
+        private void CreateOffscreenLabel()
+        {
+            GameObject indicator = new GameObject("Offscreen material", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(Text));
+            RectTransform rect = (RectTransform)indicator.transform;
+            rect.SetParent(_root, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            Text label = indicator.GetComponent<Text>();
+            label.font = _controls.font;
+            label.fontSize = 20;
+            label.fontStyle = FontStyle.Bold;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.raycastTarget = false;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            Outline outline = indicator.AddComponent<Outline>();
+            outline.effectColor = new Color(0.03f, 0.06f, 0.08f, 1f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            outline.useGraphicAlpha = false;
+            indicator.SetActive(false);
+            _offscreenLabels.Add(label);
         }
 
         /// <summary>UI 대상과 화면 좌표를 받아 Canvas 좌표로 변환하고 안전 영역 안에 둔다.</summary>

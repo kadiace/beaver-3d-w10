@@ -243,6 +243,7 @@ namespace BeaverRecycling
             _cameraTarget.x = Mathf.Clamp(_cameraTarget.x, -9f, 9f);
             _cameraTarget.z = Mathf.Clamp(_cameraTarget.z, 19f, 41f);
             _camera.transform.position = _cameraTarget - _camera.transform.forward * 32f;
+            _hud.RefreshOffscreenItems(_items, _camera, _waterY, IsWorking);
         }
 
         void OnDestroy()
