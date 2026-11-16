@@ -16,17 +16,13 @@ namespace BeaverRecycling
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
         private const float CARRYING_SPEED_MULTIPLIER = 1.7f;
-        private const float COLLISION_SLOW_DURATION = 0.5f;
-        private const float COLLISION_SPEED_MULTIPLIER = 0.3f;
+        private const float DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER = 0.5f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
         private const int SPLIT_SEARCH_RINGS = 48;
         private const int SPLIT_SEARCH_DIRECTIONS = 16;
-        private const float DEFLECT_SPEED = 24f;
-        private const float DEFLECT_DURATION = 0.35f;
-        private const float DEFLECT_REATTACH_DELAY = 0.5f;
         private static readonly int[] UPGRADE_COSTS = { 2, 4, 7 };
 
         [Header("Scene objects")]
@@ -103,7 +99,6 @@ namespace BeaverRecycling
         private float _nextSpawn;
         private float _capacityNoticeAt;
         private float _beaverStunnedUntil;
-        private float _collisionSlowUntil;
 
         public bool IsWorking => _phase == DayPhase.Supply || _phase == DayPhase.Closing;
         public float WaterfallZ => _waterfallZ;
@@ -203,7 +198,8 @@ namespace BeaverRecycling
             float loadSpeedBonus = 1f + 0.05f * Mathf.Max(0, _held.Count - 1);
             float speed = (_baseSpeed + 0.5f * _levels[1]) * loadSpeedBonus;
             if (_held.Count > 0) speed *= CARRYING_SPEED_MULTIPLIER;
-            if (Time.time < _collisionSlowUntil) speed *= COLLISION_SPEED_MULTIPLIER;
+            if (HasDifferentCategoryProjectedOverlap())
+                speed *= DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
             _beaver.Move(_movement, speed, Time.fixedDeltaTime);
@@ -298,6 +294,7 @@ namespace BeaverRecycling
             instance.name = definition.Name;
             item.Initialize(this, definition);
             _items.Add(item);
+            SetDifferentCategoryCollisionsIgnored(true);
             return true;
         }
 
@@ -373,6 +370,7 @@ namespace BeaverRecycling
             instance.name = definition.Name;
             item.Initialize(this, definition);
             _items.Add(item);
+            SetDifferentCategoryCollisionsIgnored(true);
             if (_day >= FIRST_BOMB_DAY && _bombSpawnChance > 0f &&
                 (_bombSpawnChance >= 1f || UnityEngine.Random.value < _bombSpawnChance)) SpawnBomb();
         }
@@ -449,25 +447,26 @@ namespace BeaverRecycling
             _held.Add(item);
             foreach (RecyclingItem member in group) if (member != item) _held.Add(member);
             foreach (RecyclingItem member in _held) member.SetHeld(true);
+            SetDifferentCategoryCollisionsIgnored(true);
         }
 
-        /// <summary>화면 겹침과 비버 앞 보조 영역을 검사해 기물 묶음을 부착하거나 하류로 밀어낸다.</summary>
+        /// <summary>화면 겹침과 비버 앞 보조 영역을 검사해 같은 분류의 기물 묶음을 부착한다.</summary>
         private void CollectContacts()
         {
             foreach (RecyclingItem other in _items)
             {
-                if (other.IsHeld || !other.CanJoin) continue;
+                if (other.IsHeld || !other.CanJoin ||
+                    other.Definition.Category != _held[0].Definition.Category) continue;
                 if (!TryGetProjectedContactPoint(other, out RecyclingItem held,
                     out Vector3 contactOffset, out float overlapRatio)) continue;
-                List<RecyclingItem> incoming = GetContactBundle(other, out bool sameCategory);
+                List<RecyclingItem> incoming = GetAttachableBundle(other);
                 if (incoming == null) continue;
-                if (sameCategory) AttachBundle(held, other, incoming, contactOffset, overlapRatio, "ISO");
-                else DeflectBundle(incoming);
+                AttachBundle(held, other, incoming, contactOffset, overlapRatio, "ISO");
             }
             CollectBridgeContacts();
         }
 
-        /// <summary>이번 물리 프레임의 운반 목표 위치에서 충돌할 기물을 미리 부착하거나 하류로 밀어낸다.</summary>
+        /// <summary>이번 물리 프레임의 운반 목표 위치에서 충돌할 같은 분류의 기물을 미리 부착한다.</summary>
         private void CollectImminentContacts(Vector3 previousBeaverPosition, Vector3 beaverPosition,
             Quaternion rotationDelta, Vector3 carryOffset)
         {
@@ -475,7 +474,7 @@ namespace BeaverRecycling
             Quaternion inverseRotation = Quaternion.Inverse(rotationDelta);
             foreach (RecyclingItem other in _items)
             {
-                if (!other.CanJoin) continue;
+                if (!other.CanJoin || other.Definition.Category != _held[0].Definition.Category) continue;
                 for (int i = 0; i < carriedCount; i++)
                 {
                     RecyclingItem held = _held[i];
@@ -485,15 +484,11 @@ namespace BeaverRecycling
                     if (!WillCollide(held.Collider, targetPosition, targetRotation,
                         other.Collider, other.Body.position, other.Body.rotation)) continue;
 
-                    List<RecyclingItem> incoming = GetContactBundle(other, out bool sameCategory);
+                    List<RecyclingItem> incoming = GetAttachableBundle(other);
                     if (incoming == null) break;
-                    if (sameCategory)
-                    {
-                        Vector3 offset = previousBeaverPosition + inverseRotation *
-                            (other.Body.position - beaverPosition - carryOffset) - other.Body.position;
-                        AttachBundle(held, other, incoming, offset, 0f, "predicted");
-                    }
-                    else DeflectBundle(incoming);
+                    Vector3 offset = previousBeaverPosition + inverseRotation *
+                        (other.Body.position - beaverPosition - carryOffset) - other.Body.position;
+                    AttachBundle(held, other, incoming, offset, 0f, "predicted");
                     break;
                 }
             }
@@ -518,22 +513,59 @@ namespace BeaverRecycling
             return (heldPoint - otherPoint).sqrMagnitude <= contactDistance * contactDistance;
         }
 
-        /// <summary>접촉한 묶음의 결합 가능 상태와 분류를 검사하고 처리 가능한 묶음을 반환한다.</summary>
-        private List<RecyclingItem> GetContactBundle(RecyclingItem other, out bool sameCategory)
+        /// <summary>추가할 묶음이 운반 중인 기물과 같은 분류이고 운반 가능하면 묶음을 반환한다.</summary>
+        private List<RecyclingItem> GetAttachableBundle(RecyclingItem other)
         {
-            sameCategory = false;
             List<RecyclingItem> incoming = RecyclingItem.Collect(other);
             if (incoming.Any(p => p.IsHeld || !p.CanJoin)) return null;
             RecyclingCategory heldCategory = _held[0].Definition.Category;
-            sameCategory = _held.All(p => p.Definition.Category == heldCategory) &&
-                incoming.All(p => p.Definition.Category == heldCategory);
-            if (!sameCategory || _held.Count + incoming.Count <= Capacity) return incoming;
+            if (_held.Any(p => p.Definition.Category != heldCategory) ||
+                incoming.Any(p => p.Definition.Category != heldCategory)) return null;
+            if (_held.Count + incoming.Count <= Capacity) return incoming;
             if (Time.time > _capacityNoticeAt)
             {
                 _hud.Message("운반 한도가 가득 찼어요");
                 _capacityNoticeAt = Time.time + 1.5f;
             }
             return null;
+        }
+
+        /// <summary>카메라 화면에서 들고 있는 기물과 다른 분류 기물이 30% 이상 겹치는지 반환한다.</summary>
+        private bool HasDifferentCategoryProjectedOverlap()
+        {
+            if (_held.Count == 0) return false;
+            RecyclingCategory heldCategory = _held[0].Definition.Category;
+            var heldPolygons = new List<List<Vector2>>(_held.Count);
+            foreach (RecyclingItem held in _held)
+                heldPolygons.Add(ProjectBoundsToViewport(held.Collider.bounds));
+
+            foreach (RecyclingItem other in _items)
+            {
+                if (other.IsHeld || other.IsResolved || other.Definition.Category == heldCategory) continue;
+                List<Vector2> otherPolygon = ProjectBoundsToViewport(other.Collider.bounds);
+                float otherArea = PolygonArea(otherPolygon);
+                if (otherArea <= 0.00000001f) continue;
+                foreach (List<Vector2> heldPolygon in heldPolygons)
+                {
+                    float overlapArea = PolygonArea(IntersectConvexPolygons(otherPolygon, heldPolygon));
+                    if (overlapArea > 0f && overlapArea / otherArea >= _minimumProjectedOverlap) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>들고 있는 기물과 다른 분류 기물 사이의 물리 충돌 무시 상태를 설정한다.</summary>
+        private void SetDifferentCategoryCollisionsIgnored(bool ignored)
+        {
+            foreach (RecyclingItem held in _held)
+            {
+                foreach (RecyclingItem other in _items)
+                {
+                    if (other.IsHeld || other.IsResolved ||
+                        other.Definition.Category == held.Definition.Category) continue;
+                    Physics.IgnoreCollision(held.Collider, other.Collider, ignored);
+                }
+            }
         }
 
         /// <summary>운반 기물, 새 묶음, 이동량과 판정 출처를 받아 묶음을 옮기고 조인트를 생성한다.</summary>
@@ -559,6 +591,7 @@ namespace BeaverRecycling
             Vector3 contactPoint = (heldPoint + joiningPoint) * 0.5f;
             held.Attach(other, contactPoint);
             foreach (RecyclingItem member in incoming) { member.SetHeld(true); _held.Add(member); }
+            SetDifferentCategoryCollisionsIgnored(true);
 
             Debug.Log(
                 $"[RecyclingAttach] {source} overlap={overlapRatio * 100f:F2}% " +
@@ -573,18 +606,6 @@ namespace BeaverRecycling
                 this);
         }
 
-        /// <summary>접촉한 다른 분류의 묶음을 숨겨 하류로 밀고 비버의 이동 속도를 잠시 낮춘다.</summary>
-        private void DeflectBundle(List<RecyclingItem> incoming)
-        {
-            _collisionSlowUntil = Mathf.Max(_collisionSlowUntil, Time.time + COLLISION_SLOW_DURATION);
-            foreach (RecyclingItem member in incoming)
-            {
-                member.BlockAttachment(DEFLECT_REATTACH_DELAY);
-                member.ApplyKnockback(Vector3.back * DEFLECT_SPEED, DEFLECT_DURATION);
-                member.HideForDeflection(DEFLECT_REATTACH_DELAY);
-            }
-        }
-
         // 실제 Collider 접촉까지 끌어오기 위한 검색값. 바운드의 접촉점은 실제 메시 접촉점이 아니다.
         private const float ATTACH_SURFACE_TOLERANCE = 0.002f;
         private const int ATTACH_DEPTH_SEARCH_STEPS = 24;
@@ -592,7 +613,7 @@ namespace BeaverRecycling
         private const int BRIDGE_MOVE_CHECK_STEPS = 4;
         private const float BRIDGE_BEAVER_RADIUS = 0.3f;
 
-        /// <summary>비버 앞 빈 공간의 기물 중 표면 거리가 가장 가까운 묶음부터 부착하거나 하류로 밀어낸다.</summary>
+        /// <summary>비버 앞 빈 공간의 같은 분류 기물 중 표면 거리가 가장 가까운 묶음부터 부착한다.</summary>
         private void CollectBridgeContacts()
         {
             while (TryGetBridgeArea(out Vector3 start, out Vector3 end, out RecyclingItem held))
@@ -606,13 +627,13 @@ namespace BeaverRecycling
                 for (int i = 0; i < count; i++)
                 {
                     RecyclingItem item = _overlapBuffer[i].GetComponentInParent<RecyclingItem>();
-                    if (item != null && _items.Contains(item) && item.CanJoin) candidates.Add(item);
+                    if (item != null && _items.Contains(item) && item.CanJoin &&
+                        item.Definition.Category == _held[0].Definition.Category) candidates.Add(item);
                 }
 
                 RecyclingItem best = null;
                 List<RecyclingItem> bestBundle = null;
                 Vector3 bestOffset = Vector3.zero;
-                bool bestSameCategory = false;
                 float bestGap = float.PositiveInfinity;
                 foreach (RecyclingItem candidate in candidates)
                 {
@@ -625,18 +646,16 @@ namespace BeaverRecycling
                     Vector3 offset = gap <= ATTACH_SURFACE_TOLERANCE ? Vector3.zero : heldPoint - joiningPoint;
                     if (offset.magnitude > _bridgeAttachMaxDistance ||
                         GetActualColliderGap(held, candidate, offset) > ATTACH_SURFACE_TOLERANCE) continue;
-                    List<RecyclingItem> incoming = GetContactBundle(candidate, out bool sameCategory);
+                    List<RecyclingItem> incoming = GetAttachableBundle(candidate);
                     if (incoming == null || !CanMoveBridgeBundle(incoming, held, offset)) continue;
                     best = candidate;
                     bestBundle = incoming;
                     bestOffset = offset;
-                    bestSameCategory = sameCategory;
                     bestGap = gap;
                 }
 
                 if (best == null) return;
-                if (bestSameCategory) AttachBundle(held, best, bestBundle, bestOffset, 0f, "bridge");
-                else DeflectBundle(bestBundle);
+                AttachBundle(held, best, bestBundle, bestOffset, 0f, "bridge");
             }
         }
 
@@ -996,6 +1015,7 @@ namespace BeaverRecycling
         /// <summary>분리·놓기 전에 경계 밖 묶음을 비버 작업 구역으로 보정하고 분리 시 기물을 흩뜨린다.</summary>
         private void ReleaseBundle(bool split)
         {
+            SetDifferentCategoryCollisionsIgnored(false);
             CorrectReleasedBundlePosition();
             bool scatter = split && _held.Count > 1;
             Vector3 center = Vector3.zero;
@@ -1169,6 +1189,7 @@ namespace BeaverRecycling
         private void Submit(RecyclingChute3D chute)
         {
             var submitted = new List<RecyclingItem>(_held);
+            SetDifferentCategoryCollisionsIgnored(false);
             _held.Clear();
             SubmitItems(chute, submitted);
         }
@@ -1361,6 +1382,7 @@ namespace BeaverRecycling
         /// <summary>하루 종료 또는 재시도에서 모든 생성 기물과 운반 상태를 풀에 반환한다.</summary>
         private void ClearWorld()
         {
+            SetDifferentCategoryCollisionsIgnored(false);
             _held.Clear();
             foreach (RecyclingItem item in _items.ToArray()) if (item != null) item.ReturnNow();
             _items.Clear();
@@ -1376,7 +1398,6 @@ namespace BeaverRecycling
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
             _beaverStunnedUntil = 0f;
-            _collisionSlowUntil = 0f;
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
             _movement = Vector2.zero;
