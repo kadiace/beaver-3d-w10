@@ -149,7 +149,7 @@ namespace RestoreCastle3D
             if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
             {
                 CastleMaterial3D material = ChooseCreekMaterial();
-                Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
+                Vector3 position = Vector3.zero;
                 GameObject instance = Managers.Resource.Instantiate(
                     "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
                     position: position, rotation: material.id == "vine" ||
@@ -715,6 +715,8 @@ namespace RestoreCastle3D
         /// <summary>Resources/Prefabs에서 3D 기물을 로드하고 Rigidbody를 통한 중력 낙하를 준비한다.</summary>
         private CastlePiece3D Spawn(CastleMaterial3D material, Vector3 position)
         {
+            // Spawn all gameplay pieces at the world origin, regardless of placement input.
+            position = Vector3.zero;
             GameObject instance = Managers.Resource.Instantiate(
                 "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
                 position: position, rotation: Quaternion.Euler(0f, _objectYaw, 0f) *
