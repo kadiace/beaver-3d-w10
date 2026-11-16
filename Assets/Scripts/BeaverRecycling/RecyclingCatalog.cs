@@ -46,9 +46,7 @@ namespace BeaverRecycling
             {
                 RecyclingCategory[] active = day == 1
                     ? new[] { RecyclingCategory.Plastic, RecyclingCategory.Metal }
-                    : day == 2
-                        ? new[] { RecyclingCategory.Plastic, RecyclingCategory.Metal, RecyclingCategory.Glass }
-                        : new[] { RecyclingCategory.Plastic, RecyclingCategory.Glass, RecyclingCategory.Film, RecyclingCategory.Metal };
+                    : new[] { RecyclingCategory.Plastic, RecyclingCategory.Glass, RecyclingCategory.Film, RecyclingCategory.Metal };
                 category = active[UnityEngine.Random.Range(0, active.Length)];
             }
             int total = 0;
@@ -172,6 +170,6 @@ namespace BeaverRecycling
 
         /// <summary>일차를 받아 그날 등장하는 분류 이름을 반환한다.</summary>
         public static string DayCategories(int day) => day == 1 ? "플라스틱 · 금속" :
-            day == 2 ? "플라스틱 · 금속 · 유리" : "플라스틱 · 금속 · 유리 · 비닐";
+            "플라스틱 · 금속 · 유리 · 비닐";
     }
 }

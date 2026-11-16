@@ -56,7 +56,7 @@ namespace BeaverRecycling
         /// <summary>현재 날짜에 이 재질의 투입구가 열려 있는지 반환한다.</summary>
         public bool IsAvailable(int day) =>
             (_category != RecyclingCategory.Glass || day >= 2) &&
-            (_category != RecyclingCategory.Film || day >= 3);
+            (_category != RecyclingCategory.Film || day >= 2);
 
         /// <summary>반납 가능 여부에 따라 chute의 메시 렌더러에 외곽선 레이어를 적용하거나 해제한다.</summary>
         private void SetOutline(bool enabled)

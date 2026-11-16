@@ -45,14 +45,14 @@ MonoBehaviour:
     _name: "\uBE44\uB2D0\uBD09\uD22C"
     _category: 2
     _prefab: {fileID: 1005, guid: 0eeeb09d86ecb16e776e5bb67258d591, type: 3}
-    _firstDay: 3
+    _firstDay: 2
     _woodYield: 0
     _weight: 1
   - _id: film_wrapper
     _name: "\uD3EC\uC7A5 \uBE44\uB2D0"
     _category: 2
     _prefab: {fileID: 1005, guid: 17da66d2f94502bb2be2a98946566d69, type: 3}
-    _firstDay: 3
+    _firstDay: 2
     _woodYield: 0
     _weight: 1
   - _id: metal_can

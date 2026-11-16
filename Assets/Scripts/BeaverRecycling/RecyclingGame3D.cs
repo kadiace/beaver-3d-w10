@@ -18,6 +18,7 @@ namespace BeaverRecycling
         private const float EMPTY_HANDED_SPEED_MULTIPLIER = 1.7f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
+        private const float MINIMUM_FLOATING_KIND_RATIO = 0.33f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
         private const float SPLIT_ITEM_GAP = 0.05f;
         private const int SPLIT_SEARCH_RINGS = 48;
@@ -349,7 +350,7 @@ namespace BeaverRecycling
         /// <summary>활성 정의를 난수로 골라 풀에서 생성하고 새 기물의 상태를 초기화한다.</summary>
         private void SpawnItem()
         {
-            RecyclingDefinition definition = _catalog.Draw(_day);
+            RecyclingDefinition definition = DrawSpawnDefinition();
             Vector3 position = _spawnPoint.position;
             position.x += UnityEngine.Random.Range(-_spawnHalfWidth, _spawnHalfWidth);
             Quaternion rotation = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
@@ -361,6 +362,41 @@ namespace BeaverRecycling
             _items.Add(item);
             if (_day >= FIRST_BOMB_DAY && _bombSpawnChance > 0f &&
                 (_bombSpawnChance >= 1f || UnityEngine.Random.value < _bombSpawnChance)) SpawnBomb();
+        }
+
+        /// <summary>강물에 떠 있는 기물만 세고, 신규 생성 뒤에도 특정 종류의 비중이 33% 이상이도록 분포를 보정한다.</summary>
+        private RecyclingDefinition DrawSpawnDefinition()
+        {
+            RecyclingDefinition candidate = _catalog.Draw(_day);
+            var floatingCounts = new Dictionary<string, int>();
+            RecyclingDefinition leadingDefinition = null;
+            int leadingCount = 0;
+            int totalFloating = 0;
+
+            foreach (RecyclingItem item in _items)
+            {
+                if (item == null || !item.isActiveAndEnabled || item.IsHeld || item.IsResolved ||
+                    !IsInsideRiver(item.Body.position) || item.Collider.bounds.min.y > _waterY + 0.2f)
+                    continue;
+
+                RecyclingDefinition definition = item.Definition;
+                floatingCounts.TryGetValue(definition.Id, out int count);
+                count++;
+                floatingCounts[definition.Id] = count;
+                totalFloating++;
+                if (count <= leadingCount) continue;
+                leadingCount = count;
+                leadingDefinition = definition;
+            }
+
+            if (totalFloating == 0) return candidate;
+            floatingCounts.TryGetValue(candidate.Id, out int candidateCount);
+            int largestAfterSpawn = Mathf.Max(leadingCount, candidateCount + 1);
+            if (largestAfterSpawn >= (totalFloating + 1) * MINIMUM_FLOATING_KIND_RATIO)
+                return candidate;
+
+            // If objects have just drifted away, bias the next spawn toward the current leader.
+            return leadingDefinition;
         }
 
         /// <summary>상류 공급 위치를 받아 폭탄을 별도로 생성하고 이동 흐름에 등록한다.</summary>
@@ -1465,9 +1501,9 @@ namespace BeaverRecycling
             string menuKey = _displayedGamepadConnected ? "Menu" : "ESC";
             if (_phase == DayPhase.Preparation)
             {
-                // 새로 해금되는 분류만 표시한다. 4일차부터는 추가되는 분류가 없다.
+                // 2일차에 남은 두 분류가 모두 해금된다.
                 string newCategories = _day == 1 ? "플라스틱 / 금속" :
-                    _day == 2 ? "유리" : _day == 3 ? "비닐" : "";
+                    _day == 2 ? "유리 / 비닐" : "";
                 string categoryLine = string.IsNullOrEmpty(newCategories)
                     ? "" : "\n새 분류 추가 - " + newCategories;
                 _hud.ShowModal(_day + "일차 · 출근 준비",
