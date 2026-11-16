@@ -1623,6 +1623,16 @@ namespace BeaverRecycling
         /// <summary>모달의 처음부터 버튼에서 전체 일차·점수·목재·업그레이드를 초기화한다.</summary>
         public void SecondaryAction() => RestartRun();
 
+        /// <summary>일시정지 메뉴에서 현재 일차 시작 시점의 목재와 업그레이드를 복원하고 같은 일차를 다시 시작한다.</summary>
+        public void RestartCurrentDay()
+        {
+            if (_phase != DayPhase.Paused) return;
+            _wood = _dayStartWood;
+            Array.Copy(_startLevels, _levels, _levels.Length);
+            PrepareDay();
+            StartDay();
+        }
+
         /// <summary>처음부터 진행할 때 원래 재화와 능력치로 돌아가 첫날 준비를 연다.</summary>
         private void RestartRun()
         {
@@ -1660,12 +1670,12 @@ namespace BeaverRecycling
             if (_wood < cost) return;
             _wood -= cost;
             _levels[index]++;
-            UpdateModal();
+            UpdateModal(index);
             RefreshHud();
         }
 
-        /// <summary>현재 진행 상태와 통계를 사용하여 준비·결과·상점·일시정지 패널을 갱신한다.</summary>
-        private void UpdateModal()
+        /// <summary>현재 진행 상태와 통계를 사용하여 패널을 갱신하고 구매한 강화 주변으로 포커스를 옮긴다.</summary>
+        private void UpdateModal(int purchasedUpgrade = -1)
         {
             string movementKey = _displayedGamepadConnected ? "왼쪽 스틱" : "방향키";
             string interactKey = _displayedGamepadConnected ? "South" : "Z";
@@ -1690,7 +1700,7 @@ namespace BeaverRecycling
             }
             else if (_phase == DayPhase.Paused)
                 _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\n" +
-                    splitKey + "로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
+                    splitKey + "로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false, true);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
@@ -1709,10 +1719,10 @@ namespace BeaverRecycling
                     _hud.ShowModal("5일 근무 완료!", body + "\n\n누적 " + _totalScore + "점 · 목재 " + _wood,
                         "처음부터", "", false);
                 else if (!_passed)
-                    _hud.ShowModal("오늘의 목표 미달", body + "\n\n: 출근 전 목재와 능력 복원", "재도전", "처음부터", false);
+                    _hud.ShowModal("오늘의 목표 미달", body + "\n\n: 출근 전 목재와 능력 복원", "재도전", "", false);
                 else
                 {
-                    _hud.ShowModal("퇴근 · 내일을 준비하세요", body + "\n보유 " + _wood + " 목재", "다음 날", "처음부터", true);
+                    _hud.ShowModal("퇴근 · 내일을 준비하세요", body + "\n보유 " + _wood + " 목재", "다음 날", "", true);
                     string[] names = { "튼튼한 앞발", "든든한 식사", "긴 집게" };
                     string[] statNames = { "운반 한도", "이동 속도", "집기 거리" };
                     for (int i = 0; i < _levels.Length; i++)
@@ -1727,6 +1737,7 @@ namespace BeaverRecycling
                             (level == 3 ? "최대 단계" : UPGRADE_COSTS[level] + " 목재");
                         _hud.SetUpgrade(i, description, level < 3 && _wood >= UPGRADE_COSTS[Mathf.Min(level, 2)]);
                     }
+                    _hud.FocusAvailableUpgrade(purchasedUpgrade);
                 }
             }
         }

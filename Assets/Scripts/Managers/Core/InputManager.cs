@@ -85,8 +85,7 @@ public class InputManager
     public bool FloodPreviewPressed => _floodPreview.WasPressedThisFrame();
     public bool ConfirmPressed => _inputMode == InputMode.UI && (_uiSubmit.WasPressedThisFrame() ||
         (_useRecyclingControls && Keyboard.current != null &&
-         (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame ||
-          Keyboard.current.numpadEnterKey.wasPressedThisFrame)));
+         Keyboard.current.zKey.wasPressedThisFrame));
     public bool SortExcludePressed => _inputMode == InputMode.UI && (_uiSortExclude.WasPressedThisFrame() ||
         (_useRecyclingControls && WasBoundKeyboardButtonPressed(_interact)));
     // Physical availability, not whichever device was used most recently.
