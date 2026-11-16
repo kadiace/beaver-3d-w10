@@ -50,7 +50,7 @@ namespace BeaverRecycling
         private Outline[] _focusOutlines;
 
         // Bottom-edge labels may overlap. Each visible item has its own text.
-        private const float OFFSCREEN_BASE_Y = 157f;
+        private const float OFFSCREEN_BASE_Y = 14f;
         private const float OFFSCREEN_LABEL_WIDTH = 160f;
         private readonly Dictionary<RecyclingItem, Text> _offscreenLabelsByItem =
             new Dictionary<RecyclingItem, Text>();
