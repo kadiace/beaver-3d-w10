@@ -16,6 +16,8 @@ namespace BeaverRecycling
         private const int SURPLUS_SCORE_PER_BONUS_WOOD = 10;
         private const int FIRST_BOMB_DAY = 4;
         private const float CARRYING_SPEED_MULTIPLIER = 1.7f;
+        private const float COLLISION_SLOW_DURATION = 0.5f;
+        private const float COLLISION_SPEED_MULTIPLIER = 0.3f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
@@ -38,11 +40,11 @@ namespace BeaverRecycling
         [SerializeField] private Transform _spawnPoint;
 
         [Header("Working day")]
-        [SerializeField, Min(1f)] private float _supplySeconds = 60f;
+        [SerializeField, Min(1f)] private float _supplySeconds = 30f;
         [SerializeField, Min(1f)] private float _closingSeconds = 30f;
         [SerializeField] private int[] _targets = { 30, 50, 70, 90, 110 };
-        [SerializeField] private float[] _spawnIntervals = { 2f, 1.8f, 1.6f, 1.4f, 1.2f };
-        [SerializeField] private float[] _flowSpeeds = { 1.2f, 1.35f, 1.5f, 1.65f, 1.8f };
+        [SerializeField] private float[] _spawnIntervals = { 0.666667f, 0.6f, 0.533333f, 0.466667f, 0.4f };
+        [SerializeField] private float[] _flowSpeeds = { 2.4f, 2.7f, 3f, 3.3f, 3.6f };
 
         [Header("Bombs")]
         [SerializeField, Range(0f, 1f)] private float _bombSpawnChance = 0.05f;
@@ -101,6 +103,7 @@ namespace BeaverRecycling
         private float _nextSpawn;
         private float _capacityNoticeAt;
         private float _beaverStunnedUntil;
+        private float _collisionSlowUntil;
 
         public bool IsWorking => _phase == DayPhase.Supply || _phase == DayPhase.Closing;
         public float WaterfallZ => _waterfallZ;
@@ -197,9 +200,10 @@ namespace BeaverRecycling
                 Physics.SyncTransforms();
                 CollectContacts();
             }
-            float slowdown = Mathf.Max(0.6f, 1f - 0.05f * Mathf.Max(0, _held.Count - 3));
-            float speed = (_baseSpeed + 0.5f * _levels[1]) * slowdown;
+            float loadSpeedBonus = 1f + 0.05f * Mathf.Max(0, _held.Count - 1);
+            float speed = (_baseSpeed + 0.5f * _levels[1]) * loadSpeedBonus;
             if (_held.Count > 0) speed *= CARRYING_SPEED_MULTIPLIER;
+            if (Time.time < _collisionSlowUntil) speed *= COLLISION_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
             Quaternion previousBeaverRotation = _beaver.transform.rotation;
             _beaver.Move(_movement, speed, Time.fixedDeltaTime);
@@ -569,9 +573,10 @@ namespace BeaverRecycling
                 this);
         }
 
-        /// <summary>접촉 조건을 만족한 다른 분류의 기물 묶음을 잠시 숨기고 강 하류로 밀어낸다.</summary>
+        /// <summary>접촉한 다른 분류의 묶음을 숨겨 하류로 밀고 비버의 이동 속도를 잠시 낮춘다.</summary>
         private void DeflectBundle(List<RecyclingItem> incoming)
         {
+            _collisionSlowUntil = Mathf.Max(_collisionSlowUntil, Time.time + COLLISION_SLOW_DURATION);
             foreach (RecyclingItem member in incoming)
             {
                 member.BlockAttachment(DEFLECT_REATTACH_DELAY);
@@ -1371,6 +1376,7 @@ namespace BeaverRecycling
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
             _beaverStunnedUntil = 0f;
+            _collisionSlowUntil = 0f;
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
             _movement = Vector2.zero;

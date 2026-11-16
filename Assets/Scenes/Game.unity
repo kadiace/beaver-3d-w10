@@ -747,21 +747,21 @@ MonoBehaviour:
   _hud: {fileID: 3100000440}
   _camera: {fileID: 1916402863}
   _spawnPoint: {fileID: 3100000093}
-  _supplySeconds: 60
+  _supplySeconds: 30
   _closingSeconds: 30
   _targets: 1e00000032000000460000005a0000006e000000
   _spawnIntervals:
-  - 2
-  - 1.8
-  - 1.6
-  - 1.4
-  - 1.2
+  - 0.666667
+  - 0.6
+  - 0.533333
+  - 0.466667
+  - 0.4
   _flowSpeeds:
-  - 1.2
-  - 1.35
-  - 1.5
-  - 1.65
-  - 1.8
+  - 2.4
+  - 2.7
+  - 3
+  - 3.3
+  - 3.6
   _bombSpawnChance: 0.05
   _riverMinimum: {x: -12, y: 15}
   _riverMaximum: {x: 12, y: 45}
