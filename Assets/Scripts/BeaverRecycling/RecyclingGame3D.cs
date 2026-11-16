@@ -1586,10 +1586,10 @@ namespace BeaverRecycling
                     _hud.ShowModal("5일 근무 완료!", body + "\n\n누적 " + _totalScore + "점 · 목재 " + _wood,
                         "처음부터", "", false);
                 else if (!_passed)
-                    _hud.ShowModal("오늘의 목표 미달", body + "\n\n: 출근 전 목재와 능력 복원", "재도전", "처음부터", false);
+                    _hud.ShowModal("오늘의 목표 미달", body + "\n\n: 출근 전 목재와 능력 복원", "재도전", "", false);
                 else
                 {
-                    _hud.ShowModal("퇴근 · 내일을 준비하세요", body + "\n보유 " + _wood + " 목재", "다음 날", "처음부터", true);
+                    _hud.ShowModal("퇴근 · 내일을 준비하세요", body + "\n보유 " + _wood + " 목재", "다음 날", "", true);
                     string[] names = { "튼튼한 앞발", "든든한 식사", "긴 집게" };
                     string[] statNames = { "운반 한도", "이동 속도", "집기 거리" };
                     for (int i = 0; i < _levels.Length; i++)
