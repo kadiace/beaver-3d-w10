@@ -775,6 +775,9 @@ MonoBehaviour:
   _maxCarriedSpeedMultiplier: 2
   _baseReach: 1.8
   _baseCapacity: 6
+  _rejectedScatterRadius: 1.5
+  _rejectedSpawnHeight: 1.5
+  _rejectedScatterSpeed: 2
   _splitScatterDistance: 0.6
   _minimumProjectedOverlap: 0.3
   _bridgeAttachRadius: 0.25
@@ -10157,20 +10160,14 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 9500000200}
   - {fileID: 9500000201}
-  - {fileID: 9500000202}
   - {fileID: 9500000203}
-  - {fileID: 9500000204}
   - {fileID: 9500000205}
-  - {fileID: 9500000206}
   - {fileID: 9500000207}
-  - {fileID: 9500000208}
   - {fileID: 9500000209}
-  - {fileID: 9500000210}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &9500000100
+--- !u!1001 &9500000101
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -10180,35 +10177,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_Name
-      value: Cliff Bumper 01
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -10.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -2.25
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 18.52
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.992774
+      value: Cliff Bumper 02
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalScale.x
@@ -10221,28 +10190,6 @@ PrefabInstance:
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalScale.z
       value: 1.95
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000200 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000100}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &9500000101
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 9500000002}
-    m_Modifications:
-    - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_Name
-      value: Cliff Bumper 02
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -10257,6 +10204,10 @@ PrefabInstance:
       value: 18.28
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.995942
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
@@ -10268,94 +10219,11 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.995942
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000201 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000101}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &9500000102
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 9500000002}
-    m_Modifications:
-    - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_Name
-      value: Cliff Bumper 03
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -6.3
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -2.25
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 18.52
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.992774
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000202 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000102}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &9500000103
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10367,6 +10235,18 @@ PrefabInstance:
     - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_Name
       value: Cliff Bumper 04
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.95
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -10381,6 +10261,10 @@ PrefabInstance:
       value: 18.28
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.995942
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
@@ -10392,94 +10276,11 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.995942
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000203 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000103}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &9500000104
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 9500000002}
-    m_Modifications:
-    - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_Name
-      value: Cliff Bumper 05
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -2.25
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 18.52
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.992774
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000204 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000104}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &9500000105
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10491,6 +10292,18 @@ PrefabInstance:
     - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_Name
       value: Cliff Bumper 06
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.95
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -10505,6 +10318,10 @@ PrefabInstance:
       value: 18.28
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.995942
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
@@ -10516,94 +10333,11 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.995942
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000205 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000105}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &9500000106
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 9500000002}
-    m_Modifications:
-    - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_Name
-      value: Cliff Bumper 07
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -2.25
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 18.52
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.992774
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000206 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000106}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &9500000107
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10615,6 +10349,18 @@ PrefabInstance:
     - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_Name
       value: Cliff Bumper 08
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.95
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -10629,6 +10375,10 @@ PrefabInstance:
       value: 18.28
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.995942
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
@@ -10640,94 +10390,11 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.995942
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000207 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000107}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &9500000108
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 9500000002}
-    m_Modifications:
-    - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_Name
-      value: Cliff Bumper 09
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 6.3
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -2.25
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 18.52
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.992774
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000208 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000108}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &9500000109
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10739,6 +10406,18 @@ PrefabInstance:
     - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_Name
       value: Cliff Bumper 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.95
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -10753,6 +10432,10 @@ PrefabInstance:
       value: 18.28
       objectReference: {fileID: 0}
     - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.995942
+      objectReference: {fileID: 0}
+    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
@@ -10764,93 +10447,35 @@ PrefabInstance:
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.995942
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+--- !u!4 &9500000201 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+  m_PrefabInstance: {fileID: 9500000101}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9500000203 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+  m_PrefabInstance: {fileID: 9500000103}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9500000205 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+  m_PrefabInstance: {fileID: 9500000105}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9500000207 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
+  m_PrefabInstance: {fileID: 9500000107}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &9500000209 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
   m_PrefabInstance: {fileID: 9500000109}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &9500000110
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 9500000002}
-    m_Modifications:
-    - target: {fileID: 100100, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_Name
-      value: Cliff Bumper 11
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 10.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -2.25
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 18.52
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.12
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.992774
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 2.1
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1.95
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
---- !u!4 &9500000210 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 100200, guid: 73f49da98c33480b8a7a051a50a1c0d2, type: 3}
-  m_PrefabInstance: {fileID: 9500000110}
   m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
