@@ -12,6 +12,7 @@ namespace BeaverRecycling
         private const float RELEASE_MOMENTUM_SECONDS = 0.45f;
         private const float THROWN_SUBMISSION_SECONDS = 1f;
         private const float RELEASE_MOMENTUM_FADE_SECONDS = 0.15f;
+        private const int DEFLECTION_MARK_SEGMENTS = 32;
 
         [Header("Wood marker")]
         [SerializeField] private GameObject _woodBadge;
@@ -36,6 +37,10 @@ namespace BeaverRecycling
         private float _releaseMomentumUntil;
         private float _thrownSubmissionUntil;
         private float _lastFlowTime = float.NegativeInfinity;
+        private bool[] _deflectionRendererStates;
+        private bool _deflectionWasTrigger;
+        private GameObject _deflectionMark;
+        private Material _deflectionMarkMaterial;
 
         public Rigidbody Body => _body;
         public Collider Collider => _collider;
@@ -78,6 +83,7 @@ namespace BeaverRecycling
         void OnDisable()
         {
             StopAllCoroutines();
+            EndDeflection();
             DetachAll();
             if (_game != null) _game.ForgetItem(this);
             _game = null;
@@ -207,6 +213,72 @@ namespace BeaverRecycling
             velocityChange.y = 0f;
             _knockbackVelocity += velocityChange;
             _knockbackTimeRemaining = duration;
+        }
+
+        /// <summary>지속 시간 동안 기물을 숨기고 물리 충돌을 끈 뒤 충돌 위치에 남색 원형 흔적을 표시한다.</summary>
+        public void HideForDeflection(float duration)
+        {
+            if (_deflectionRendererStates != null) return;
+            _deflectionRendererStates = new bool[_renderers.Length];
+            for (int i = 0; i < _renderers.Length; i++)
+            {
+                _deflectionRendererStates[i] = _renderers[i].enabled;
+                _renderers[i].enabled = false;
+            }
+            _deflectionWasTrigger = _collider.isTrigger;
+            _collider.isTrigger = true;
+            CreateDeflectionMark();
+            StartCoroutine(RevealAfterDeflection(duration));
+        }
+
+        /// <summary>충돌 지점의 수면 또는 기물 바닥 위에 남색 원형 흔적을 만든다.</summary>
+        private void CreateDeflectionMark()
+        {
+            Bounds bounds = _collider.bounds;
+            float radius = Mathf.Max(bounds.extents.x, bounds.extents.z) + 0.15f;
+            float height = Mathf.Max(_game.WaterY, bounds.min.y) + 0.08f;
+            _deflectionMark = new GameObject("Deflection mark");
+            _deflectionMark.layer = gameObject.layer;
+            _deflectionMark.transform.position = new Vector3(bounds.center.x, height, bounds.center.z);
+            LineRenderer line = _deflectionMark.AddComponent<LineRenderer>();
+            _deflectionMarkMaterial = new Material(Shader.Find("RestoreCastle3D/Outline"));
+            _deflectionMarkMaterial.SetFloat("_Outline_Thickness", 0f);
+            _deflectionMarkMaterial.SetColor("_Outline_Color", new Color(0.03f, 0.06f, 0.25f));
+            line.sharedMaterial = _deflectionMarkMaterial;
+            line.useWorldSpace = false;
+            line.alignment = LineAlignment.View;
+            line.widthMultiplier = 0.1f;
+            line.numCornerVertices = 3;
+            line.loop = true;
+            line.positionCount = DEFLECTION_MARK_SEGMENTS;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            for (int i = 0; i < DEFLECTION_MARK_SEGMENTS; i++)
+            {
+                float angle = 2f * Mathf.PI * i / DEFLECTION_MARK_SEGMENTS;
+                line.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
+            }
+        }
+
+        /// <summary>지속 시간이 지나면 기물과 충돌을 복구하고 원형 흔적을 제거한다.</summary>
+        private IEnumerator RevealAfterDeflection(float duration)
+        {
+            yield return new WaitForSeconds(duration);
+            EndDeflection();
+        }
+
+        /// <summary>기물의 기존 렌더러와 콜라이더 상태를 복구하고 원형 흔적을 제거한다.</summary>
+        private void EndDeflection()
+        {
+            if (_deflectionRendererStates == null) return;
+            for (int i = 0; i < _renderers.Length; i++)
+                _renderers[i].enabled = _deflectionRendererStates[i];
+            _deflectionRendererStates = null;
+            _collider.isTrigger = _deflectionWasTrigger;
+            Destroy(_deflectionMark);
+            Destroy(_deflectionMarkMaterial);
+            _deflectionMark = null;
+            _deflectionMarkMaterial = null;
         }
 
         /// <summary>외곽선 렌더링 레이어를 받아 기존 기본 렌더링을 유지하며 강조 색을 바꾼다.</summary>
