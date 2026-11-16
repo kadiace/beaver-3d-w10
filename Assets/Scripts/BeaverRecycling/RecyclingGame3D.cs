@@ -1521,20 +1521,15 @@ namespace BeaverRecycling
             string menuKey = _displayedGamepadConnected ? "Menu" : "ESC";
             if (_phase == DayPhase.Preparation)
             {
-                // 새로 해금되는 분류만 표시한다. 4일차부터는 추가되는 분류가 없다.
-                string newCategories = _day == 1 ? "플라스틱 / 금속" :
-                    _day == 2 ? "유리" : _day == 3 ? "비닐" : "";
-                string categoryLine = string.IsNullOrEmpty(newCategories)
-                    ? "" : "\n새 분류 추가 - " + newCategories;
                 _hud.ShowModal(_day + "일차 · 출근 준비",
-                    "오늘의 목표 " + _targets[_day - 1] + "점" + categoryLine + "\n\n" +
-                    movementKey + " 이동\n" +
+                    "같은 재질의 쓰레기를 모아 올바른 수거함에 제출하세요! 목재는 폭포 아래로 흘려 보내세요.\n" +
+                    "오늘의 목표 " + _targets[_day - 1] + "점\n\n" +
+                    movementKey + " 이동 / " + dashKey + " 대시 (최대 3초 · 충전 3초)\n" +
                     interactKey + " 집기 / 놓기 / 투입구에서 놓으면 분류\n" +
                     splitKey + " 묶음 분리\n" +
-                    dashKey + " 대시 (최대 3초 · 충전 3초)\n" +
                     menuKey + " 일시정지\n\n" +
-                    "나무 폭포 통과 +3점·목재\n" +
-                    "유실 없음 +10점·+3목재 · 오분류 없음 +10점·+3목재\n목표 초과 10점당 +1목재",
+                    "목재 폭포 아래로 흘려보내기 +3점 & +1목재 / 목표 초과 10점 당 +1목재\n" +
+                    "유실 없음 +10점 & +3목재 / 오분류 없음 +10점 & +3목재",
                     "출근", "", false);
             }
             else if (_phase == DayPhase.Paused)
