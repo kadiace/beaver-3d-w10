@@ -100,7 +100,7 @@ namespace BeaverRecycling
         {
             if (_game == null || !_game.IsWorking || _exploded) return;
             if (_collider.bounds.min.z <= _game.ObjectBoundaryExitZ ||
-                transform.position.y < _game.FallbackY || Mathf.Abs(transform.position.x) > 25f)
+                _game.IsOutsideField(transform.position))
                 _game.ResolveBombExit(this);
         }
 

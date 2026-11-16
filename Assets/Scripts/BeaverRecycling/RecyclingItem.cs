@@ -257,7 +257,7 @@ namespace BeaverRecycling
         {
             if (_game == null || !_game.IsWorking || _held || _resolved) return;
             if (_collider.bounds.min.z <= _game.ObjectBoundaryExitZ) _game.ResolveExit(this, true, true);
-            else if (transform.position.y < _game.FallbackY || Mathf.Abs(transform.position.x) > 25f)
+            else if (_game.IsOutsideField(transform.position))
                 _game.ResolveExit(this, false, true);
         }
 

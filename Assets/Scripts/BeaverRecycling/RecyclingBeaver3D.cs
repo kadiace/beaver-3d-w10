@@ -4,6 +4,11 @@ namespace BeaverRecycling
 {
     public sealed class RecyclingBeaver3D : MonoBehaviour
     {
+        private const int EYE_TRAIL_PAIR_COUNT = 12;
+        private const float EYE_TRAIL_LIFETIME = 0.38f;
+        private const float EYE_TRAIL_INTERVAL = 0.025f;
+        private const float EYE_TRAIL_MIN_DISTANCE_SQUARED = 0.0036f;
+
         [Header("Movement")]
         [SerializeField] private Vector2 _minimum = new Vector2(-12f, 17f);
         [SerializeField] private Vector2 _maximum = new Vector2(12f, 43f);
@@ -21,9 +26,18 @@ namespace BeaverRecycling
         [Header("Eye fire")]
         [SerializeField] private MeshRenderer _leftEye;
         [SerializeField] private MeshRenderer _rightEye;
+        private GameObject _eyeTrailRoot;
         private Material _eyeGlowMaterial;
+        private Material _eyeTrailMaterial;
         private Material _outerFlameMaterial;
         private Material _innerFlameMaterial;
+        private MeshRenderer[] _eyeTrailRenderers;
+        private float[] _eyeTrailBirthTimes;
+        private MaterialPropertyBlock _eyeTrailProperties;
+        private Vector3 _lastLeftEyeTrailPosition;
+        private Vector3 _lastRightEyeTrailPosition;
+        private float _lastEyeTrailTime;
+        private int _nextEyeTrailPair;
         private Transform[] _outerFlames;
         private Transform[] _innerFlames;
         private int _carriedItemCount = -1;
@@ -73,6 +87,7 @@ namespace BeaverRecycling
                 CreateFlame(_rightEye, "Right outer flame", _outerFlameMaterial) };
             _innerFlames = new[] { CreateFlame(_leftEye, "Left inner flame", _innerFlameMaterial),
                 CreateFlame(_rightEye, "Right inner flame", _innerFlameMaterial) };
+            CreateEyeTrail();
             SetCarriedItemCount(0);
         }
 
@@ -82,6 +97,100 @@ namespace BeaverRecycling
             _visual.rotation = Quaternion.Slerp(_previousRotation, _currentRotation, InterpolationFactor);
             AnimateStunStar(Time.deltaTime);
             AnimateEyeFire();
+            AnimateEyeTrail();
+        }
+
+        /// <summary>눈 메시를 재사용할 잔상 쌍을 월드 공간에 만들고 투명 발광 재질을 준비한다.</summary>
+        private void CreateEyeTrail()
+        {
+            _eyeTrailRoot = new GameObject("Beaver eye afterimages");
+            _eyeTrailMaterial = new Material(_leftEye.sharedMaterial);
+            _eyeTrailMaterial.SetFloat("_Surface", 1f);
+            _eyeTrailMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            _eyeTrailMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            _eyeTrailMaterial.SetFloat("_ZWrite", 0f);
+            _eyeTrailMaterial.SetOverrideTag("RenderType", "Transparent");
+            _eyeTrailMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            _eyeTrailMaterial.EnableKeyword("_EMISSION");
+            _eyeTrailMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            _eyeTrailProperties = new MaterialPropertyBlock();
+            _eyeTrailRenderers = new MeshRenderer[EYE_TRAIL_PAIR_COUNT * 2];
+            _eyeTrailBirthTimes = new float[EYE_TRAIL_PAIR_COUNT];
+
+            for (int pair = 0; pair < EYE_TRAIL_PAIR_COUNT; pair++)
+            {
+                for (int eye = 0; eye < 2; eye++)
+                {
+                    MeshRenderer source = eye == 0 ? _leftEye : _rightEye;
+                    GameObject afterimage = new GameObject(eye == 0 ? "Left eye afterimage" : "Right eye afterimage");
+                    afterimage.transform.SetParent(_eyeTrailRoot.transform, false);
+                    afterimage.AddComponent<MeshFilter>().sharedMesh = source.GetComponent<MeshFilter>().sharedMesh;
+                    MeshRenderer renderer = afterimage.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterial = _eyeTrailMaterial;
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    renderer.receiveShadows = false;
+                    renderer.enabled = false;
+                    _eyeTrailRenderers[pair * 2 + eye] = renderer;
+                }
+            }
+        }
+
+        /// <summary>눈이 움직이면 현재 위치에 잔상을 남기고 이전 잔상의 색과 크기를 수명에 따라 줄인다.</summary>
+        private void AnimateEyeTrail()
+        {
+            float now = Time.time;
+            for (int pair = 0; pair < EYE_TRAIL_PAIR_COUNT; pair++)
+            {
+                MeshRenderer left = _eyeTrailRenderers[pair * 2];
+                if (!left.enabled) continue;
+
+                float remaining = 1f - (now - _eyeTrailBirthTimes[pair]) / EYE_TRAIL_LIFETIME;
+                if (remaining <= 0f)
+                {
+                    left.enabled = false;
+                    _eyeTrailRenderers[pair * 2 + 1].enabled = false;
+                    continue;
+                }
+
+                float alpha = remaining * remaining;
+                _eyeTrailProperties.SetColor("_BaseColor", new Color(1f, 0.32f, 0.05f, alpha * 0.65f));
+                _eyeTrailProperties.SetColor("_EmissionColor", new Color(2.4f * alpha, 0.6f * alpha, 0.04f * alpha));
+                left.SetPropertyBlock(_eyeTrailProperties);
+                _eyeTrailRenderers[pair * 2 + 1].SetPropertyBlock(_eyeTrailProperties);
+            }
+
+            if (_carriedItemCount == 0 || now - _lastEyeTrailTime < EYE_TRAIL_INTERVAL) return;
+            Vector3 leftPosition = _leftEye.transform.position;
+            Vector3 rightPosition = _rightEye.transform.position;
+            if ((leftPosition - _lastLeftEyeTrailPosition).sqrMagnitude < EYE_TRAIL_MIN_DISTANCE_SQUARED &&
+                (rightPosition - _lastRightEyeTrailPosition).sqrMagnitude < EYE_TRAIL_MIN_DISTANCE_SQUARED) return;
+
+            int index = _nextEyeTrailPair * 2;
+            PlaceEyeAfterimage(_eyeTrailRenderers[index], _leftEye);
+            PlaceEyeAfterimage(_eyeTrailRenderers[index + 1], _rightEye);
+            _eyeTrailBirthTimes[_nextEyeTrailPair] = now;
+            _nextEyeTrailPair = (_nextEyeTrailPair + 1) % EYE_TRAIL_PAIR_COUNT;
+            _lastLeftEyeTrailPosition = leftPosition;
+            _lastRightEyeTrailPosition = rightPosition;
+            _lastEyeTrailTime = now;
+        }
+
+        /// <summary>눈의 현재 월드 자세와 크기를 재사용 잔상 메시로 복사한다.</summary>
+        private void PlaceEyeAfterimage(MeshRenderer afterimage, MeshRenderer eye)
+        {
+            Transform source = eye.transform;
+            afterimage.transform.SetPositionAndRotation(source.position + source.forward * 0.045f, source.rotation);
+            afterimage.transform.localScale = source.lossyScale * 0.9f;
+            afterimage.enabled = true;
+        }
+
+        /// <summary>남아 있는 눈 잔상을 지우고 다음 잔상의 시작 위치를 현재 눈으로 맞춘다.</summary>
+        private void ClearEyeTrail()
+        {
+            foreach (MeshRenderer renderer in _eyeTrailRenderers) renderer.enabled = false;
+            _lastLeftEyeTrailPosition = _leftEye.transform.position;
+            _lastRightEyeTrailPosition = _rightEye.transform.position;
+            _lastEyeTrailTime = Time.time;
         }
 
         /// <summary>눈 위치에 충돌 없는 불꽃 메시를 만들고 운반량에 따라 켜질 수 있도록 보관한다.</summary>
@@ -103,7 +212,14 @@ namespace BeaverRecycling
         public void SetCarriedItemCount(int count)
         {
             if (_carriedItemCount == count) return;
+            bool startedGlowing = _carriedItemCount <= 0 && count > 0;
             _carriedItemCount = count;
+            if (startedGlowing)
+            {
+                _lastLeftEyeTrailPosition = _leftEye.transform.position;
+                _lastRightEyeTrailPosition = _rightEye.transform.position;
+                _lastEyeTrailTime = Time.time;
+            }
             float intensity = Mathf.Clamp01((count - 1f) / 5f);
             _eyeGlowMaterial.SetColor("_BaseColor", count > 0
                 ? Color.Lerp(new Color(1f, 0.48f, 0.08f), new Color(1f, 0.16f, 0.02f), intensity)
@@ -137,7 +253,9 @@ namespace BeaverRecycling
 
         void OnDestroy()
         {
+            Destroy(_eyeTrailRoot);
             Destroy(_eyeGlowMaterial);
+            Destroy(_eyeTrailMaterial);
             Destroy(_outerFlameMaterial);
             Destroy(_innerFlameMaterial);
         }
@@ -222,6 +340,7 @@ namespace BeaverRecycling
             _lastMoveFixedTime = Time.time - Time.fixedDeltaTime;
             _visual.localPosition = Vector3.zero;
             _visual.localRotation = Quaternion.identity;
+            ClearEyeTrail();
         }
     }
 }

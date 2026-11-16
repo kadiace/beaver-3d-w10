@@ -239,6 +239,12 @@ namespace BeaverRecycling
         public bool IsInsideRiver(Vector3 position) => position.x >= _riverMinimum.x && position.x <= _riverMaximum.x &&
             position.z >= _riverMinimum.y && position.z <= _riverMaximum.y;
 
+        /// <summary>위치가 필드의 측면·상류 경계를 벗어났거나 수면 아래로 떨어져 회수할 수 없는지 반환한다.</summary>
+        public bool IsOutsideField(Vector3 position) =>
+            position.x < _beaver.MovementMinimum.x - 1f || position.x > _beaver.MovementMaximum.x + 1f ||
+            position.z > _beaver.MovementMaximum.y + 1f ||
+            position.y < Mathf.Max(_fallbackY, _waterY - 3f);
+
         /// <summary>연결 해제 직전 묶음이 비버 이동 영역을 벗어나면 Collider 전체를 가장 가까운 내부 위치로 보정한다.</summary>
         private void CorrectReleasedBundlePosition()
         {
