@@ -1308,7 +1308,7 @@ namespace BeaverRecycling
             _wrong += submission.Wrong;
             if (submission.Correct == submittedCount) _bestBundle = Mathf.Max(_bestBundle, submittedCount);
             string resultText = submission.Score < 0 && submission.Correct == 0
-                ? "오제출 " + submission.Score + "점"
+                ? submission.Score + "점"
                 : (submission.Score - submission.Bonus) + " 점 (+ 묶음 보너스 " + submission.Bonus + " 점)";
             _hud.Event(resultText, intakePosition, _camera,
                 submission.Score >= 0 ? new Color(0.3f, 1f, 0.8f) : new Color(1f, 0.4f, 0.3f));
