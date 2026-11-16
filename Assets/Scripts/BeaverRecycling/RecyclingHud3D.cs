@@ -34,6 +34,7 @@ namespace BeaverRecycling
         [SerializeField] private GameObject _upgradeGroup;
         [SerializeField] private Button[] _upgradeButtons;
         [SerializeField] private Text[] _upgradeTexts;
+        private Button _restartCurrent;
         [Header("Sorting window")]
         [SerializeField] private RecyclingSortingWindow3D _sortingWindowPrefab;
         private float _messageUntil;
@@ -61,9 +62,14 @@ namespace BeaverRecycling
         /// <summary>게임 콜백을 받아 씬에 저장된 버튼과 업그레이드 조작을 연결한다.</summary>
         public void Initialize(RecyclingGame3D game)
         {
+            _restartCurrent = Instantiate(_secondary, _secondary.transform.parent);
+            _restartCurrent.name = "Restart Current Day";
+            _restartCurrent.GetComponentInChildren<Text>().text = "현 스테이지 재시작";
+            _restartCurrent.gameObject.SetActive(false);
             _pauseButton.onClick.AddListener(game.TogglePause);
             _primary.onClick.AddListener(game.PrimaryAction);
             _secondary.onClick.AddListener(game.SecondaryAction);
+            _restartCurrent.onClick.AddListener(game.RestartCurrentDay);
             for (int i = 0; i < _upgradeButtons.Length; i++)
             {
                 int index = i;
@@ -161,10 +167,11 @@ namespace BeaverRecycling
         /// <summary>모달 버튼에 게임패드 내비게이션과 선택 시 강조할 굵은 외곽선을 준비한다.</summary>
         private void SetupModalFocus()
         {
-            _modalButtons = new Button[_upgradeButtons.Length + 2];
+            _modalButtons = new Button[_upgradeButtons.Length + 3];
             _modalButtons[0] = _primary;
-            _modalButtons[1] = _secondary;
-            Array.Copy(_upgradeButtons, 0, _modalButtons, 2, _upgradeButtons.Length);
+            _modalButtons[1] = _restartCurrent;
+            _modalButtons[2] = _secondary;
+            Array.Copy(_upgradeButtons, 0, _modalButtons, 3, _upgradeButtons.Length);
             _focusOutlines = new Outline[_modalButtons.Length];
 
             foreach (Button button in _modalButtons)
@@ -263,8 +270,9 @@ namespace BeaverRecycling
             _pauseButton.interactable = working;
         }
 
-        /// <summary>제목·결과 문구·버튼 이름과 상점 여부를 받아 정산 또는 준비 패널을 표시한다.</summary>
-        public void ShowModal(string title, string body, string primary, string secondary, bool upgrades)
+        /// <summary>제목·문구·버튼 이름과 상점·현재 일차 재시작 표시 여부를 받아 모달을 갱신한다.</summary>
+        public void ShowModal(string title, string body, string primary, string secondary, bool upgrades,
+            bool restartCurrent = false)
         {
             _modal.SetActive(true);
             _pauseButton.interactable = false;
@@ -273,9 +281,27 @@ namespace BeaverRecycling
             _primaryText.text = primary;
             _secondary.gameObject.SetActive(!string.IsNullOrEmpty(secondary));
             _secondaryText.text = secondary;
+            _restartCurrent.gameObject.SetActive(restartCurrent);
             _upgradeGroup.SetActive(upgrades);
             RectTransform primaryRect = (RectTransform)_primary.transform;
-            primaryRect.anchoredPosition = new Vector2(string.IsNullOrEmpty(secondary) ? 0f : -190f, primaryRect.anchoredPosition.y);
+            primaryRect.anchoredPosition = new Vector2(restartCurrent ? -320f :
+                string.IsNullOrEmpty(secondary) ? 0f : -190f, primaryRect.anchoredPosition.y);
+            RectTransform secondaryRect = (RectTransform)_secondary.transform;
+            secondaryRect.anchoredPosition = new Vector2(restartCurrent ? 320f : 190f,
+                secondaryRect.anchoredPosition.y);
+            RectTransform restartRect = (RectTransform)_restartCurrent.transform;
+            restartRect.anchoredPosition = new Vector2(0f, restartRect.anchoredPosition.y);
+            restartRect.sizeDelta = new Vector2(280f, restartRect.sizeDelta.y);
+            if (restartCurrent)
+            {
+                primaryRect.sizeDelta = new Vector2(280f, primaryRect.sizeDelta.y);
+                secondaryRect.sizeDelta = new Vector2(280f, secondaryRect.sizeDelta.y);
+            }
+            else
+            {
+                primaryRect.sizeDelta = new Vector2(330f, primaryRect.sizeDelta.y);
+                secondaryRect.sizeDelta = new Vector2(330f, secondaryRect.sizeDelta.y);
+            }
             _hover.transform.parent.gameObject.SetActive(false);
             FocusModal();
         }

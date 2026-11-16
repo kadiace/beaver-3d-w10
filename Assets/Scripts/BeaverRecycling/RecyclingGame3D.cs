@@ -1435,6 +1435,16 @@ namespace BeaverRecycling
         /// <summary>모달의 처음부터 버튼에서 전체 일차·점수·목재·업그레이드를 초기화한다.</summary>
         public void SecondaryAction() => RestartRun();
 
+        /// <summary>일시정지 메뉴에서 현재 스테이지의 시작 시점으로 복원하고 재시작한다.</summary>
+        public void RestartCurrentDay()
+        {
+            if (_phase != DayPhase.Paused) return;
+            _wood = _dayStartWood;
+            Array.Copy(_startLevels, _levels, _levels.Length);
+            PrepareDay();
+            StartDay();
+        }
+
         /// <summary>처음부터 진행할 때 원래 재화와 능력치로 돌아가 첫날 준비를 연다.</summary>
         private void RestartRun()
         {
@@ -1505,7 +1515,7 @@ namespace BeaverRecycling
             }
             else if (_phase == DayPhase.Paused)
                 _hud.ShowModal("잠깐 쉬는 중", "올바른 투입구 +3점 · 오분류 -4점\n놓친 쓰레기 -2점\n쓰레기 유실 0회 +10점 · +3 목재\n오분류 0회 +10점 · +3 목재\n목표 초과 10점당 +1 목재\n\n같은 재질 2/4/6개부터 묶음 보너스\n" +
-                    splitKey + "로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false);
+                    splitKey + "로 혼합 묶음을 풀 수 있어요", "계속", "처음부터", false, true);
             else
             {
                 string body = "오늘 " + _dayScore + " / " + _targets[_day - 1] + "점\n" +
