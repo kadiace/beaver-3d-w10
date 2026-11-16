@@ -506,11 +506,14 @@ namespace BeaverRecycling
             return (heldPoint - otherPoint).sqrMagnitude <= contactDistance * contactDistance;
         }
 
-        /// <summary>추가할 기물의 연결 묶음을 검사하고, 운반 가능하면 묶음을 반환한다.</summary>
+        /// <summary>추가할 기물의 연결 묶음이 운반 중인 기물과 같은 분류이고 운반 가능하면 묶음을 반환한다.</summary>
         private List<RecyclingItem> GetAttachableBundle(RecyclingItem other)
         {
             List<RecyclingItem> incoming = RecyclingItem.Collect(other);
             if (incoming.Any(p => p.IsHeld || !p.CanJoin)) return null;
+            RecyclingCategory heldCategory = _held[0].Definition.Category;
+            if (_held.Any(p => p.Definition.Category != heldCategory) ||
+                incoming.Any(p => p.Definition.Category != heldCategory)) return null;
             if (_held.Count + incoming.Count <= Capacity) return incoming;
             if (Time.time > _capacityNoticeAt)
             {
