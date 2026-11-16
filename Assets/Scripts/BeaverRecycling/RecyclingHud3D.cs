@@ -49,19 +49,14 @@ namespace BeaverRecycling
         private Button[] _modalButtons;
         private Outline[] _focusOutlines;
 
-        // Keep bottom-of-screen cues above the existing carry/control panel.
-        private const float OFFSCREEN_SLOT_WIDTH = 160f;
+        // Bottom-edge labels may overlap. Each visible item has its own text.
         private const float OFFSCREEN_BASE_Y = 157f;
-        private const float OFFSCREEN_ROW_HEIGHT = 30f;
-        private readonly List<Text> _offscreenLabels = new List<Text>();
-        private readonly List<OffscreenGroup> _offscreenGroups = new List<OffscreenGroup>();
-
-        private struct OffscreenGroup
-        {
-            public int Column;
-            public RecyclingCategory Category;
-            public int Count;
-        }
+        private const float OFFSCREEN_LABEL_WIDTH = 160f;
+        private readonly Dictionary<RecyclingItem, Text> _offscreenLabelsByItem =
+            new Dictionary<RecyclingItem, Text>();
+        private readonly Stack<Text> _offscreenUnusedLabels = new Stack<Text>();
+        private readonly HashSet<RecyclingItem> _offscreenVisibleItems = new HashSet<RecyclingItem>();
+        private readonly List<RecyclingItem> _offscreenExpiredItems = new List<RecyclingItem>();
 
         /// <summary>게임패드 연결/해제 시 인게임 HUD 키 안내를 현재 장치에 맞게 갱신한다.</summary>
         private void RefreshControls(bool force = false)
@@ -362,81 +357,63 @@ namespace BeaverRecycling
         }
 
 
-        /// <summary>화면 아래(-Z)로 벗어난 기물을 재질별 색상과 수량으로 표시한다.</summary>
+        /// <summary>화면 아래(-Z)로 벗어난 기물을 오브젝트마다 한 개의 재질색 텍스트로 표시한다.</summary>
         public void RefreshOffscreenItems(IEnumerable<RecyclingItem> items, Camera camera, float groundY, bool show)
         {
-            _offscreenGroups.Clear();
+            _offscreenVisibleItems.Clear();
             if (show && camera != null && _root != null)
             {
                 float width = Mathf.Max(1f, _root.rect.width);
-                int columns = Mathf.Max(1, Mathf.FloorToInt(width / OFFSCREEN_SLOT_WIDTH));
                 foreach (RecyclingItem item in items)
                 {
                     if (item == null || !item.isActiveAndEnabled || item.IsResolved ||
                         item.IsHeld || item.Definition == null) continue;
 
-                    // Project onto the river plane: falling/throwing height must not move a
-                    // downstream (-Z) indicator to the wrong edge of the screen.
+                    // Height must not move a downstream (-Z) object to another screen edge.
                     Vector3 position = item.Body.position;
                     position.y = groundY;
                     Vector3 viewport = camera.WorldToViewportPoint(position);
                     if (viewport.z <= 0f || viewport.y >= 0f) continue;
 
-                    int column = Mathf.Clamp(Mathf.FloorToInt(viewport.x * columns), 0, columns - 1);
-                    RecyclingCategory category = item.Definition.Category;
-                    int index = -1;
-                    for (int i = 0; i < _offscreenGroups.Count; i++)
+                    _offscreenVisibleItems.Add(item);
+                    if (!_offscreenLabelsByItem.TryGetValue(item, out Text label))
                     {
-                        if (_offscreenGroups[i].Column != column ||
-                            _offscreenGroups[i].Category != category) continue;
-                        index = i;
-                        break;
+                        label = _offscreenUnusedLabels.Count > 0
+                            ? _offscreenUnusedLabels.Pop() : CreateOffscreenLabel();
+                        _offscreenLabelsByItem.Add(item, label);
                     }
-                    if (index >= 0)
-                    {
-                        OffscreenGroup group = _offscreenGroups[index];
-                        group.Count++;
-                        _offscreenGroups[index] = group;
-                    }
-                    else
-                        _offscreenGroups.Add(new OffscreenGroup
-                            { Column = column, Category = category, Count = 1 });
-                }
 
-                // Same-column materials get separate rows; nearby objects of one material
-                // share a label with a count rather than hiding one another.
-                _offscreenGroups.Sort((a, b) =>
-                {
-                    int order = a.Column.CompareTo(b.Column);
-                    return order != 0 ? order : a.Category.CompareTo(b.Category);
-                });
-                int previousColumn = -1;
-                int row = 0;
-                for (int i = 0; i < _offscreenGroups.Count; i++)
-                {
-                    OffscreenGroup group = _offscreenGroups[i];
-                    row = group.Column == previousColumn ? row + 1 : 0;
-                    previousColumn = group.Column;
-                    if (i >= _offscreenLabels.Count) CreateOffscreenLabel();
-                    Text label = _offscreenLabels[i];
-                    label.text = "▼ " + RecyclingRules.Name(group.Category) +
-                        (group.Count > 1 ? " ×" + group.Count : "");
-                    // Reuse chute colors for plastic/glass/film/metal (and brown for wood).
-                    label.color = RecyclingRules.Color(group.Category);
+                    label.text = "▼ " + RecyclingRules.Name(item.Definition.Category);
+                    label.color = RecyclingRules.Color(item.Definition.Category);
                     RectTransform rect = (RectTransform)label.transform;
-                    float slotWidth = width / columns;
-                    rect.sizeDelta = new Vector2(slotWidth - 4f, 27f);
+                    // No horizontal spacing or rows: labels at similar positions may overlap.
                     rect.anchoredPosition = new Vector2(
-                        (group.Column + 0.5f) * slotWidth, OFFSCREEN_BASE_Y + row * OFFSCREEN_ROW_HEIGHT);
-                    if (!label.gameObject.activeSelf) label.gameObject.SetActive(true);
+                        Mathf.Clamp(viewport.x * width, OFFSCREEN_LABEL_WIDTH * 0.5f,
+                            Mathf.Max(OFFSCREEN_LABEL_WIDTH * 0.5f, width - OFFSCREEN_LABEL_WIDTH * 0.5f)),
+                        OFFSCREEN_BASE_Y);
+                    if (!label.gameObject.activeSelf)
+                    {
+                        // Unity UI draws later siblings over earlier ones. Reused labels
+                        // move to the top only on appearance; existing labels keep their order.
+                        label.transform.SetAsLastSibling();
+                        label.gameObject.SetActive(true);
+                    }
                 }
             }
-            for (int i = _offscreenGroups.Count; i < _offscreenLabels.Count; i++)
-                if (_offscreenLabels[i].gameObject.activeSelf)
-                    _offscreenLabels[i].gameObject.SetActive(false);
+
+            _offscreenExpiredItems.Clear();
+            foreach (KeyValuePair<RecyclingItem, Text> entry in _offscreenLabelsByItem)
+                if (!_offscreenVisibleItems.Contains(entry.Key))
+                {
+                    entry.Value.gameObject.SetActive(false);
+                    _offscreenUnusedLabels.Push(entry.Value);
+                    _offscreenExpiredItems.Add(entry.Key);
+                }
+            foreach (RecyclingItem item in _offscreenExpiredItems)
+                _offscreenLabelsByItem.Remove(item);
         }
 
-        private void CreateOffscreenLabel()
+        private Text CreateOffscreenLabel()
         {
             GameObject indicator = new GameObject("Offscreen material", typeof(RectTransform),
                 typeof(CanvasRenderer), typeof(Text));
@@ -444,6 +421,7 @@ namespace BeaverRecycling
             rect.SetParent(_root, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
+            rect.sizeDelta = new Vector2(OFFSCREEN_LABEL_WIDTH, 27f);
             Text label = indicator.GetComponent<Text>();
             label.font = _controls.font;
             label.fontSize = 20;
@@ -452,12 +430,8 @@ namespace BeaverRecycling
             label.raycastTarget = false;
             label.horizontalOverflow = HorizontalWrapMode.Overflow;
             label.verticalOverflow = VerticalWrapMode.Overflow;
-            Outline outline = indicator.AddComponent<Outline>();
-            outline.effectColor = new Color(0.03f, 0.06f, 0.08f, 1f);
-            outline.effectDistance = new Vector2(2f, -2f);
-            outline.useGraphicAlpha = false;
             indicator.SetActive(false);
-            _offscreenLabels.Add(label);
+            return label;
         }
 
         /// <summary>UI 대상과 화면 좌표를 받아 Canvas 좌표로 변환하고 안전 영역 안에 둔다.</summary>
