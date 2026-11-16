@@ -17,6 +17,8 @@ namespace BeaverRecycling
         private const int FIRST_BOMB_DAY = 4;
         private const float CARRYING_SPEED_MULTIPLIER = 1.7f;
         private const float DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER = 0.1f;
+        private const float SUBMISSION_DASH_HOLD_SECONDS = 1f;
+        private const float SUBMISSION_EYE_TRAIL_FADE_SECONDS = 0.3f;
         private const string BOMB_PREFAB_PATH = "Prefabs/Recycling/bomb";
         private const float CHUTE_PROJECTED_OVERLAP_RATIO = 0.5f;
         private const float SPLIT_RIVER_MARGIN = 0.25f;
@@ -99,6 +101,9 @@ namespace BeaverRecycling
         private float _nextSpawn;
         private float _capacityNoticeAt;
         private float _beaverStunnedUntil;
+        private float _submissionDashUntil = float.NegativeInfinity;
+        private float _retainedDashMultiplier = 1f;
+        private int _retainedEyeItemCount;
 
         public bool IsWorking => _phase == DayPhase.Supply || _phase == DayPhase.Closing;
         public float WaterfallZ => _waterfallZ;
@@ -195,9 +200,11 @@ namespace BeaverRecycling
                 Physics.SyncTransforms();
                 CollectContacts();
             }
-            float loadSpeedBonus = 1f + 0.05f * Mathf.Max(0, _held.Count - 1);
-            float speed = (_baseSpeed + 0.5f * _levels[1]) * loadSpeedBonus;
-            if (_held.Count > 0) speed *= CARRYING_SPEED_MULTIPLIER;
+            RefreshSubmissionDashFromCarry();
+            float speedMultiplier = CarrySpeedMultiplier(_held.Count);
+            if (Time.time < _submissionDashUntil)
+                speedMultiplier = Mathf.Max(speedMultiplier, _retainedDashMultiplier);
+            float speed = (_baseSpeed + 0.5f * _levels[1]) * speedMultiplier;
             if (HasDifferentCategoryProjectedOverlap())
                 speed *= DIFFERENT_CATEGORY_OVERLAP_SPEED_MULTIPLIER;
             Vector3 previousBeaverPosition = _beaver.transform.position;
@@ -224,7 +231,24 @@ namespace BeaverRecycling
 
         void LateUpdate()
         {
-            _beaver.SetCarriedItemCount(_held.Count);
+            RefreshSubmissionDashFromCarry();
+            float now = Time.time;
+            if (IsWorking && now < _submissionDashUntil)
+            {
+                _beaver.SetCarriedItemEffect(_retainedEyeItemCount, 1f);
+            }
+            else if (IsWorking && now < _submissionDashUntil + SUBMISSION_EYE_TRAIL_FADE_SECONDS &&
+                _retainedEyeItemCount > _held.Count)
+            {
+                float fade = Mathf.Clamp01((now - _submissionDashUntil) / SUBMISSION_EYE_TRAIL_FADE_SECONDS);
+                float itemCount = Mathf.Lerp(_retainedEyeItemCount, _held.Count, fade);
+                float opacity = _held.Count > 0 ? 1f : 1f - fade;
+                _beaver.SetCarriedItemEffect(itemCount, opacity);
+            }
+            else
+            {
+                _beaver.SetCarriedItemCount(_held.Count);
+            }
             _cameraTarget = Vector3.Lerp(_cameraTarget,
                 new Vector3(_beaver.transform.position.x, 0f, _beaver.transform.position.z + 2f),
                 1f - Mathf.Exp(-6f * Time.unscaledDeltaTime));
@@ -1193,6 +1217,38 @@ namespace BeaverRecycling
             return totalArea > 0f && coveredArea >= totalArea * CHUTE_PROJECTED_OVERLAP_RATIO;
         }
 
+        /// <summary>실제 운반 개수에 따른 기본 이동속도 배율을 반환한다.</summary>
+        private static float CarrySpeedMultiplier(int carriedCount) =>
+            carriedCount > 0 ? CARRYING_SPEED_MULTIPLIER * (1f + 0.05f * (carriedCount - 1)) : 1f;
+
+        /// <summary>제출 후 1초 동안 실제 운반 상태가 더 빨라지면 보존 중인 대시 속도와 눈 효과를 즉시 갱신한다.</summary>
+        private void RefreshSubmissionDashFromCarry()
+        {
+            if (Time.time >= _submissionDashUntil || _held.Count == 0) return;
+            float multiplier = CarrySpeedMultiplier(_held.Count);
+            if (multiplier <= _retainedDashMultiplier) return;
+            _retainedDashMultiplier = multiplier;
+            _retainedEyeItemCount = _held.Count;
+        }
+
+        /// <summary>0점 초과 제출이 확정되면 제출 직전 운반 속도·눈 효과를 1초 유지한다.</summary>
+        private void PreserveSuccessfulSubmissionDash(int carriedCountBeforeSubmission)
+        {
+            if (carriedCountBeforeSubmission <= 0) return;
+            float multiplier = CarrySpeedMultiplier(carriedCountBeforeSubmission);
+            if (Time.time >= _submissionDashUntil)
+            {
+                _retainedDashMultiplier = multiplier;
+                _retainedEyeItemCount = carriedCountBeforeSubmission;
+            }
+            else if (multiplier > _retainedDashMultiplier)
+            {
+                _retainedDashMultiplier = multiplier;
+                _retainedEyeItemCount = carriedCountBeforeSubmission;
+            }
+            _submissionDashUntil = Time.time + SUBMISSION_DASH_HOLD_SECONDS;
+        }
+
         /// <summary>관성 비행 허용 시간 내 던진 묶음도 직접 제출과 동일한 화면 겹침 판정으로 정산한다.</summary>
         public bool TrySubmitThrownItem(RecyclingItem item)
         {
@@ -1201,7 +1257,7 @@ namespace BeaverRecycling
             if (bundle.Any(member => member.IsHeld || member.IsResolved || !_items.Contains(member))) return false;
             RecyclingChute3D chute = FindChute(item.Body.position, bundle);
             if (chute == null) return false;
-            SubmitItems(chute, bundle);
+            SubmitItems(chute, bundle, _held.Count);
             return true;
         }
 
@@ -1209,13 +1265,14 @@ namespace BeaverRecycling
         private void Submit(RecyclingChute3D chute)
         {
             var submitted = new List<RecyclingItem>(_held);
+            int carriedCountBeforeSubmission = _held.Count;
             SetDifferentCategoryCollisionsIgnored(false);
             _held.Clear();
-            SubmitItems(chute, submitted);
+            SubmitItems(chute, submitted, carriedCountBeforeSubmission);
         }
 
         /// <summary>수동 제출과 던져 넣은 묶음을 흡수하고, 다른 재질이 섞였을 때만 분류 미니게임을 연다.</summary>
-        private void SubmitItems(RecyclingChute3D chute, List<RecyclingItem> submitted)
+        private void SubmitItems(RecyclingChute3D chute, List<RecyclingItem> submitted, int carriedCountBeforeSubmission)
         {
             RecyclingDefinition[] definitions = submitted.Select(item => item.Definition).ToArray();
             bool needsSorting = definitions.Any(definition => definition.Category != chute.Category);
@@ -1225,7 +1282,7 @@ namespace BeaverRecycling
             if (!needsSorting)
             {
                 ApplySubmission(RecyclingRules.EvaluateDefinitions(definitions, chute.Category),
-                    definitions.Length, intakePosition);
+                    definitions.Length, intakePosition, carriedCountBeforeSubmission);
                 return;
             }
 
@@ -1234,20 +1291,24 @@ namespace BeaverRecycling
             _movement = Vector2.zero;
             SetUiMode(true);
             _hud.ShowSorting(definitions, chute.Category,
-                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition));
+                (submission, includedCount) => CompleteSubmission(submission, includedCount, intakePosition,
+                    carriedCountBeforeSubmission));
         }
 
         /// <summary>미니게임이 끝나면 작업 단계로 복귀하고 최종 제출 결과를 적용한다.</summary>
-        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        private void CompleteSubmission(RecyclingSubmission submission, int submittedCount,
+            Vector3 intakePosition, int carriedCountBeforeSubmission)
         {
             _phase = _beforeSorting;
             SetUiMode(false);
-            ApplySubmission(submission, submittedCount, intakePosition);
+            ApplySubmission(submission, submittedCount, intakePosition, carriedCountBeforeSubmission);
         }
 
         /// <summary>즉시 제출과 미니게임 제출에 동일한 점수 및 기록 처리를 적용한다.</summary>
-        private void ApplySubmission(RecyclingSubmission submission, int submittedCount, Vector3 intakePosition)
+        private void ApplySubmission(RecyclingSubmission submission, int submittedCount,
+            Vector3 intakePosition, int carriedCountBeforeSubmission)
         {
+            if (submission.Score > 0) PreserveSuccessfulSubmissionDash(carriedCountBeforeSubmission);
             _dayScore += submission.Score;
             _correct += submission.Correct;
             _wrong += submission.Wrong;
@@ -1418,6 +1479,9 @@ namespace BeaverRecycling
             Array.Copy(_levels, _startLevels, _levels.Length);
             _dayScore = _correct = _wrong = _lost = _bestBundle = _dayWood = 0;
             _beaverStunnedUntil = 0f;
+            _submissionDashUntil = float.NegativeInfinity;
+            _retainedDashMultiplier = 1f;
+            _retainedEyeItemCount = 0;
             _beaver.ResetPose();
             _phase = DayPhase.Preparation;
             _movement = Vector2.zero;
@@ -1440,6 +1504,9 @@ namespace BeaverRecycling
         /// <summary>마감 때 남은 기물과 무실수 보너스를 정산해 목표 통과·초과 점수 목재·최종 클리어를 확정한다.</summary>
         private void FinishDay()
         {
+            _submissionDashUntil = float.NegativeInfinity;
+            _retainedDashMultiplier = 1f;
+            _retainedEyeItemCount = 0;
             ReleaseBundle(false);
             foreach (RecyclingItem item in _items.ToArray())
                 if (!item.IsResolved) ResolveExit(item, false, false);

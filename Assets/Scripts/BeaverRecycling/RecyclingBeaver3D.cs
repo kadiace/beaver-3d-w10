@@ -49,7 +49,8 @@ namespace BeaverRecycling
         private MeshRenderer[] _eyeGlowMeshes;
         private MeshRenderer[] _eyeHaloMeshes;
         private TrailRenderer[] _eyeTrails;
-        private int _lastEyeEffectCount = -1;
+        private float _lastEyeEffectCount = -1f;
+        private float _lastEyeEffectOpacity = -1f;
 
         [Header("Stun effect")]
         [SerializeField] private Transform _stunStar;
@@ -263,16 +264,19 @@ namespace BeaverRecycling
             }
         }
 
-        /// <summary>운반 물체가 많아질수록 눈과 후광은 더 밝게, 잔상은 더 길고 굵게 만든다.</summary>
-        public void SetCarriedItemCount(int count)
+        /// <summary>운반 개수를 받아 눈 발광과 트레일을 표시하거나 빈손 상태로 끈다.</summary>
+        public void SetCarriedItemCount(int count) =>
+            SetCarriedItemEffect(count, count > 0 ? 1f : 0f);
+
+        /// <summary>보존 중인 운반 개수와 0~1 가시도를 받아 눈 발광·트레일의 색, 길이 및 투명도를 부드럽게 갱신한다.</summary>
+        public void SetCarriedItemEffect(float count, float opacity)
         {
             if (_eyeTrails == null) CreateEyeTrails();
             if (_eyeTrails == null) return;
 
-            int effectCount = Mathf.Clamp(count, 0, MAX_EYE_EFFECT_ITEMS);
-            bool visible = effectCount > 0;
-            // Always restore the renderer state even if the count did not change.
-            // This also recovers if a pooled/disabled object interrupted the VFX state.
+            float effectCount = Mathf.Clamp(count, 0f, MAX_EYE_EFFECT_ITEMS);
+            float effectOpacity = Mathf.Clamp01(opacity);
+            bool visible = effectCount > 0.001f && effectOpacity > 0.001f;
             bool renderersMatch = true;
             for (int i = 0; i < _eyeTrails.Length; i++)
                 if (_eyeGlowMeshes[i].enabled != visible || _eyeHaloMeshes[i].enabled != visible ||
@@ -281,10 +285,11 @@ namespace BeaverRecycling
                     renderersMatch = false;
                     break;
                 }
-            if (effectCount == _lastEyeEffectCount && renderersMatch) return;
+            if (Mathf.Abs(effectCount - _lastEyeEffectCount) < 0.001f &&
+                Mathf.Abs(effectOpacity - _lastEyeEffectOpacity) < 0.001f && renderersMatch) return;
             _lastEyeEffectCount = effectCount;
+            _lastEyeEffectOpacity = effectOpacity;
 
-            // Empty-handed eyes have no glow, halo or lingering trail.
             for (int i = 0; i < _eyeTrails.Length; i++)
             {
                 _eyeGlowMeshes[i].enabled = visible;
@@ -298,11 +303,9 @@ namespace BeaverRecycling
             float intensity = 1.6f + _eyeGlowIntensityPerItem * effectCount;
             float colorProgress = Mathf.Clamp01((effectCount - 1f) / 5f);
             Color eyeColor = Color.Lerp(_eyeGlowYellow, _eyeGlowRed, colorProgress);
-            // Only the red emission grows with item count. Multiplying green by HDR intensity
-            // saturates it for 1-4 items and makes different hues look identically yellow.
-            Color coreColor = new Color(eyeColor.r * intensity, eyeColor.g, eyeColor.b, 1f);
+            Color coreColor = new Color(eyeColor.r * intensity, eyeColor.g, eyeColor.b, effectOpacity);
             Color haloColor = new Color(eyeColor.r * intensity * 0.8f,
-                eyeColor.g * 0.8f, eyeColor.b * 0.8f, 0.28f);
+                eyeColor.g * 0.8f, eyeColor.b * 0.8f, 0.28f * effectOpacity);
 
             _eyeGlowProperties.SetColor(_eyeGlowColorId, coreColor);
             _eyeGlowProperties.SetFloat(_useVertexColorId, 0f);
