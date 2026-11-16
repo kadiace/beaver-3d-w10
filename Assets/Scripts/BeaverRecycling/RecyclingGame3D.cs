@@ -40,7 +40,7 @@ namespace BeaverRecycling
         [SerializeField, Min(1f)] private float _closingSeconds = 30f;
         [SerializeField] private int[] _targets = { 30, 50, 70, 90, 110 };
         [SerializeField] private float[] _spawnIntervals = { 0.666667f, 0.6f, 0.533333f, 0.466667f, 0.4f };
-        [SerializeField] private float[] _flowSpeeds = { 2.4f, 2.7f, 3f, 3.3f, 3.6f };
+        [SerializeField] private float[] _flowSpeeds = { 1.8f, 2.025f, 2.25f, 2.475f, 2.7f };
 
         [Header("Bombs")]
         [SerializeField, Range(0f, 1f)] private float _bombSpawnChance = 0.05f;
@@ -1132,10 +1132,27 @@ namespace BeaverRecycling
             return Mathf.Max(0f, width) * Mathf.Max(0f, depth);
         }
 
-        /// <summary>비버가 들고 있는 묶음을 동일한 카메라 투영 조건으로 제출할 투입구를 찾는다.</summary>
-        private RecyclingChute3D FindChute() => FindChute(_beaver.transform.position, _held);
+        /// <summary>비버가 Dock 위에 있으면 해당 투입구를 우선하고, 그 외에는 운반 묶음의 화면 겹침으로 찾는다.</summary>
+        private RecyclingChute3D FindChute()
+        {
+            Vector3 position = _beaver.transform.position;
+            RecyclingChute3D nearest = null;
+            float distance = float.PositiveInfinity;
+            foreach (RecyclingChute3D chute in _chutes)
+            {
+                if (!chute.IsAvailable(_day)) continue;
+                Bounds dock = chute.DockBounds;
+                if (position.x < dock.min.x || position.x > dock.max.x ||
+                    position.z < dock.min.z || position.z > dock.max.z) continue;
+                float next = (chute.transform.position - position).sqrMagnitude;
+                if (next >= distance) continue;
+                nearest = chute;
+                distance = next;
+            }
+            return nearest != null ? nearest : FindChute(position, _held);
+        }
 
-        /// <summary>던지기와 직접 제출 모두 카메라에서 본 기물 면적의 50% 이상 겹치는 투입구를 사용한다.</summary>
+        /// <summary>던지기와 Dock 밖 직접 제출에서 카메라로 본 기물 면적이 50% 이상 겹치는 투입구를 찾는다.</summary>
         private RecyclingChute3D FindChute(Vector3 position, IReadOnlyList<RecyclingItem> items)
         {
             RecyclingChute3D nearest = null;
