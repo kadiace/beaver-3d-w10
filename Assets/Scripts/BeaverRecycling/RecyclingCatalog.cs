@@ -62,23 +62,34 @@ namespace BeaverRecycling
             throw new InvalidOperationException("Recycling catalog has no active item for " + category);
         }
 
-        /// <summary>기존 분류별 확률을 유지하면서 목재와 지정 종류를 제외한 재활용품을 다시 추첨한다.</summary>
-        public RecyclingDefinition DrawOtherRecyclable(int day, string excludedId)
+        /// <summary>해당 일차의 재질 안에서 종류별 현재 개수와 가중치 목표를 비교해 가장 부족한 정의를 선택한다.</summary>
+        public RecyclingDefinition DrawMostUnderrepresented(int day, RecyclingCategory category,
+            IReadOnlyDictionary<string, int> counts)
         {
-            bool hasAlternative = false;
+            int categoryCount = 0;
+            int totalWeight = 0;
             foreach (RecyclingDefinition definition in _items)
             {
-                if (definition.IsWood || definition.FirstDay > day || definition.Id == excludedId) continue;
-                hasAlternative = true;
-                break;
+                if (definition.Category != category || definition.FirstDay > day) continue;
+                totalWeight += definition.Weight;
+                if (counts.TryGetValue(definition.Id, out int count)) categoryCount += count;
             }
-            if (!hasAlternative)
-                throw new InvalidOperationException("Recycling catalog has no alternative recyclable to " + excludedId);
+            if (totalWeight == 0)
+                throw new InvalidOperationException("Recycling catalog has no active item for " + category);
 
-            RecyclingDefinition result;
-            do { result = Draw(day); }
-            while (result.IsWood || result.Id == excludedId);
-            return result;
+            RecyclingDefinition selected = null;
+            float largestDeficit = float.NegativeInfinity;
+            foreach (RecyclingDefinition definition in _items)
+            {
+                if (definition.Category != category || definition.FirstDay > day) continue;
+                counts.TryGetValue(definition.Id, out int count);
+                float targetCount = (categoryCount + 1f) * definition.Weight / totalWeight;
+                float deficit = targetCount - count;
+                if (deficit <= largestDeficit) continue;
+                largestDeficit = deficit;
+                selected = definition;
+            }
+            return selected;
         }
     }
 
