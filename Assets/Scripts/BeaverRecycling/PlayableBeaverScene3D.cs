@@ -36,6 +36,17 @@ namespace BeaverRecycling
         private void Update()
         {
             _movement = Managers.Input.MoveInput;
+            Mouse mouse = Mouse.current;
+            if (mouse != null)
+            {
+                float scroll = mouse.scroll.ReadValue().y;
+                if (Mathf.Abs(scroll) > 0.01f)
+                {
+                    float steps = scroll / 120f;
+                    _camera.orthographicSize = Mathf.Clamp(
+                        _camera.orthographicSize * Mathf.Exp(-steps * 0.12f), 6f, 13.5f);
+                }
+            }
             bool keyboardInteract = Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame;
             bool gamepadInteract = Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame;
             if (keyboardInteract || gamepadInteract) Interact();
