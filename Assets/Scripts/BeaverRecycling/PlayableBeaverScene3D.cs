@@ -30,7 +30,6 @@ namespace BeaverRecycling
 
         [Header("River swimming")]
         [SerializeField, Range(0f, 1f)] private float _submergedBodyFraction = 0.6f;
-        [SerializeField, Min(0f)] private float _swimmingEyeTrailCount = 1f;
         [SerializeField, Min(0f)] private float _bankContactPadding = 0.25f;
         [SerializeField, Min(0.1f)] private float _bankGrassProbeDistance = 2.5f;
         [SerializeField, Min(0.1f)] private float _bankClimbSpeed = 14f;
@@ -303,7 +302,11 @@ namespace BeaverRecycling
             labelRect.anchoredPosition = Vector2.zero;
             labelRect.sizeDelta = new Vector2(0f, 26f);
             _dashLabel = labelObject.GetComponent<TextMeshProUGUI>();
-            _dashLabel.font = TMP_Settings.defaultFontAsset;
+            Font sourceFont = Resources.Load<Font>("Fonts & Materials/NotoSansKR");
+            _dashLabel.font = sourceFont != null
+                ? TMP_FontAsset.CreateFontAsset(sourceFont) : TMP_Settings.defaultFontAsset;
+            if (_dashLabel.font != null)
+                _dashLabel.font.atlasPopulationMode = AtlasPopulationMode.Dynamic;
             _dashLabel.fontSize = 19f;
             _dashLabel.alignment = TextAlignmentOptions.Center;
             _dashLabel.color = new Color(0.92f, 0.97f, 1f, 1f);
@@ -349,7 +352,7 @@ namespace BeaverRecycling
             if (score == null) return;
             int selectedCategory = -1;
             if (_held.Count > 0)
-                PlayableRecyclingRules3D.TryGetCategory(_held[0].MaterialId,
+                PlayableRecyclingRules3D.TryGetCategory(_held[_held.Count - 1].MaterialId,
                     out selectedCategory);
 
             float radiusSquared = _pickupRadius * _pickupRadius;
