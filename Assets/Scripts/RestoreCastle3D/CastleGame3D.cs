@@ -540,6 +540,7 @@ namespace RestoreCastle3D
         public int RoundsPerStage => ROUNDS_PER_STAGE;
         public int CurrentStageRound => _awaitingStage ? ROUNDS_PER_STAGE : _turn % ROUNDS_PER_STAGE + 1;
         public int PlacementsPerRound => PLACEMENTS_PER_ROUND;
+        public bool PlayerCameraFollowEnabled { get; set; }
         public float RotationSpeed { get; set; } = 90f;
         public Vector2 PlacementCenterOffset { get; set; }
         public float PlacementRadius { get; set; } = 9f;
@@ -605,6 +606,7 @@ namespace RestoreCastle3D
         /// <summary>우클릭 드래그로 주시점을 Z축으로 이동하고 일반 휠로 줌을 조절한다.</summary>
         private void UpdateCameraInput()
         {
+            if (PlayerCameraFollowEnabled) return;
             Mouse mouse = Mouse.current;
             if (mouse == null)
             {
