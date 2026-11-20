@@ -183,6 +183,17 @@ namespace RestoreCastle3D
             _body.angularVelocity = Vector3.zero;
         }
 
+        /// <summary>비버가 내려놓은 기물을 물리 시뮬레이션과 자동 낙하 흐름으로 되돌려 다시 집을 수 있게 한다.</summary>
+        public void ReleaseFromBeaver(Vector3 releaseVelocity)
+        {
+            _held = false;
+            _continuousDrop = true;
+            _body.isKinematic = false;
+            _body.useGravity = true;
+            _body.linearVelocity = releaseVelocity;
+            _body.angularVelocity = Vector3.zero;
+        }
+
         private void Update()
         {
             if (_settling) return;
