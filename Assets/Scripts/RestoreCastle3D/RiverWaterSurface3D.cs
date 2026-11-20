@@ -14,6 +14,10 @@ namespace RestoreCastle3D
         private static readonly int WakeCountId = Shader.PropertyToID("_RiverWakeCount");
         private static readonly int WakeObjectsId = Shader.PropertyToID("_RiverWakeObjects");
         private static readonly int WakeMotionId = Shader.PropertyToID("_RiverWakeMotion");
+        private static readonly int FlowSpeedId = Shader.PropertyToID("_FlowSpeed");
+        private static readonly int RiverHalfWidthId = Shader.PropertyToID("_RiverHalfWidth");
+        private static readonly int ImpactEnabledId = Shader.PropertyToID("_ImpactEnabled");
+        private static readonly int WaterfallImpactZId = Shader.PropertyToID("_WaterfallImpactZ");
         private static readonly HashSet<CastlePiece3D> FloatingPieces =
             new HashSet<CastlePiece3D>();
         private static readonly List<CastlePiece3D> StalePieces =
@@ -25,6 +29,7 @@ namespace RestoreCastle3D
 
         [SerializeField, Min(0f)] private float _flowSpeed = 3f;
         [SerializeField, Range(0.1f, 1f)] private float _submergedFraction = 0.8f;
+        [SerializeField, Range(0f, 2f)] private float _visualFlowRatio = 0.43f;
         private BoxCollider _volume;
         private Camera _mainCamera;
 
@@ -43,6 +48,28 @@ namespace RestoreCastle3D
             if (!_volume.isTrigger)
                 Debug.LogWarning("River surface requires a trigger BoxCollider.", this);
             if (_publisher == null) _publisher = this;
+            ConfigureFlatPixelWater();
+        }
+
+        /// <summary>
+        /// Supplies the visible river segment's actual width, downstream
+        /// waterfall lip and flow speed to the entirely flat water material.
+        /// The short upper segment has no preceding waterfall; the long two do.
+        /// Physical buoyancy, triggers and the global wake publisher are untouched.
+        /// </summary>
+        private void ConfigureFlatPixelWater()
+        {
+            MeshRenderer surfaceRenderer = GetComponent<MeshRenderer>();
+            if (surfaceRenderer == null) return;
+
+            Bounds bounds = _volume.bounds;
+            MaterialPropertyBlock block = new MaterialPropertyBlock();
+            surfaceRenderer.GetPropertyBlock(block);
+            block.SetFloat(FlowSpeedId, _flowSpeed * _visualFlowRatio);
+            block.SetFloat(RiverHalfWidthId, bounds.extents.x);
+            block.SetFloat(WaterfallImpactZId, bounds.max.z);
+            block.SetFloat(ImpactEnabledId, bounds.size.z > 20f ? 1f : 0f);
+            surfaceRenderer.SetPropertyBlock(block);
         }
 
         private void OnTriggerStay(Collider other)

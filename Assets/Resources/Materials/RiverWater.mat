@@ -25,22 +25,35 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _PixelDensity: 4
-    - _AnimationFPS: 10
+    - _PixelDensity: 5
+    - _AnimationFPS: 12
     - _FlowSpeed: 1.3
-    - _FoamWidth: 0.16
-    - _BankFoamWidth: 0.12
-    - _ShallowDepth: 1.8
+    - _DepthRange: 2.7
+    - _ShallowOpacity: 0.54
+    - _DeepOpacity: 0.91
+    - _RefractionPixels: 0.6
+    - _ContactTolerance: 0.42
+    - _ContactPixelRadius: 1.2
+    - _ShoreDepth: 0.15
+    - _BankFoamWidth: 0.18
+    - _RiverHalfWidth: 12
     - _WakeRadiusScale: 1.1
-    - _WakeTailLength: 1.8
-    - _WakeFoamDensity: 0.42
-    - _SparkleStrength: 0.12
-    - _Opacity: 0.83
+    - _WakeTailLength: 2.3
+    - _WakeFoamDensity: 0.48
+    - _GlintCellDensity: 0.9
+    - _GlintStrength: 0.66
+    - _GlintCycle: 0.7
+    - _ImpactReach: 2.1
+    - _ImpactEnabled: 0
+    - _WaterfallImpactZ: -15
+    - _ReflectionStrength: 0
     m_Colors:
-    - _DeepColor: {r: 0.18, g: 0.51, b: 0.56, a: 1}
-    - _ShallowColor: {r: 0.26, g: 0.65, b: 0.66, a: 1}
-    - _CrestColor: {r: 0.44, g: 0.76, b: 0.72, a: 1}
-    - _FoamColor: {r: 0.89, g: 0.97, b: 0.91, a: 1}
-    - _GlintColor: {r: 0.97, g: 1, b: 0.93, a: 1}
+    - _ShallowColor: {r: 0.37, g: 0.77, b: 0.83, a: 1}
+    - _MidColor: {r: 0.2, g: 0.66, b: 0.78, a: 1}
+    - _DeepColor: {r: 0.1, g: 0.41, b: 0.63, a: 1}
+    - _FoamColor: {r: 0.8, g: 0.96, b: 0.98, a: 1}
+    - _HighlightColor: {r: 0.94, g: 0.99, b: 0.95, a: 1}
+    - _WakeColor: {r: 0.56, g: 0.85, b: 0.91, a: 1}
+    - _FlowDirection: {r: 0, g: -1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
