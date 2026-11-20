@@ -24,6 +24,9 @@ namespace BeaverRecycling
         [Header("River swimming")]
         [SerializeField, Range(0f, 1f)] private float _submergedBodyFraction = 0.6f;
         [SerializeField, Min(0f)] private float _swimmingEyeTrailCount = 1f;
+        [SerializeField, Min(0f)] private float _bankContactPadding = 0.25f;
+        [SerializeField, Min(0.1f)] private float _bankGrassProbeDistance = 2.5f;
+        [SerializeField, Min(0.1f)] private float _bankClimbSpeed = 14f;
 
         [Header("Camera follow")]
         [SerializeField, Min(0f)] private float _lookAheadDistance = 3f;
@@ -37,6 +40,9 @@ namespace BeaverRecycling
         private Vector3 _cameraTarget;
         private RiverWaterSurface3D[] _riverSurfaces;
         private MeshCollider[] _grassColliders;
+        private BoxCollider _beaverCollider;
+        private float _bodyBottomOffset;
+        private float _bodyHeight;
         private bool _isSwimming;
 
         private void Start()
@@ -44,6 +50,10 @@ namespace BeaverRecycling
             _beaver = FindFirstObjectByType<RecyclingBeaver3D>();
             _chutes = FindObjectsByType<PlayableChute3D>(FindObjectsSortMode.None);
             _camera = Camera.main;
+            _beaverCollider = _beaver.GetComponent<BoxCollider>();
+            Bounds bodyBounds = _beaver.BodyBounds;
+            _bodyBottomOffset = bodyBounds.min.y - _beaver.transform.position.y;
+            _bodyHeight = bodyBounds.size.y;
             _riverSurfaces = FindObjectsByType<RiverWaterSurface3D>(FindObjectsSortMode.None);
             MeshCollider[] sceneColliders = FindObjectsByType<MeshCollider>(FindObjectsSortMode.None);
             List<MeshCollider> grassColliders = new List<MeshCollider>();
@@ -94,10 +104,11 @@ namespace BeaverRecycling
             UpdateCameraPosition();
         }
 
-        /// <summary>비버가 있는 XZ 위치를 포함하는 강물의 표면 높이를 구한다.</summary>
-        private bool TryGetRiverSurfaceY(Vector3 position, out float surfaceY)
+        /// <summary>비버 중심이 속한 river의 수면 높이와 월드 경계를 구한다.</summary>
+        private bool TryGetRiverSurfaceY(Vector3 position, out float surfaceY, out Bounds riverBounds)
         {
             surfaceY = 0f;
+            riverBounds = default;
             float closestHeightDifference = float.PositiveInfinity;
             bool found = false;
             foreach (RiverWaterSurface3D river in _riverSurfaces)
@@ -111,6 +122,7 @@ namespace BeaverRecycling
                 if (difference >= closestHeightDifference) continue;
                 closestHeightDifference = difference;
                 surfaceY = candidateY;
+                riverBounds = bounds;
                 found = true;
             }
             return found;
@@ -136,17 +148,50 @@ namespace BeaverRecycling
             return found;
         }
 
-        /// <summary>강에서는 몸통의 설정 비율이 수면 아래에 있도록 하고 눈 잔상을 켜며,
-        /// Grass에서는 지형 높이에 발을 맞추고 눈 잔상을 끈다.</summary>
+        /// <summary>강의 좌우 경계와 비버 충돌 몸체가 닿으면 강둑 바깥쪽 Grass 높이를 찾아낸다.</summary>
+        private bool TryGetBankContactHeight(Vector3 position, Bounds riverBounds,
+            out float grassSurfaceY)
+        {
+            grassSurfaceY = 0f;
+            float contactRadius = _beaverCollider.bounds.extents.x + _bankContactPadding;
+            float leftDistance = Mathf.Abs(position.x - riverBounds.min.x);
+            float rightDistance = Mathf.Abs(riverBounds.max.x - position.x);
+            float nearestDistance = Mathf.Min(leftDistance, rightDistance);
+            if (nearestDistance > contactRadius) return false;
+
+            float shoreX = leftDistance <= rightDistance ? riverBounds.min.x : riverBounds.max.x;
+            float side = leftDistance <= rightDistance ? -1f : 1f;
+            const float PROBE_STEP = 0.25f;
+            for (float distance = PROBE_STEP; distance <= _bankGrassProbeDistance;
+                distance += PROBE_STEP)
+            {
+                Vector3 probe = new Vector3(shoreX + side * distance, position.y, position.z);
+                if (TryGetGrassSurfaceY(probe, out grassSurfaceY)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>강둑에 몸체가 닿으면 미리 Grass 높이로 올라가며,
+        /// 물 한가운데서는 몸통을 잠기게 하고 육지에서는 지면 높이로 이동한다.</summary>
         private void UpdateSurfaceHeightAndSwimming()
         {
             Vector3 position = _beaver.transform.position;
-            bool swimming = TryGetRiverSurfaceY(position, out float waterSurfaceY);
-            if (swimming)
+            bool inRiver = TryGetRiverSurfaceY(position, out float waterSurfaceY,
+                out Bounds riverBounds);
+            bool climbingBank = inRiver &&
+                TryGetBankContactHeight(position, riverBounds, out float bankSurfaceY);
+            bool swimming = inRiver && !climbingBank;
+
+            if (climbingBank)
             {
-                Bounds body = _beaver.BodyBounds;
-                float bodyWaterline = body.min.y + body.size.y * _submergedBodyFraction;
-                _beaver.SetWorldHeight(position.y + waterSurfaceY - bodyWaterline);
+                float nextHeight = Mathf.MoveTowards(position.y, bankSurfaceY,
+                    _bankClimbSpeed * Time.fixedDeltaTime);
+                _beaver.SetWorldHeight(nextHeight);
+            }
+            else if (swimming)
+            {
+                float waterlineOffset = _bodyBottomOffset + _bodyHeight * _submergedBodyFraction;
+                _beaver.SetWorldHeight(waterSurfaceY - waterlineOffset);
             }
             else if (TryGetGrassSurfaceY(position, out float grassSurfaceY))
             {
