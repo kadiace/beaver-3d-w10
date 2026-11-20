@@ -2,6 +2,8 @@ using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
+using TMPro;
 
 using RestoreCastle3D;
 
@@ -15,10 +17,15 @@ namespace BeaverRecycling
         private const float CAMERA_DISTANCE = 20f;
         private const float GRASS_RAYCAST_START_Y = 80f;
         private const float GRASS_RAYCAST_DISTANCE = 200f;
+        private const int MAX_CARRIED_ITEMS = 6;
+        private const float DASH_DURATION_SECONDS = 3f;
+        private const float DASH_RECOVERY_SECONDS = 3f;
+        private const float CARRIED_ITEM_GAP = 0.12f;
 
         [Header("Movement")]
         [SerializeField, Min(0.1f)] private float _moveSpeed = 4.5f;
-        [SerializeField, Min(1f)] private float _swimSpeedMultiplier = 1.6f;
+        [SerializeField, Min(1f)] private float _swimSpeedMultiplier = 1.5f;
+        [SerializeField, Min(1f)] private float _dashSpeedMultiplier = 2f;
         [SerializeField, Min(0.1f)] private float _pickupRadius = 2.4f;
 
         [Header("River swimming")]
@@ -34,7 +41,14 @@ namespace BeaverRecycling
 
         private RecyclingBeaver3D _beaver;
         private PlayableChute3D[] _chutes;
-        private CastlePiece3D _heldPiece;
+        private readonly List<CastlePiece3D> _held = new List<CastlePiece3D>();
+        private readonly List<float> _carryDistances = new List<float>();
+        private readonly List<FixedJoint> _carryJoints = new List<FixedJoint>();
+        private RectTransform _dashFill;
+        private Image _dashFillImage;
+        private TextMeshProUGUI _dashLabel;
+        private float _dashRemaining = DASH_DURATION_SECONDS;
+        private bool _isDashing;
         private Camera _camera;
         private Vector2 _movement;
         private Vector3 _cameraTarget;
@@ -65,6 +79,7 @@ namespace BeaverRecycling
             _cameraTarget = new Vector3(0f, 0f,
                 Mathf.Clamp(_beaver.transform.position.z, CAMERA_MIN_TARGET_Z, CAMERA_MAX_TARGET_Z));
             UpdateCameraPosition();
+            CreateDashGauge();
         }
 
         private void Update()
@@ -84,14 +99,18 @@ namespace BeaverRecycling
             bool keyboardInteract = Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame;
             bool gamepadInteract = Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame;
             if (keyboardInteract || gamepadInteract) Interact();
+            RefreshOutlines();
+            RefreshDashGauge();
         }
 
         private void FixedUpdate()
         {
-            float speed = _moveSpeed * (_isSwimming ? _swimSpeedMultiplier : 1f);
+            UpdateDash(Time.fixedDeltaTime);
+            float speed = _moveSpeed * (_isSwimming ? _swimSpeedMultiplier : 1f) *
+                (_isDashing ? _dashSpeedMultiplier : 1f);
             _beaver.Move(_movement, speed, Time.fixedDeltaTime);
             UpdateSurfaceHeightAndSwimming();
-            if (_heldPiece != null) _heldPiece.MoveHeld(_beaver.CarryPoint.position);
+            UpdateCarriedItems();
         }
 
         private void LateUpdate()
@@ -199,9 +218,156 @@ namespace BeaverRecycling
                 _beaver.SetWorldHeight(grassSurfaceY);
             }
 
-            if (_isSwimming == swimming) return;
             _isSwimming = swimming;
-            _beaver.SetCarriedItemEffect(_swimmingEyeTrailCount, swimming ? 1f : 0f);
+        }
+
+        /// <summary>W11의 Shift/패드 X 대시를 적용한다. 누르고 이동 중 소모하고 버튼을 놓으면 3초 동안 재충전한다.</summary>
+        private void UpdateDash(float deltaTime)
+        {
+            Keyboard keyboard = Keyboard.current;
+            Gamepad pad = Gamepad.current;
+            bool dashHeld = (keyboard != null &&
+                    (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed)) ||
+                (pad != null && pad.buttonWest.isPressed);
+            _isDashing = dashHeld && _movement.sqrMagnitude > 0.0001f &&
+                _dashRemaining > 0f;
+            if (_isDashing)
+                _dashRemaining = Mathf.Max(0f, _dashRemaining - deltaTime);
+            else if (!dashHeld)
+                _dashRemaining = Mathf.Min(DASH_DURATION_SECONDS,
+                    _dashRemaining + deltaTime *
+                    (DASH_DURATION_SECONDS / DASH_RECOVERY_SECONDS));
+
+            // Eye Trail은 물 위 이동이 아닌 대시 상태일 때만 표현한다.
+            _beaver.SetCarriedItemEffect(Mathf.Max(1f, _held.Count),
+                _isDashing ? 1f : 0f);
+        }
+
+        /// <summary>W11 형식의 하단 대시 게이지를 런타임 UI로 생성한다.</summary>
+        private void CreateDashGauge()
+        {
+            GameObject canvasObject = new GameObject("Playable Dash Canvas",
+                typeof(RectTransform), typeof(Canvas));
+            canvasObject.transform.SetParent(transform, false);
+            Canvas canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 16;
+
+            GameObject gaugeObject = new GameObject("Dash Gauge", typeof(RectTransform));
+            RectTransform gauge = gaugeObject.GetComponent<RectTransform>();
+            gauge.SetParent(canvasObject.transform, false);
+            gauge.anchorMin = gauge.anchorMax = new Vector2(0.5f, 0f);
+            gauge.pivot = new Vector2(0.5f, 0f);
+            gauge.anchoredPosition = new Vector2(0f, 160f);
+            gauge.sizeDelta = new Vector2(500f, 56f);
+
+            GameObject trackObject = new GameObject("Gauge Track",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            RectTransform track = trackObject.GetComponent<RectTransform>();
+            track.SetParent(gauge, false);
+            track.anchorMin = new Vector2(0f, 0f);
+            track.anchorMax = new Vector2(1f, 0f);
+            track.pivot = new Vector2(0.5f, 0f);
+            track.anchoredPosition = Vector2.zero;
+            track.sizeDelta = new Vector2(0f, 24f);
+            Image trackImage = trackObject.GetComponent<Image>();
+            trackImage.color = new Color(0.035f, 0.075f, 0.1f, 0.95f);
+            trackImage.raycastTarget = false;
+
+            GameObject insetObject = new GameObject("Gauge Inset", typeof(RectTransform));
+            RectTransform inset = insetObject.GetComponent<RectTransform>();
+            inset.SetParent(track, false);
+            inset.anchorMin = Vector2.zero;
+            inset.anchorMax = Vector2.one;
+            inset.offsetMin = new Vector2(3f, 3f);
+            inset.offsetMax = new Vector2(-3f, -3f);
+
+            GameObject fillObject = new GameObject("Gauge Fill",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            _dashFill = fillObject.GetComponent<RectTransform>();
+            _dashFill.SetParent(inset, false);
+            _dashFill.anchorMin = Vector2.zero;
+            _dashFill.anchorMax = Vector2.one;
+            _dashFill.offsetMin = Vector2.zero;
+            _dashFill.offsetMax = Vector2.zero;
+            _dashFillImage = fillObject.GetComponent<Image>();
+            _dashFillImage.raycastTarget = false;
+
+            GameObject labelObject = new GameObject("Gauge Label", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(gauge, false);
+            labelRect.anchorMin = new Vector2(0f, 1f);
+            labelRect.anchorMax = Vector2.one;
+            labelRect.pivot = new Vector2(0.5f, 1f);
+            labelRect.anchoredPosition = Vector2.zero;
+            labelRect.sizeDelta = new Vector2(0f, 26f);
+            _dashLabel = labelObject.GetComponent<TextMeshProUGUI>();
+            _dashLabel.font = TMP_Settings.defaultFontAsset;
+            _dashLabel.fontSize = 19f;
+            _dashLabel.alignment = TextAlignmentOptions.Center;
+            _dashLabel.color = new Color(0.92f, 0.97f, 1f, 1f);
+            _dashLabel.raycastTarget = false;
+        }
+
+        /// <summary>대시 잔량과 입력 장치에 따라 게이지 길이·색상·문구를 갱신한다.</summary>
+        private void RefreshDashGauge()
+        {
+            float fill = Mathf.Clamp01(_dashRemaining / DASH_DURATION_SECONDS);
+            _dashFill.anchorMax = new Vector2(fill, 1f);
+            _dashFillImage.color = _isDashing
+                ? new Color(1f, 0.68f, 0.24f, 1f)
+                : new Color(0.35f, 0.85f, 0.9f, 1f);
+            string key = Gamepad.current != null ? "X" : "SHIFT";
+            _dashLabel.text = _isDashing
+                ? key + " · 대시 " + _dashRemaining.ToString("0.0") + "초"
+                : fill >= 0.999f
+                    ? key + " · 대시 준비"
+                    : key + " · 충전 " + _dashRemaining.ToString("0.0") +
+                      " / " + DASH_DURATION_SECONDS.ToString("0") + "초";
+        }
+
+        /// <summary>최대 6개의 기물을 비버가 바라보는 forward 방향으로 앞뒤 간격을 유지해 운반한다.</summary>
+        private void UpdateCarriedItems()
+        {
+            Vector3 start = _beaver.CarryPoint.position;
+            Vector3 forward = _beaver.transform.forward;
+            Quaternion rotation = _beaver.transform.rotation;
+            for (int i = 0; i < _held.Count; i++)
+            {
+                CastlePiece3D piece = _held[i];
+                if (piece == null) continue;
+                piece.transform.rotation = rotation;
+                piece.MoveHeld(start + forward * _carryDistances[i]);
+            }
+        }
+
+        /// <summary>재질 안내는 노랑(레이어4), 현재 Z로 집을 수 있는 대상은 우선 주황(레이어2)으로 표시한다.</summary>
+        private void RefreshOutlines()
+        {
+            CastleCreekScore3D score = CastleCreekScore3D.Active;
+            if (score == null) return;
+            int selectedCategory = -1;
+            if (_held.Count > 0)
+                PlayableRecyclingRules3D.TryGetCategory(_held[0].MaterialId,
+                    out selectedCategory);
+
+            float radiusSquared = _pickupRadius * _pickupRadius;
+            Vector3 carryPoint = _beaver.CarryPoint.position;
+            foreach (CastlePiece3D piece in score.RegisteredPieces)
+            {
+                if (piece == null || !piece.isActiveAndEnabled) continue;
+                if (_held.Contains(piece)) { piece.SetOutlineLayer(0u); continue; }
+                if (!PlayableRecyclingRules3D.TryGetCategory(piece.MaterialId,
+                    out int category)) continue;
+                Vector3 delta = piece.transform.position - carryPoint;
+                bool pickupAvailable = _held.Count < MAX_CARRIED_ITEMS &&
+                    piece.CanPickUp && delta.sqrMagnitude <= radiusSquared;
+                piece.SetOutlineLayer(pickupAvailable ? 2u :
+                    selectedCategory >= 0 && selectedCategory == category ? 4u : 0u);
+            }
+            foreach (PlayableChute3D chute in _chutes)
+                chute.SetHighlighted(chute.Category == selectedCategory);
         }
 
         /// <summary>기존 카메라의 각도와 거리 및 X/Y 주시점을 유지하며 Z 주시점만 이동한다.</summary>
@@ -210,21 +376,38 @@ namespace BeaverRecycling
             _camera.transform.position = _cameraTarget - _camera.transform.forward * CAMERA_DISTANCE;
         }
 
-        /// <summary>Z 또는 패드 South로 가까운 기물을 집거나, 투입구에 제출하거나, 바닥에 내려놓는다.</summary>
+        /// <summary>Z 또는 패드 South로 주변 기물을 최대 6개 집거나, 가까운 chute에 일괄 제출하거나 놓는다.</summary>
         private void Interact()
         {
-            if (_heldPiece != null)
+            if (_held.Count > 0)
             {
                 PlayableChute3D chute = FindNearbyChute();
-                CastlePiece3D held = _heldPiece;
-                _heldPiece = null;
                 if (chute != null)
-                    chute.Submit(held);
-                else
-                    held.ReleaseFromBeaver(Vector3.zero);
-                return;
+                {
+                    List<CastlePiece3D> submitted = new List<CastlePiece3D>(_held);
+                    ClearCarryJoints();
+                    _held.Clear();
+                    _carryDistances.Clear();
+                    chute.Submit(submitted);
+                    return;
+                }
             }
 
+            if (_held.Count < MAX_CARRIED_ITEMS)
+            {
+                CastlePiece3D target = FindNearbyPickable();
+                if (target != null)
+                {
+                    AddCarriedItem(target);
+                    return;
+                }
+            }
+            if (_held.Count > 0) ReleaseBundle();
+        }
+
+        /// <summary>입 주변에서 가장 가까운 현재 집기 가능 재활용 오브젝트를 찾는다.</summary>
+        private CastlePiece3D FindNearbyPickable()
+        {
             Vector3 carryPoint = _beaver.CarryPoint.position;
             Collider[] contacts = Physics.OverlapSphere(carryPoint, _pickupRadius,
                 Physics.AllLayers, QueryTriggerInteraction.Ignore);
@@ -233,16 +416,73 @@ namespace BeaverRecycling
             foreach (Collider contact in contacts)
             {
                 CastlePiece3D piece = contact.GetComponentInParent<CastlePiece3D>();
-                if (piece == null || !piece.CanPickUp) continue;
-                float sqrDistance = (piece.transform.position - carryPoint).sqrMagnitude;
-                if (sqrDistance >= closest) continue;
-                closest = sqrDistance;
+                if (piece == null || !piece.CanPickUp || _held.Contains(piece) ||
+                    !PlayableRecyclingRules3D.IsRecycling(piece.MaterialId)) continue;
+                float distance = (piece.transform.position - carryPoint).sqrMagnitude;
+                if (distance >= closest) continue;
+                closest = distance;
                 chosen = piece;
             }
-            if (chosen == null) return;
-            chosen.PickUp();
-            _heldPiece = chosen;
-            chosen.MoveHeld(carryPoint);
+            return chosen;
+        }
+
+        /// <summary>신규 기물을 현재 운반 묶음의 마지막 기물 forward에 정렬하고 고정 조인트로 연결한다.</summary>
+        private void AddCarriedItem(CastlePiece3D piece)
+        {
+            CastlePiece3D previous = _held.Count > 0 ? _held[_held.Count - 1] : null;
+            float distance = 0f;
+            if (previous != null)
+            {
+                Vector3 direction = _beaver.transform.forward;
+                Collider previousCollider = previous.GetComponent<Collider>();
+                Collider currentCollider = piece.GetComponent<Collider>();
+                Vector3 prevExtent = previousCollider.bounds.extents;
+                Vector3 currExtent = currentCollider.bounds.extents;
+                Vector3 absForward = new Vector3(Mathf.Abs(direction.x),
+                    Mathf.Abs(direction.y), Mathf.Abs(direction.z));
+                float reach = Vector3.Dot(prevExtent + currExtent, absForward);
+                distance = _carryDistances[_carryDistances.Count - 1] + reach +
+                    CARRIED_ITEM_GAP;
+            }
+
+            piece.PickUp();
+            piece.transform.rotation = _beaver.transform.rotation;
+            piece.MoveHeld(_beaver.CarryPoint.position + _beaver.transform.forward * distance);
+            FixedJoint joint = null;
+            if (previous != null)
+            {
+                joint = piece.gameObject.AddComponent<FixedJoint>();
+                joint.connectedBody = previous.Body;
+                joint.breakForce = Mathf.Infinity;
+                joint.breakTorque = Mathf.Infinity;
+                joint.enableCollision = false;
+                joint.enablePreprocessing = false;
+            }
+            _held.Add(piece);
+            _carryDistances.Add(distance);
+            _carryJoints.Add(joint);
+        }
+
+        /// <summary>운반 묶음의 고정 조인트를 제거해 제출·놓기 시 풀링된 기물에 남지 않도록 한다.</summary>
+        private void ClearCarryJoints()
+        {
+            foreach (FixedJoint joint in _carryJoints)
+                if (joint != null)
+                {
+                    joint.connectedBody = null;
+                    Destroy(joint);
+                }
+            _carryJoints.Clear();
+        }
+
+        /// <summary>운반 중인 모든 기물을 제자리에 내려놓고 물리 시뮬레이션을 재개한다.</summary>
+        private void ReleaseBundle()
+        {
+            ClearCarryJoints();
+            foreach (CastlePiece3D piece in _held)
+                if (piece != null) piece.ReleaseFromBeaver(Vector3.zero);
+            _held.Clear();
+            _carryDistances.Clear();
         }
 
         /// <summary>비버에서 수평으로 닿을 수 있는 가장 가까운 분리수거 chute를 찾는다.</summary>
