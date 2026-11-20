@@ -869,10 +869,9 @@ GameObject:
   m_Component:
   - component: {fileID: 129339277172114426}
   - component: {fileID: 5433463325538826814}
-  - component: {fileID: 524643655184219614}
   - component: {fileID: 1957523268536551195}
   m_Layer: 0
-  m_Name: Upper Creek Bed Cliff Face
+  m_Name: Upper Waterfall
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -901,27 +900,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1111394967483737420}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!65 &524643655184219614
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1111394967483737420}
-  m_Material: {fileID: -2239556415349914283, guid: c0680ba94f7a61b49ac0e4ad3fe4f252, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1957523268536551195
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -930,8 +908,8 @@ MeshRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1111394967483737420}
   m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
@@ -947,7 +925,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 8827096481272329597, guid: c0680ba94f7a61b49ac0e4ad3fe4f252, type: 2}
+  - {fileID: 2100000, guid: 82ef157ea439476fb9bca74379644af8, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7467,10 +7445,9 @@ GameObject:
   m_Component:
   - component: {fileID: 7274035330766236281}
   - component: {fileID: 2694017671390678956}
-  - component: {fileID: 133955012228866239}
   - component: {fileID: 756730049876426667}
   m_Layer: 0
-  m_Name: Creek Bed Cliff Face
+  m_Name: Lower Waterfall
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7499,27 +7476,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6620147718380706671}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!65 &133955012228866239
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6620147718380706671}
-  m_Material: {fileID: -2239556415349914283, guid: c0680ba94f7a61b49ac0e4ad3fe4f252, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &756730049876426667
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -7528,8 +7484,8 @@ MeshRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6620147718380706671}
   m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
@@ -7545,7 +7501,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 8827096481272329597, guid: c0680ba94f7a61b49ac0e4ad3fe4f252, type: 2}
+  - {fileID: 2100000, guid: 82ef157ea439476fb9bca74379644af8, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
