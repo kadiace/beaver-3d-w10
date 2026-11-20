@@ -7,7 +7,6 @@ namespace RestoreCastle3D
     [RequireComponent(typeof(Rigidbody))]
     public sealed class CastlePiece3D : MonoBehaviour
     {
-        private const float CREEK_SPEED = 3f;
         private const float SPRING_STRENGTH = 10000f;
         private const float SPRING_DAMPER = 500f;
         private const float SPRING_DISTANCE = 0f;
@@ -28,6 +27,8 @@ namespace RestoreCastle3D
         private float _springDistanceLimit;
         private CastleGame3D _game;
         private Rigidbody _body;
+        private RiverWaterSurface3D _waterSurface;
+        private Collider[] _buoyancyColliders;
         private Renderer[] _renderers;
         private bool _fuseStarted;
         private bool _fusePending;
@@ -68,6 +69,7 @@ namespace RestoreCastle3D
         private void Awake()
         {
             _body = GetComponent<Rigidbody>();
+            _buoyancyColliders = GetComponentsInChildren<Collider>(true);
             _initialChildCount = transform.childCount;
             _initialScale = transform.localScale;
             if (TryGetComponent(out BoxCollider box))
@@ -118,6 +120,7 @@ namespace RestoreCastle3D
         /// <summary>기물을 들어 올려 중력과 물리 이동을 잠시 멈춘다.</summary>
         public void PickUp()
         {
+            _waterSurface = null;
             _held = true;
             _continuousDrop = false;
             _removalScheduled = false;
@@ -175,6 +178,7 @@ namespace RestoreCastle3D
 
         private void FixedUpdate()
         {
+            UpdateRiverBuoyancy();
             if (_springJoint == null || _springTarget == null || _springDistanceLimit <= 0f) return;
             Vector3 anchor = transform.TransformPoint(_springJoint.anchor);
             Vector3 connectedAnchor = _springTarget.transform.TransformPoint(_springJoint.connectedAnchor);
@@ -243,6 +247,7 @@ namespace RestoreCastle3D
             }
             CastleCreekScore3D.Active?.Unregister(this);
             _game = null;
+            _waterSurface = null;
             _attachBlockedUntil = 0f;
             _settling = false;
             _fuseStarted = false;
@@ -285,32 +290,51 @@ namespace RestoreCastle3D
 
         private void OnCollisionStay(Collision collision)
         {
-            if ((_continuousDrop || _thrown) &&
-                (collision.gameObject.name == "Flat Muddy Creek Bed" ||
-                 collision.gameObject.name == "Upper Flat Muddy Creek Bed") && !_body.isKinematic)
-            {
-                ApplyCreekFlow();
-            }
             if (_continuousDrop) return;
             AttachThrownPiece(collision);
             Register(collision);
         }
 
-        /// <summary>하천에 닿은 기물과 스프링으로 연결된 기물에 같은 -Z 속도를 적용한다.</summary>
-        private void ApplyCreekFlow()
+        /// <summary>물 영역에 들어온 기물을 수면 부력 제어에 등록한다.</summary>
+        public void TouchRiverSurface(RiverWaterSurface3D surface)
         {
-            CastlePiece3D origin = _springTarget != null ? _springTarget : this;
-            Vector3 velocity = origin._body.linearVelocity;
-            if (!origin._body.isKinematic)
-                origin._body.linearVelocity = new Vector3(0f, velocity.y, -CREEK_SPEED);
+            if (_held || _settling || _body == null || _body.isKinematic || surface == null)
+                return;
+            if (_waterSurface == null || surface.SurfaceY >= _waterSurface.SurfaceY)
+                _waterSurface = surface;
+        }
 
-            foreach (CastlePiece3D attached in origin._attachedPieces)
+        public void LeaveRiverSurface(RiverWaterSurface3D surface)
+        {
+            if (_waterSurface != surface) return;
+            _waterSurface = null;
+            if (_body != null && !_body.isKinematic)
+                _body.useGravity = true;
+        }
+
+        /// <summary>오브젝트 AABB 높이의 80%를 수면 아래에 둔다. 실제 부피는 근사한다.</summary>
+        private void UpdateRiverBuoyancy()
+        {
+            if (_waterSurface == null || _body == null || _body.isKinematic || _held || _settling)
+                return;
+
+            bool found = false;
+            Bounds bounds = default;
+            foreach (Collider collider in _buoyancyColliders)
             {
-                if (attached == null || attached._springTarget != origin || attached._body.isKinematic)
-                    continue;
-                velocity = attached._body.linearVelocity;
-                attached._body.linearVelocity = new Vector3(0f, velocity.y, -CREEK_SPEED);
+                if (collider == null || !collider.enabled || collider.isTrigger) continue;
+                if (!found) { bounds = collider.bounds; found = true; }
+                else bounds.Encapsulate(collider.bounds);
             }
+            if (!found) return;
+
+            float contactHeight = bounds.min.y + bounds.size.y * _waterSurface.SubmergedFraction;
+            float heightError = _waterSurface.SurfaceY - contactHeight;
+            _body.useGravity = false;
+            Vector3 velocity = _body.linearVelocity;
+            velocity.y = Mathf.Clamp(heightError * 8f, -5f, 7f);
+            velocity.z = -_waterSurface.FlowSpeed;
+            _body.linearVelocity = velocity;
         }
 
         private void OnCollisionExit(Collision collision)

@@ -29,7 +29,7 @@ public class GameSceneContext : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        GameObject bed = GameObject.Find("Flat Muddy Creek Bed");
+        GameObject bed = GameObject.Find("Main River Surface");
         if (bed == null) return;
 
         Bounds bounds = bed.GetComponent<BoxCollider>().bounds;

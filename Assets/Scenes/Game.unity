@@ -410,7 +410,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
   m_RenderShadows: 1
-  m_RequiresDepthTextureOption: 2
+  m_RequiresDepthTextureOption: 1
   m_RequiresOpaqueTextureOption: 2
   m_CameraType: 0
   m_Cameras: []
@@ -431,7 +431,7 @@ MonoBehaviour:
   m_UseScreenCoordOverride: 0
   m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
-  m_RequiresDepthTexture: 0
+  m_RequiresDepthTexture: 1
   m_RequiresColorTexture: 0
   m_TaaSettings:
     m_Quality: 3
@@ -451,7 +451,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4708130476543534937, guid: 348bf5f506f90b54385b6b9e41fe6127, type: 3}
       propertyPath: m_Name
-      value: Castle Creek Environment
+      value: River Environment
       objectReference: {fileID: 0}
     - target: {fileID: 8232243532057865115, guid: 348bf5f506f90b54385b6b9e41fe6127, type: 3}
       propertyPath: m_LocalPosition.x

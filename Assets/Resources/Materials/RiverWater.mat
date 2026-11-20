@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: CreekFlow
+  m_Name: RiverWater
   m_Shader: {fileID: 4800000, guid: 3c248ebc41f54a34dabc99180c909356, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -19,16 +19,20 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties: 
+  m_LockedProperties:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _FlowScale: 0.42
     - _FlowSpeed: 1.2
+    - _RippleScale: 0.7
+    - _FoamWidth: 0.8
+    - _SparkleStrength: 0.7
+    - _Opacity: 0.77
     m_Colors:
-    - _FlowColor: {r: 0.42999998, g: 0.35999998, b: 0.23999995, a: 1}
-    - _MudColor: {r: 0.28999996, g: 0.22999996, b: 0.14999998, a: 1}
+    - _DeepColor: {r: 0.025, g: 0.16, b: 0.22, a: 0.82}
+    - _ShallowColor: {r: 0.08, g: 0.45, b: 0.48, a: 0.82}
+    - _FoamColor: {r: 0.79, g: 0.96, b: 0.91, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

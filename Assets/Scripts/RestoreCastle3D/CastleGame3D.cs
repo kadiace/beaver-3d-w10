@@ -102,7 +102,7 @@ namespace RestoreCastle3D
         private void Start()
         {
             _catalog = new CastleCatalog3D();
-            _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly).ToArray();
+            _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly && material.category != "석재").ToArray();
             _random = new System.Random(Environment.TickCount);
             _spawnCycleStartTime = Time.time;
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
@@ -511,7 +511,7 @@ namespace RestoreCastle3D
             _camera.transform.rotation = Quaternion.Euler(45f, 45f, 0f);
             _cameraTarget = Vector3.zero;
             UpdateCameraPosition();
-            _placementBounds = GameObject.Find("Flat Muddy Creek Bed")
+            _placementBounds = GameObject.Find("Main River Surface")
                 .GetComponent<BoxCollider>().bounds;
         }
 
