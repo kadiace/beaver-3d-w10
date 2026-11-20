@@ -28,14 +28,16 @@ Material:
     - _PixelDensity: 4
     - _AnimationFPS: 10
     - _FlowSpeed: 1.3
-    - _RippleScale: 0.7
-    - _FoamWidth: 0.72
-    - _BankFoamWidth: 0.55
-    - _ShallowDepth: 2.2
-    - _SparkleStrength: 0.8
+    - _FoamWidth: 0.45
+    - _BankFoamWidth: 0.28
+    - _ShallowDepth: 1.8
+    - _WakeRadiusScale: 1.15
+    - _WakeTailLength: 2.8
+    - _WakeFoamDensity: 0.58
+    - _SparkleStrength: 0.24
     - _Opacity: 0.83
     m_Colors:
-    - _DeepColor: {r: 0.055, g: 0.2, b: 0.26, a: 1}
+    - _DeepColor: {r: 0.065, g: 0.25, b: 0.29, a: 1}
     - _ShallowColor: {r: 0.12, g: 0.38, b: 0.42, a: 1}
     - _CrestColor: {r: 0.29, g: 0.68, b: 0.67, a: 1}
     - _FoamColor: {r: 0.77, g: 0.94, b: 0.85, a: 1}
