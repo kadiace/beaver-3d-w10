@@ -17,8 +17,8 @@ namespace BeaverRecycling
         private static readonly Color _eyeGlowRed = new Color(1f, 0.04f, 0.02f, 1f);
 
         [Header("Movement")]
-        [SerializeField] private Vector2 _minimum = new Vector2(-12f, 17f);
-        [SerializeField] private Vector2 _maximum = new Vector2(12f, 43f);
+        [SerializeField] private Vector2 _minimum = new Vector2(-28.25f, -15f);
+        [SerializeField] private Vector2 _maximum = new Vector2(28.25f, 45f);
         [SerializeField] private Transform _carryPoint;
         [SerializeField] private Transform _visual;
         [SerializeField, Min(0f)] private float _knockbackSpinSpeed = 720f;
@@ -129,6 +129,16 @@ namespace BeaverRecycling
             _lastMoveFixedTime = Time.fixedTime;
             _stride += deltaTime * speed * 5f;
             _currentBobHeight = movement.sqrMagnitude > 0f ? Mathf.Abs(Mathf.Sin(_stride)) * 0.045f : 0f;
+        }
+
+        /// <summary>지형 높이에 따라 비버 월드 Y와 프레임 보간 높이를 함께 갱신한다.</summary>
+        public void SetWorldHeight(float worldY)
+        {
+            Vector3 position = transform.position;
+            position.y = worldY;
+            transform.position = position;
+            _previousPosition.y = worldY;
+            _currentPosition.y = worldY;
         }
 
         /// <summary>기절 상태를 받아 머리 위 별 이펙트를 켜거나 끈다.</summary>

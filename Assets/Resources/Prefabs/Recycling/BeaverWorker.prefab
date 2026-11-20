@@ -2021,8 +2021,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7737dd0bdd09308da46de4b7ab65e59a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BeaverRecycling.RecyclingBeaver3D
-  _minimum: {x: -12, y: 17}
-  _maximum: {x: 12, y: 43}
+  _minimum: {x: -28.25, y: -15}
+  _maximum: {x: 28.25, y: 45}
   _carryPoint: {fileID: 3100000090}
   _visual: {fileID: 3100000004}
   _knockbackSpinSpeed: 720
