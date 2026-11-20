@@ -28,19 +28,19 @@ Material:
     - _PixelDensity: 4
     - _AnimationFPS: 10
     - _FlowSpeed: 1.3
-    - _FoamWidth: 0.45
-    - _BankFoamWidth: 0.28
+    - _FoamWidth: 0.16
+    - _BankFoamWidth: 0.12
     - _ShallowDepth: 1.8
-    - _WakeRadiusScale: 1.15
-    - _WakeTailLength: 2.8
-    - _WakeFoamDensity: 0.58
-    - _SparkleStrength: 0.24
+    - _WakeRadiusScale: 1.1
+    - _WakeTailLength: 1.8
+    - _WakeFoamDensity: 0.42
+    - _SparkleStrength: 0.12
     - _Opacity: 0.83
     m_Colors:
-    - _DeepColor: {r: 0.065, g: 0.25, b: 0.29, a: 1}
-    - _ShallowColor: {r: 0.12, g: 0.38, b: 0.42, a: 1}
-    - _CrestColor: {r: 0.29, g: 0.68, b: 0.67, a: 1}
-    - _FoamColor: {r: 0.77, g: 0.94, b: 0.85, a: 1}
-    - _GlintColor: {r: 0.96, g: 1, b: 0.88, a: 1}
+    - _DeepColor: {r: 0.18, g: 0.51, b: 0.56, a: 1}
+    - _ShallowColor: {r: 0.26, g: 0.65, b: 0.66, a: 1}
+    - _CrestColor: {r: 0.44, g: 0.76, b: 0.72, a: 1}
+    - _FoamColor: {r: 0.89, g: 0.97, b: 0.91, a: 1}
+    - _GlintColor: {r: 0.97, g: 1, b: 0.93, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

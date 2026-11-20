@@ -2,29 +2,29 @@ Shader "Beaver/Pixel River Water"
 {
     Properties
     {
-        _DeepColor ("01 / Quiet Water", Color) = (0.065, 0.25, 0.29, 1)
-        _ShallowColor ("02 / Shallow Water", Color) = (0.12, 0.39, 0.42, 1)
-        _CrestColor ("03 / Wake Tint", Color) = (0.29, 0.68, 0.67, 1)
-        _FoamColor ("04 / Contact Foam", Color) = (0.77, 0.94, 0.85, 1)
-        _GlintColor ("05 / Rare Wake Glint", Color) = (0.96, 1, 0.88, 1)
+        _DeepColor ("01 / Calm Water", Color) = (0.18, 0.51, 0.56, 1)
+        _ShallowColor ("02 / Light Water", Color) = (0.26, 0.65, 0.66, 1)
+        _CrestColor ("03 / Wake Tint", Color) = (0.44, 0.76, 0.72, 1)
+        _FoamColor ("04 / Fine Contact Foam", Color) = (0.89, 0.97, 0.91, 1)
+        _GlintColor ("05 / Rare Wake Glint", Color) = (0.97, 1, 0.93, 1)
         _PixelDensity ("Pixels Per World Unit", Range(1, 12)) = 4
         _AnimationFPS ("Foam Animation FPS", Range(2, 24)) = 10
         _FlowSpeed ("Foam Advection", Range(0, 5)) = 1.3
-        _FoamWidth ("Scene Depth Contact Width", Range(0.04, 2)) = 0.45
-        _BankFoamWidth ("Quiet Shore Foam", Range(0.05, 2)) = 0.28
+        _FoamWidth ("Thin Contact Depth Range", Range(0.03, 0.5)) = 0.16
+        _BankFoamWidth ("Shore Foam Width", Range(0.02, 0.5)) = 0.12
         _ShallowDepth ("Shallow Tint Depth", Range(0.1, 8)) = 1.8
-        _WakeRadiusScale ("Object Foam Radius", Range(0.8, 2.5)) = 1.15
-        _WakeTailLength ("Downstream Trail Length", Range(0.5, 6)) = 2.8
-        _WakeFoamDensity ("Foam Density", Range(0, 1)) = 0.58
-        _SparkleStrength ("Wake-only Glints", Range(0, 1)) = 0.24
-        _Opacity ("Base Transparency", Range(0.25, 1)) = 0.83
+        _WakeRadiusScale ("Wake Spread", Range(0.8, 2.5)) = 1.10
+        _WakeTailLength ("Wake Length", Range(0.5, 6)) = 1.8
+        _WakeFoamDensity ("Wake Density", Range(0, 1)) = 0.42
+        _SparkleStrength ("Wake-only Glints", Range(0, 1)) = 0.12
+        _Opacity ("Water Transparency", Range(0.25, 1)) = 0.83
     }
     SubShader
     {
         Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Transparent" "Queue"="Transparent" }
         Pass
         {
-            Name "Quiet Water and Object Wakes"
+            Name "Calm Water and Thin Silhouette Foam"
             Tags { "LightMode"="UniversalForward" }
             Blend SrcAlpha OneMinusSrcAlpha
             ZWrite Off
@@ -35,15 +35,13 @@ Shader "Beaver/Pixel River Water"
             #pragma target 3.0
             #pragma vertex Vert
             #pragma fragment Frag
-
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             #define MAX_RIVER_WAKES 24
-            // SetGlobalVectorArray updates these outside UnityPerMaterial.
             int _RiverWakeCount;
-            float4 _RiverWakeObjects[MAX_RIVER_WAKES]; // world x,z + half-width/length
-            float4 _RiverWakeMotion[MAX_RIVER_WAKES];  // relative speed, seed, flow speed
+            float4 _RiverWakeObjects[MAX_RIVER_WAKES]; // World xz, collider half-extents xz.
+            float4 _RiverWakeMotion[MAX_RIVER_WAKES];  // Slip speed, seed, current.
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _DeepColor;
@@ -64,22 +62,12 @@ Shader "Beaver/Pixel River Water"
                 float _Opacity;
             CBUFFER_END
 
-            struct Attributes
-            {
-                float4 positionOS : POSITION;
-            };
-
+            struct Attributes { float4 positionOS : POSITION; };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
             };
-
-            float Hash21(float2 p)
-            {
-                return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
-            }
-
             Varyings Vert(Attributes v)
             {
                 Varyings o;
@@ -87,96 +75,135 @@ Shader "Beaver/Pixel River Water"
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 return o;
             }
+            float Hash21(float2 p)
+            {
+                return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            // Screen-space silhouette detection: unlike the old circular mask,
+            // this follows the depth edges of every opaque object, not just the
+            // first 24 objects whose wake data was uploaded.
+            float ThinIntersection(float2 uv, float3 surfaceWS, float surfaceEye,
+                                   float sceneEye, float depthRange)
+            {
+                float2 pixelStep = 1.3 / _ScaledScreenParams.xy;
+                float2 offsets[4] = {
+                    float2(pixelStep.x, 0), float2(-pixelStep.x, 0),
+                    float2(0, pixelStep.y), float2(0, -pixelStep.y)
+                };
+
+                float minEye = 1e8;
+                float2 nearestUV = uv;
+                float nearestRaw = 0;
+                float edgeContrast = 0;
+                [unroll]
+                for (int k = 0; k < 4; k++)
+                {
+                    float2 sampleUV = saturate(uv + offsets[k]);
+                    float raw = SampleSceneDepth(sampleUV);
+                    float sampleEye = LinearEyeDepth(raw, _ZBufferParams);
+                    edgeContrast = max(edgeContrast, abs(sampleEye - sceneEye));
+                    if (sampleEye < minEye)
+                    {
+                        minEye = sampleEye;
+                        nearestUV = sampleUV;
+                        nearestRaw = raw;
+                    }
+                }
+
+                float centerGap = sceneEye - surfaceEye;
+                float visibleWater = step(0.02, centerGap);
+                float frontEdge = visibleWater * (1.0 - step(surfaceEye - 0.025, minEye));
+                if (frontEdge > 0.0)
+                {
+                    // Avoid projected silhouettes from objects floating high
+                    // above the water: this is a waterline, not an object outline.
+                    float3 objectWS = ComputeWorldSpacePosition(
+                        nearestUV, nearestRaw, UNITY_MATRIX_I_VP);
+                    frontEdge *= 1.0 - smoothstep(0.20, 0.58,
+                        abs(objectWS.y - surfaceWS.y));
+                }
+
+                float submergedEdge = visibleWater *
+                    (1.0 - smoothstep(0.02, max(0.04, depthRange), centerGap)) *
+                    smoothstep(0.08, 0.30, edgeContrast);
+                return max(frontEdge, submergedEdge);
+            }
 
             half4 Frag(Varyings i) : SV_Target
             {
                 float pixelDensity = max(1.0, _PixelDensity);
                 float2 p = floor(i.positionWS.xz * pixelDensity) / pixelDensity;
-                float tick = floor(_Time.y * max(1.0, _AnimationFPS)) /
-                    max(1.0, _AnimationFPS);
+                float fps = max(1.0, _AnimationFPS);
+                float tick = floor(_Time.y * fps) / fps;
 
-                // No full-surface oscillation, stripe, ripple or animated normal.
-                // Depth adds only a restrained static shallow tint.
-                float2 screenUV = GetNormalizedScreenSpaceUV(i.positionCS);
-                float sceneEye = LinearEyeDepth(SampleSceneDepth(screenUV), _ZBufferParams);
+                float2 uv = GetNormalizedScreenSpaceUV(i.positionCS);
+                float sceneEye = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
                 float surfaceEye = LinearEyeDepth(i.positionCS.z, _ZBufferParams);
                 float depthDelta = sceneEye - surfaceEye;
-                half shallow = 1.0 - smoothstep(0.1, max(0.2, _ShallowDepth), depthDelta);
-                half3 water = lerp(_DeepColor.rgb, _ShallowColor.rgb, shallow * 0.16);
 
-                float foam = 0.0;
-                float wakeGlow = 0.0;
+                // Almost flat, bright water. No repeating wave or full-field noise.
+                half shallow = 1.0 - smoothstep(0.18,
+                    max(0.2, _ShallowDepth), depthDelta);
+                half3 water = lerp(_DeepColor.rgb, _ShallowColor.rgb, shallow * 0.23);
 
+                // Actual screen-depth contour, not a fake ring around AABB centers.
+                float fineContact = ThinIntersection(
+                    uv, i.positionWS, surfaceEye, sceneEye, _FoamWidth);
+                float bankDistance = 12.0 - abs(i.positionWS.x);
+                float shore = (1.0 - smoothstep(0.01,
+                    max(0.03, _BankFoamWidth), bankDistance)) * 0.20;
+                float foam = max(fineContact * 0.85, shore);
+                float trailing = 0;
+
+                // Only sparse wakes use the selected object list. Contact foam
+                // above is not capped, and the wake cannot fill an object's center.
                 [loop]
                 for (int j = 0; j < MAX_RIVER_WAKES; j++)
                 {
                     if (j >= _RiverWakeCount) break;
-                    float4 obj = _RiverWakeObjects[j];
+                    float4 body = _RiverWakeObjects[j];
                     float4 motion = _RiverWakeMotion[j];
-                    float2 delta = p - obj.xy;
-                    float2 radius = max(obj.zw * _WakeRadiusScale, float2(0.35, 0.35));
-                    float slip = saturate(motion.x / 4.0);
-
-                    // Early spatial reject: unaffected water has no work to do.
-                    float tailLength = _WakeTailLength + slip * 1.7;
-                    if (abs(delta.x) > radius.x * 2.3 ||
-                        delta.y > radius.y * 2.0 ||
-                        delta.y < -radius.y * (tailLength + 1.0))
+                    float2 delta = p - body.xy;
+                    float2 halfSize = max(body.zw * _WakeRadiusScale,
+                        float2(0.35, 0.35));
+                    float aft = -delta.y / halfSize.y;
+                    if (aft < 0.82 || aft > _WakeTailLength + 0.82 ||
+                        abs(delta.x) > halfSize.x * 2.3)
                         continue;
 
-                    // Pixelated, broken crescent around the floating hull.
-                    float r = length(delta / radius);
-                    float crescent = smoothstep(0.74, 0.97, r) *
-                        (1.0 - smoothstep(1.10, 1.39, r));
-                    crescent *= lerp(0.72, 1.0, smoothstep(-0.6, 0.7, delta.y / radius.y));
-
-                    // Separate fluid speeds on both sides of the obstacle:
-                    // slow inner eddies, fast outer streamlines. No sine waves.
-                    float localFlow = _FlowSpeed * (0.65 + motion.z * 0.09);
-                    float sideSpeed = delta.x < 0.0 ? 0.52 : 1.28;
-                    float drift = tick * localFlow * sideSpeed;
-                    float2 cell = floor(float2(delta.x, delta.y + drift) *
-                        pixelDensity * 0.74 + motion.y);
-                    float foamNoise = Hash21(cell);
-                    float splitNoise = Hash21(cell + float2(17.7, 43.1));
-
-                    float rim = crescent * step(1.0 - _WakeFoamDensity, foamNoise);
-
-                    // Two short, sparse downstream trails; broken clusters
-                    // progressively disperse into the downstream current.
-                    float behind = -delta.y / radius.y;
-                    float sideOffset = radius.x * (0.92 + behind * 0.08);
-                    float sideDistance = abs(abs(delta.x) - sideOffset);
-                    float lanes = 1.0 - smoothstep(radius.x * 0.20,
-                        radius.x * 0.48, sideDistance);
-                    float fade = smoothstep(0.65, 1.25, behind) *
-                        (1.0 - smoothstep(tailLength * 0.62, tailLength, behind));
-                    float wake = lanes * fade *
-                        step(0.73, splitNoise) * (0.62 + slip * 0.30);
-
-                    foam = max(foam, max(rim, wake));
-                    wakeGlow = max(wakeGlow, max(crescent * 0.4, lanes * fade * 0.36));
+                    // Slim, separated trails along either side of the body,
+                    // not a round crescent or a solid patch at its center.
+                    float side = sign(delta.x);
+                    float laneX = halfSize.x * (1.02 + aft * 0.09);
+                    float offset = abs(abs(delta.x) - laneX);
+                    float filament = 1.0 - smoothstep(0.045, 0.19, offset);
+                    float fade = smoothstep(0.82, 1.12, aft) *
+                        (1.0 - smoothstep(_WakeTailLength * 0.67 + 0.82,
+                            _WakeTailLength + 0.82, aft));
+                    float slip = saturate(motion.x / 4.0);
+                    float sideSpeed = side < 0 ? 0.72 : 1.26;
+                    float2 advected = floor(float2(
+                        p.x * pixelDensity * 0.72 + motion.y,
+                        (p.y + tick * _FlowSpeed * sideSpeed) *
+                        pixelDensity * 0.6));
+                    float fragment = step(1.0 - _WakeFoamDensity,
+                        Hash21(advected));
+                    float trail = filament * fade * fragment *
+                        (0.20 + 0.20 * slip);
+                    trailing = max(trailing, trail);
                 }
 
-                // Weak, stationary depth contact and narrow shoreline foam.
-                // These never animate by themselves, so empty water stays calm.
-                float depthFoam = smoothstep(0.0, 0.05, depthDelta) *
-                    (1.0 - smoothstep(0.1, max(0.15, _FoamWidth), depthDelta));
-                float bankDistance = 12.0 - abs(p.x);
-                float bankFoam = (1.0 - smoothstep(0.01,
-                    max(_BankFoamWidth, 0.05), bankDistance)) * 0.22;
-                float staticBreak = step(0.58, Hash21(floor(p * pixelDensity * 0.5)));
-                foam = saturate(max(foam, max(depthFoam * 0.55, bankFoam * staticBreak)));
+                foam = saturate(max(foam, trailing));
+                water = lerp(water, _CrestColor.rgb, trailing * 0.18);
+                water = lerp(water, _FoamColor.rgb, foam * 0.85);
 
-                // Wake color and occasional square glints are localized as well.
-                water = lerp(water, _CrestColor.rgb, saturate(wakeGlow * 0.28));
-                water = lerp(water, _FoamColor.rgb, foam);
-                float glintNoise = Hash21(floor(float2(p.x, p.y + tick * _FlowSpeed)
-                    * pixelDensity * 0.8 + 71.0));
-                float glint = step(0.985, glintNoise) *
-                    step(0.3, wakeGlow) * _SparkleStrength;
+                // Glints only appear in localized trails, never on empty water.
+                float glint = step(0.987, Hash21(floor(
+                    (p + float2(0, tick * _FlowSpeed)) * pixelDensity)))
+                    * step(0.14, trailing) * _SparkleStrength;
                 water = lerp(water, _GlintColor.rgb, glint);
-                return half4(water, saturate(lerp(_Opacity, 0.97, foam)));
+                return half4(water, saturate(lerp(_Opacity, 0.95, foam)));
             }
             ENDHLSL
         }
