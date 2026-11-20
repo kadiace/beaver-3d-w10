@@ -22,6 +22,8 @@ namespace RestoreCastle3D
         private const float CAMERA_MAX_TARGET_Z = 30f;
         private const float WINDOWS_SCROLL_UNITS_PER_TICK = 120f;
         private const float SPAWN_INTERVAL = 0.02f;
+        private const float SPAWN_CYCLE_SECONDS = 30f;
+        private const float SPAWN_ACTIVE_SECONDS = 5f;
 
         private static readonly float _livingTreeScalePerGrowth =
             1.05f * Mathf.Pow(2f, 1f / LIVING_TREE_MAX_GROWTH);
@@ -92,6 +94,7 @@ namespace RestoreCastle3D
         private string _status;
         private CastleMaterial3D[] _spawnMaterials;
         private float _nextSpawnTime;
+        private float _spawnCycleStartTime;
         private Vector2 _rightDragDisplacement;
         private bool _rightGestureActive;
         private bool _rightGestureMoved;
@@ -101,6 +104,7 @@ namespace RestoreCastle3D
             _catalog = new CastleCatalog3D();
             _spawnMaterials = _catalog.All.Where(material => !material.startOnly && !material.spawnOnly).ToArray();
             _random = new System.Random(Environment.TickCount);
+            _spawnCycleStartTime = Time.time;
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
             ConfigureScene();
             gameObject.AddComponent<CastleCreekScore3D>().Initialize(_camera, _catalog);
@@ -146,7 +150,13 @@ namespace RestoreCastle3D
         {
             UpdateCameraInput();
             UpdateHeldPiece();
-            if (_spawnMaterials != null && Time.time >= _nextSpawnTime)
+            // Spawn during [0, 5) seconds of each 30-second cycle;
+            // keep the existing interval and conveyor-belt spawn behavior unchanged.
+            bool spawnWindowOpen = _spawnMaterials != null &&
+                (Time.time - _spawnCycleStartTime) % SPAWN_CYCLE_SECONDS < SPAWN_ACTIVE_SECONDS;
+            if (_spawnMaterials != null && !spawnWindowOpen)
+                _nextSpawnTime = Time.time + SPAWN_INTERVAL; // Drop paused-time backlog.
+            if (spawnWindowOpen && Time.time >= _nextSpawnTime)
             {
                 CastleMaterial3D material = ChooseCreekMaterial();
                 Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
