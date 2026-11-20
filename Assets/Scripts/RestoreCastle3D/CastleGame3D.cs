@@ -7,6 +7,8 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.EventSystems;
 
+using BeaverRecycling;
+
 namespace RestoreCastle3D
 {
     public sealed class CastleGame3D : MonoBehaviour
@@ -107,7 +109,9 @@ namespace RestoreCastle3D
             _spawnCycleStartTime = Time.time;
             _nextSpawnTime = Time.time + SPAWN_INTERVAL;
             ConfigureScene();
-            gameObject.AddComponent<CastleCreekScore3D>().Initialize(_camera, _catalog);
+            CastleCreekScore3D score = gameObject.AddComponent<CastleCreekScore3D>();
+            score.Initialize(_camera, _catalog);
+            score.UseRecyclingRules = UseRecyclingSpawns;
         }
 
         /// <summary>Weighted endless spawns: categories 5:5:2:6:2; general/advanced/rare 4:2:1.</summary>
@@ -146,6 +150,19 @@ namespace RestoreCastle3D
             return tier[_random.Next(tier.Length)];
         }
 
+        /// <summary>W11 재활용 프리팹의 모델·물성은 유지하고 W12의 강물 흐름·풀링에 연결한다.</summary>
+        private void SpawnRecyclingPiece()
+        {
+            string id = PlayableRecyclingRules3D.DrawPrefabId();
+            Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
+            GameObject instance = Managers.Resource.Instantiate("Prefabs/Recycling/" + id,
+                position: position, rotation: Quaternion.identity);
+            instance.name = id;
+            CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
+            spawned.EnableContinuousDrop();
+            CastleCreekScore3D.Active.Register(spawned);
+        }
+
         private void Update()
         {
             UpdateCameraInput();
@@ -158,22 +175,26 @@ namespace RestoreCastle3D
                 _nextSpawnTime = Time.time + SPAWN_INTERVAL; // Drop paused-time backlog.
             if (spawnWindowOpen && Time.time >= _nextSpawnTime)
             {
-                CastleMaterial3D material = ChooseCreekMaterial();
-                Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
-                GameObject instance = Managers.Resource.Instantiate(
-                    "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
-                    position: position, rotation: material.id == "vine" ||
-                        material.id == "growing_vine" || material.id == "sunflower"
-                        ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity);
-                instance.name = material.name;
-                CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
-                spawned.EnableContinuousDrop();
-                CastleCreekScore3D.Active.Register(spawned);
+                if (UseRecyclingSpawns) SpawnRecyclingPiece();
+                else
+                {
+                    CastleMaterial3D material = ChooseCreekMaterial();
+                    Vector3 position = new Vector3(UnityEngine.Random.Range(-11f, 11f), 30f, 45f);
+                    GameObject instance = Managers.Resource.Instantiate(
+                        "Prefabs/" + CastleCatalog3D.PrefabId(material.id),
+                        position: position, rotation: material.id == "vine" ||
+                            material.id == "growing_vine" || material.id == "sunflower"
+                            ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity);
+                    instance.name = material.name;
+                    CastlePiece3D spawned = instance.GetComponent<CastlePiece3D>();
+                    spawned.EnableContinuousDrop();
+                    CastleCreekScore3D.Active.Register(spawned);
+                }
                 _nextSpawnTime += SPAWN_INTERVAL;
             }
             if (_spawnMaterials != null)
             {
-                UpdateHoveredPiece();
+                if (!UseRecyclingSpawns) UpdateHoveredPiece();
                 return;
             }
 
@@ -541,6 +562,7 @@ namespace RestoreCastle3D
         public int CurrentStageRound => _awaitingStage ? ROUNDS_PER_STAGE : _turn % ROUNDS_PER_STAGE + 1;
         public int PlacementsPerRound => PLACEMENTS_PER_ROUND;
         public bool PlayerCameraFollowEnabled { get; set; }
+        public bool UseRecyclingSpawns { get; set; }
         public float RotationSpeed { get; set; } = 90f;
         public Vector2 PlacementCenterOffset { get; set; }
         public float PlacementRadius { get; set; } = 9f;

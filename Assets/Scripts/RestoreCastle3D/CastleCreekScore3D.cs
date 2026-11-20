@@ -4,6 +4,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+using BeaverRecycling;
+
 namespace RestoreCastle3D
 {
     /// <summary>Feedback and settlement for the endless creek mode, independent of the legacy stage HUD.</summary>
@@ -35,6 +37,8 @@ namespace RestoreCastle3D
         private CastlePiece3D _hovered;
 
         public int TotalScore => _score;
+        public IEnumerable<CastlePiece3D> RegisteredPieces => _registered;
+        public bool UseRecyclingRules { get; set; }
 
         public void Initialize(Camera camera, CastleCatalog3D catalog)
         {
@@ -103,7 +107,7 @@ namespace RestoreCastle3D
         /// <summary>Recalculate only components touched by an added or removed edge.</summary>
         public void Refresh(CastlePiece3D a, CastlePiece3D b = null)
         {
-            if (_catalog == null || _batching) return;
+            if (_catalog == null || _batching || UseRecyclingRules) return;
             var visited = new HashSet<CastlePiece3D>();
             foreach (var start in new[] { a, b })
             {
@@ -128,6 +132,15 @@ namespace RestoreCastle3D
         public void Settle(CastlePiece3D piece)
         {
             if (piece == null || piece.IsSettling) return;
+            if (UseRecyclingRules && PlayableRecyclingRules3D.IsRecycling(piece.MaterialId))
+            {
+                AwardPoints(PlayableRecyclingRules3D.ExitScore(piece.MaterialId),
+                    piece.transform.position);
+                piece.MarkSettling();
+                Unregister(piece);
+                Managers.Resource.Destroy(piece.gameObject);
+                return;
+            }
             var group = CastleSynergy3D.Collect(piece);
             if (group.Count == 0) return;
             // Freeze every member before invoking resource pooling callbacks.
@@ -154,6 +167,33 @@ namespace RestoreCastle3D
                 Unregister(member);
                 Managers.Resource.Destroy(member.gameObject);
             }
+        }
+
+        /// <summary>W11의 정상3점·오분류-4점·2/4/6개 순수 묶음 보너스를 계산하고 점수 UI에 반영한다.</summary>
+        public int SubmitRecycling(IReadOnlyList<CastlePiece3D> submitted, int chuteCategory,
+            Vector3 intakePosition)
+        {
+            int earned = PlayableRecyclingRules3D.Evaluate(submitted, chuteCategory,
+                out int correct, out int wrong, out int bonus);
+            AwardPoints(earned, intakePosition);
+            foreach (CastlePiece3D piece in submitted)
+            {
+                if (piece == null || piece.IsSettling) continue;
+                piece.MarkSettling();
+                Unregister(piece);
+                Managers.Resource.Destroy(piece.gameObject);
+            }
+            return earned;
+        }
+
+        /// <summary>정산 점수를 누적하고 우상단 점수와 획득/감점 플로팅 텍스트를 갱신한다.</summary>
+        private void AwardPoints(int points, Vector3 position)
+        {
+            _score += points;
+            _flashUntil = Time.unscaledTime + 0.65f;
+            if (points == 0) return;
+            _floating.Show(new CastleChange3D(null, null, CastleChangeKind.ScoreAward,
+                points, position, (points > 0 ? "+" : "") + points + "점"));
         }
 
         /// <summary>Fallen-out objects leave without score; only the Z=-15 boundary awards points.</summary>
@@ -256,7 +296,7 @@ namespace RestoreCastle3D
             }
             else if (_edgeText.gameObject.activeSelf) _edgeText.gameObject.SetActive(false);
 
-            UpdateHover();
+            if (!UseRecyclingRules) UpdateHover();
         }
 
         private void UpdateHover()

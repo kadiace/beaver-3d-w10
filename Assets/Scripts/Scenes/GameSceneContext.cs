@@ -21,6 +21,7 @@ public class GameSceneContext : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         RestoreCastle3D.CastleGame3D game = gameObject.AddComponent<RestoreCastle3D.CastleGame3D>();
+        game.UseRecyclingSpawns = true;
         game.RotationSpeed = _rotationSpeed;
         game.PlacementCenterOffset = _placementCenterOffset;
         game.PlacementRadius = _placementRadius;
