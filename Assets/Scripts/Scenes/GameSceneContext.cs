@@ -24,6 +24,7 @@ public class GameSceneContext : MonoBehaviour
         game.RotationSpeed = _rotationSpeed;
         game.PlacementCenterOffset = _placementCenterOffset;
         game.PlacementRadius = _placementRadius;
+        gameObject.AddComponent<BeaverRecycling.PlayableBeaverScene3D>();
         Debug.Log("[GameSceneContext] Game scene initialized.");
     }
 

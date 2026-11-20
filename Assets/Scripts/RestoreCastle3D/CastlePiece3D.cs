@@ -62,6 +62,39 @@ namespace RestoreCastle3D
         public bool CanPickUp => !_thrown && !_body.isKinematic && _attachedPieces.Count == 0;
         public bool WasThrown => _thrown;
         public bool IsSettling => _settling;
+        public bool IsFloatingOnRiver =>
+            _waterSurface != null && !_held && !_settling && _body != null &&
+            !_body.isKinematic && gameObject.activeInHierarchy;
+
+        /// <summary>
+        /// AABB footprint and motion data for localized foam. Do not render
+        /// wakes for objects outside the river, or use collider allocations.
+        /// </summary>
+        public bool TryGetRiverWake(out Vector4 footprint, out Vector4 motion)
+        {
+            footprint = default;
+            motion = default;
+            if (!IsFloatingOnRiver || _buoyancyColliders == null) return false;
+
+            bool found = false;
+            Bounds bounds = default;
+            foreach (Collider collider in _buoyancyColliders)
+            {
+                if (collider == null || !collider.enabled || collider.isTrigger) continue;
+                if (!found) { bounds = collider.bounds; found = true; }
+                else bounds.Encapsulate(collider.bounds);
+            }
+            if (!found) return false;
+
+            footprint = new Vector4(bounds.center.x, bounds.center.z,
+                Mathf.Clamp(bounds.extents.x, 0.30f, 3f),
+                Mathf.Clamp(bounds.extents.z, 0.30f, 3f));
+            float slipSpeed = Mathf.Abs(_body.linearVelocity.z + _waterSurface.FlowSpeed);
+            motion = new Vector4(Mathf.Min(4f, slipSpeed),
+                Mathf.Repeat(Mathf.Abs(GetInstanceID()) * 0.618034f, 19f),
+                _waterSurface.FlowSpeed, 0f);
+            return true;
+        }
         public void MarkSettling() { _settling = true; _removalScheduled = true; }
         public void BlockReattachment(float seconds) =>
             _attachBlockedUntil = Mathf.Max(_attachBlockedUntil, Time.time + seconds);
@@ -150,6 +183,17 @@ namespace RestoreCastle3D
             _body.angularVelocity = Vector3.zero;
         }
 
+        /// <summary>비버가 내려놓은 기물을 물리 시뮬레이션과 자동 낙하 흐름으로 되돌려 다시 집을 수 있게 한다.</summary>
+        public void ReleaseFromBeaver(Vector3 releaseVelocity)
+        {
+            _held = false;
+            _continuousDrop = true;
+            _body.isKinematic = false;
+            _body.useGravity = true;
+            _body.linearVelocity = releaseVelocity;
+            _body.angularVelocity = Vector3.zero;
+        }
+
         private void Update()
         {
             if (_settling) return;
@@ -208,6 +252,7 @@ namespace RestoreCastle3D
 
         private void OnDisable()
         {
+            RiverWaterSurface3D.ForgetPiece(this);
             StopAllCoroutines();
             RemoveSpringAttachment();
             foreach (CastlePiece3D other in new List<CastlePiece3D>(_attachedPieces))
@@ -348,6 +393,7 @@ namespace RestoreCastle3D
 
         private void OnDestroy()
         {
+            RiverWaterSurface3D.ForgetPiece(this);
             foreach (CastlePiece3D other in _attachedPieces)
                 if (other != null) other._attachedPieces.Remove(this);
             _attachedPieces.Clear();
