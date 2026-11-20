@@ -178,8 +178,9 @@ namespace BeaverRecycling
             Vector3 position = _beaver.transform.position;
             bool inRiver = TryGetRiverSurfaceY(position, out float waterSurfaceY,
                 out Bounds riverBounds);
+            float bankSurfaceY = 0f;
             bool climbingBank = inRiver &&
-                TryGetBankContactHeight(position, riverBounds, out float bankSurfaceY);
+                TryGetBankContactHeight(position, riverBounds, out bankSurfaceY);
             bool swimming = inRiver && !climbingBank;
 
             if (climbingBank)
